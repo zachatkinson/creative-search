@@ -1,0 +1,13 @@
+/vendor/
+/node_modules/
+/tmp/
+/build/
+/*.zip
+/test-results/
+/playwright-report/
+/.phpunit.result.cache
+/.phpunit.cache/
+/.wp-env.override.json
+/.idea/
+.DS_Store
+/coverage/
