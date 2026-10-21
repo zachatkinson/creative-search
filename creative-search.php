@@ -4,8 +4,8 @@
  * Plugin URI:        https://creativebranding.ca
  * Description:       Search for WooCommerce: live suggestions as the shopper types, typo tolerance, SKU and attribute matching, an index of its own, search analytics and an accessible search bar.
  * Version:           0.1.0
- * Requires at least: 6.8
- * Requires PHP:      8.2
+ * Requires at least: 7.0
+ * Requires PHP:      8.5
  * Requires Plugins:  woocommerce
  * Author:            Creative Branding
  * Author URI:        https://zachatkinson.com

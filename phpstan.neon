@@ -1,6 +1,6 @@
 parameters:
     level: 9
-    phpVersion: 80200
+    phpVersion: 80500
     tmpDir: tmp/cache/phpstan
     paths:
         - src

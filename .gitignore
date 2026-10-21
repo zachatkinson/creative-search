@@ -30,5 +30,5 @@
 .DS_Store
 Thumbs.db
 
-# PHPUnit 9.6 phar for the WordPress suite (tools/integration.sh fetches it)
-/tools/bin/
+# PHPUnit 9.6 and the polyfills for the WordPress suite (tools/integration.sh installs them; the lock is committed)
+/tools/integration/vendor/

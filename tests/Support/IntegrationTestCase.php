@@ -35,6 +35,12 @@ abstract class IntegrationTestCase extends WP_UnitTestCase {
 		foreach ( Tables::all() as $table ) {
 			$wpdb->query( 'TRUNCATE TABLE ' . Tables::name( $table ) ); // phpcs:ignore
 		}
+		// WooCommerce's Action Scheduler tables are not among the core tables the suite reinstalls, so a cancelled
+		// action a test leaves behind would survive into the next run. Clear the plugin's group here, outside the
+		// transaction, so every test starts with an empty queue.
+		if ( isset( $wpdb->actionscheduler_actions, $wpdb->actionscheduler_groups ) ) {
+			$wpdb->query( $wpdb->prepare( 'DELETE a FROM %i a INNER JOIN %i g ON g.group_id = a.group_id WHERE g.slug = %s', $wpdb->actionscheduler_actions, $wpdb->actionscheduler_groups, Options::QUEUE_GROUP ) ); // phpcs:ignore
+		}
 		parent::set_up();
 		wp_cache_flush();
 		Settings::flush();

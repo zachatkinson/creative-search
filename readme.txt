@@ -1,9 +1,9 @@
 === Creative Search ===
 Contributors: creativebranding, zachatkinson
 Tags: woocommerce, search, ajax search, product search, autocomplete
-Requires at least: 6.8
+Requires at least: 7.0
 Tested up to: 7.1
-Requires PHP: 8.2
+Requires PHP: 8.5
 Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html

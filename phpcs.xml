@@ -38,7 +38,7 @@
 	</rule>
 
 	<config name="minimum_supported_wp_version" value="6.8"/>
-	<config name="testVersion" value="8.2-"/>
+	<config name="testVersion" value="8.5-"/>
 	<rule ref="PHPCompatibilityWP"/>
 
 	<rule ref="WordPress.WP.I18n">

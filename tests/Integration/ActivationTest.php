@@ -42,7 +42,7 @@ final class ActivationTest extends IntegrationTestCase {
 		Activator::activate();
 		self::assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $wpdb->prefix . 'csearch_documents' ) ), 'the first build is the owner\'s' );
 		if ( function_exists( 'as_get_scheduled_actions' ) ) {
-			self::assertSame( array(), as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'per_page' => 5 ), 'ids' ) );
+			self::assertSame( array(), as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ), 'ids' ), 'activation queued work' );
 		}
 	}
 
@@ -60,8 +60,8 @@ final class ActivationTest extends IntegrationTestCase {
 		self::assertSame( 'Creative Search', $data['Name'] );
 		self::assertSame( 'creative-search', $data['TextDomain'] );
 		self::assertSame( '/languages', $data['DomainPath'] );
-		self::assertSame( '6.8', $data['RequiresWP'] );
-		self::assertSame( '8.2', $data['RequiresPHP'] );
+		self::assertSame( '7.0', $data['RequiresWP'] );
+		self::assertSame( '8.5', $data['RequiresPHP'] );
 		self::assertSame( 'woocommerce', $data['RequiresPlugins'] );
 		self::assertSame( CSEARCH_VERSION, $data['Version'] );
 	}

@@ -9,7 +9,7 @@ Search for WooCommerce: live suggestions as the shopper types, typo tolerance, S
 - Benchmarks: [docs/BENCHMARK.md](docs/BENCHMARK.md) · Queries: [docs/QUERIES.md](docs/QUERIES.md)
 - Milestone reviews: [docs/reviews/](docs/reviews/)
 
-Requires WordPress 6.8+, WooCommerce 10.0+, PHP 8.2+, MySQL 8.0 or MariaDB 10.6+. GPL-2.0-or-later.
+Requires WordPress 7.0+, WooCommerce 10.0+, PHP 8.5+, MySQL 8.0 or MariaDB 10.6+. GPL-2.0-or-later.
 
 ## Developing
 

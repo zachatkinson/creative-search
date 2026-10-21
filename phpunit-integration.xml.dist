@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- PHPUnit 9.6: the newest version the WordPress core test suite supports (docs/DECISIONS.md D-021). -->
+<!-- PHPUnit 9.6 from tools/integration/: the newest version the WordPress core test suite supports (docs/DECISIONS.md D-021). -->
 <phpunit
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
@@ -14,6 +14,6 @@
 		</testsuite>
 	</testsuites>
 	<php>
-		<const name="WP_TESTS_PHPUNIT_POLYFILLS_PATH" value="vendor/yoast/phpunit-polyfills"/>
+		<const name="WP_TESTS_PHPUNIT_POLYFILLS_PATH" value="tools/integration/vendor/yoast/phpunit-polyfills"/>
 	</php>
 </phpunit>
