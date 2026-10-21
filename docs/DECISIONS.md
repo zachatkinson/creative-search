@@ -30,17 +30,24 @@ Off by default. The block setting `recent_searches` defaults to `no`.
 
 **Why:** the spec's "The front end" and "Analytics and privacy" sections both say "off by default for privacy"; the question only asked whether to override that.
 
-### D-005 · FiboSearch benchmark licence · 2026-10-21 · **OPEN**
+### D-005 · FiboSearch benchmark licence · 2026-10-21 · **Decided: no purchase**
 
-Not decided. The benchmark day is in milestone 8, so nothing in milestones 1 to 7 depends on it. Recommendation when the time comes: buy one Pro Personal licence ($59) for the afternoon, because the comparison table is built against Pro, and a benchmark against the free version would not test typo tolerance, synonyms or the own index.
+Zach declined to buy FiboSearch Pro. Milestone 8's benchmark is built from two public sources instead:
+
+1. **Documented behaviour.** FiboSearch publishes the Pro feature list (fibosearch.com/pricing and the "Should I go Pro?" article), the fuzzy-search algorithm in full (prefix of 2 letters, up to 50/200/400 candidate expansions, Levenshtein distance 1/2/3 for soft/normal/hard), the synonyms format (comma-separated groups, one per line, phrases allowed, the index rebuilt on save, matches via a synonym not highlighted), the analytics feature set (critical phrases after three no-result searches, 30-day retention, CSV export, dashboard widget, a filter to exclude phrases and IPs), the index design (three tables: index, inverted-index wordlist, doclist; SHORTINIT request path; "products found in less than 0.2 second"; 5 to 10 % database growth, about 10 MB per 1,000 products) and their own reliability figure (1.5 % of Pro indexes fail to build, down from 5 to 8 % in 2020, per the FiboSearch 2.0 post of 27 April 2026). These become a feature-by-feature matrix in `docs/BENCHMARK.md` with the source and date for each row, and the fuzzy rules become golden-query expectations our engine must at least match.
+2. **Measured behaviour against the free version.** FiboSearch free is installed on the copy of Skatehouse for the afternoon: the same 50 queries, timing, ranking and suggestions. The free engine is WooCommerce's own `WP_Query` search, so this is a floor, not a peer; the write-up says so.
+
+What this cannot give: Pro's actual suggestion content, ranking and timing on our catalogue. FiboSearch offers no trial or public Pro demo (pricing FAQ: "We don't offer a demo version of FiboSearch Pro for trial"; refund within 30 days only). The spec's "better" claims against Pro are therefore made against its documentation, and the benchmark says which rows are documented and which are measured.
+
+**Why:** Zach's call. The documentation is unusually specific about how Pro works, which covers most of what a licence would have shown; the one thing lost is a side-by-side on the same catalogue.
 
 ## Milestone 1: Foundation
 
 ### D-010 · Tooling versions · 2026-10-21
 
-PHP floor 8.2 (`composer.json` platform pinned to 8.2.99 so dependencies stay installable on the floor), PHPUnit 11 (the spec's version; 13 exists but the WordPress test suite and the polyfills are known good on 11), Infection 0.35, PHPStan 2.3 at **level 9** as the gate table says (PHPStan 2 has a level 10; the spec wrote "level 9 (max)" when 9 was the maximum; moving to 10 is a one-line change to try once the domain exists), PHPCS with WordPress-Extra, WordPress-Docs, WordPress-VIP-Go (`automattic/vipwpcs`) and PHPCompatibilityWP, `@wordpress/scripts` 37 for the JavaScript and CSS standards, `@wordpress/env` 12, Playwright 1.64 with `@axe-core/playwright`.
+PHP floor 8.2 (`composer.json` platform pinned to 8.2.99 so dependencies stay installable on the floor), PHPUnit 11 (the spec's version; 13 exists but the WordPress test suite and the polyfills are known good on 11), Infection 0.32 (0.33 and later require PHP 8.3, above the spec's 8.2 floor), PHPStan 2.3 at **level 9** as the gate table says (PHPStan 2 has a level 10; the spec wrote "level 9 (max)" when 9 was the maximum; moving to 10 is a one-line change to try once the domain exists), PHPCS with WordPress-Extra, WordPress-Docs, WordPress-VIP-Go (`automattic/vipwpcs`) and PHPCompatibilityWP, `@wordpress/scripts` 37 for the JavaScript and CSS standards, `@wordpress/env` 12, Playwright 1.64 with `@axe-core/playwright`.
 
-**Why:** the newest release of each that satisfies the spec's named version.
+**Why:** the newest release of each that satisfies the spec's named version and the PHP 8.2 floor. Everything in `composer.json` and `package.json` is the current release as of 21 October 2026 (`composer outdated --direct` and `npm outdated` report nothing newer); the only deliberately older choices are Infection 0.32 (PHP floor) and the PHPUnit 9.6 phar for integration tests (D-021). The wp-env zips (WordPress 7.1.3, WooCommerce 11.2.1, Plugin Check 2.1.0) are exact pins so a run is reproducible, bumped by hand when a release lands; they were the current releases on that date.
 
 ### D-011 · wp-env pins and the compatibility matrix · 2026-10-21
 
@@ -107,3 +114,9 @@ With `src/Domain` empty, `infection.json5` covers `src/Settings` and `src/Contai
 The unit suite runs on PHPUnit 11 through Composer, as the spec says. The integration suite runs on PHPUnit 9.6 (a pinned, checksummed phar fetched by `tools/integration.sh` into the gitignored `tools/bin/`), because the WordPress core test suite that wp-env ships, for WordPress 7.1 as for 6.8, still calls `PHPUnit\Util\Test::parseTestMethodAnnotations()`, which PHPUnit 10 removed. Composer cannot install two versions of one package. Integration tests therefore use `set_up()`/`tear_down()` and no PHPUnit 10+ attributes.
 
 **Why:** the first integration run under PHPUnit 11 failed every test with that undefined method; the WordPress suite's PHPUnit ceiling is core's to lift, not ours.
+
+### D-022 · Firefox under Playwright on macOS 27 · 2026-10-21
+
+macOS 27 puts `~/Library/Application Support/Firefox` behind a permission prompt. Playwright's Firefox build still resolves that directory for `profiles.ini` bookkeeping even when launched with its own `-profile`, so a launch from a terminal without Full Disk Access exits with "Could not find profile folder" (microsoft/playwright#42768, open; Chromium and WebKit are unaffected because Playwright hands them a complete user-data directory). `playwright.config.ts` sets `CFFIXED_USER_HOME` to a fresh temporary directory for the Firefox project on macOS only, which is the workaround confirmed in that issue; Firefox then launches and the two smoke tests pass locally. Linux CI and Windows get the default launch. Remove the branch when Playwright ships a build that owns its app-data directory.
+
+**Why:** the browser gate names three engines; "run it in CI" was the only alternative and left the Firefox column unverified before each push.

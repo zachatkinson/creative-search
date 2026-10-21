@@ -343,7 +343,7 @@ For Zach, before milestone 1:
 - [ ] Licence and sale: GPL-2.0-or-later like the rest (it must be, for WordPress.org); sold as a product with support, or kept to the agency's shops for 1.0?
 - [ ] Posts and pages in 1.0 or 1.1? The spec says 1.1; the index is ready for it either way.
 - [ ] Recent searches in the block: off by default (privacy) or on (convenience)?
-- [ ] The FiboSearch benchmark: one Pro Personal licence ($59) for a day on a copy of the shop, or benchmark against the free version only?
+- [x] The FiboSearch benchmark: one Pro Personal licence ($59) for a day on a copy of the shop, or benchmark against the free version only? **Decided 21 October 2026: no licence. Documented behaviour from FiboSearch's public pages plus a measured run against the free version (D-005).**
 
 For the owner, before milestone 7:
 

@@ -1,6 +1,6 @@
 # Benchmarks
 
-The spec's budgets are tests: a build fails when one is missed. The numbers from each tag are appended here. The FiboSearch Pro comparison (50 queries, timing, ranking, suggestions) is added in milestone 8.
+The spec's budgets are tests: a build fails when one is missed. The numbers from each tag are appended here. The FiboSearch comparison is added in milestone 8 in two parts (D-005): a documented-behaviour matrix built from FiboSearch's public feature pages, documentation and changelog (fuzzy rules, synonyms, analytics, index design, reliability figures, each row with its source and date), and a measured run of the same 50 queries, their timing, ranking and suggestions against FiboSearch **free** on a copy of Skatehouse. No Pro licence is bought and there is no public Pro demo, so Pro's own suggestions and timings on our catalogue are not measured; every row says whether it is documented or measured.
 
 ## Budgets (spec: Performance)
 
