@@ -1,0 +1,30 @@
+{
+	"name": "creative-search",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Search for WooCommerce: live suggestions, typo tolerance, an index of its own, analytics, an accessible search bar.",
+	"author": "Zach Atkinson",
+	"license": "GPL-2.0-or-later",
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"env:start": "wp-env start",
+		"env:stop": "wp-env stop",
+		"env:clean": "wp-env clean all",
+		"env:oldest": "bash tools/wp-env-oldest.sh",
+		"lint:js": "wp-scripts lint-js --no-error-on-unmatched-pattern tests/e2e",
+		"lint:css": "wp-scripts lint-style --allow-empty-input 'assets/**/*.{css,scss}'",
+		"format:check": "wp-scripts format --check tests/e2e playwright.config.ts eslint.config.js .prettierrc.js",
+		"format": "wp-scripts format tests/e2e playwright.config.ts eslint.config.js .prettierrc.js",
+		"test:e2e": "playwright test",
+		"plugin-check": "wp-env run cli wp plugin check creative-search --exclude-directories=tests,tools,node_modules,vendor,tmp,docs,test-results,playwright-report,.claude,.github --exclude-files=.wp-env.json,.wp-env.override.json,.gitignore,.distignore,.editorconfig,.nvmrc,CLAUDE.md,composer.json,composer.lock,package.json,package-lock.json,phpcs.xml,phpstan.neon,phpunit.xml.dist,phpunit-integration.xml.dist,infection.json5,playwright.config.ts,eslint.config.js,.stylelintrc.json,.prettierrc.js",
+		"check": "npm run lint:js && npm run lint:css && npm run format:check"
+	},
+	"devDependencies": {
+		"@axe-core/playwright": "^4.14.0",
+		"@playwright/test": "^1.64.1",
+		"@wordpress/env": "^12.0.0",
+		"@wordpress/scripts": "^37.0.0"
+	}
+}

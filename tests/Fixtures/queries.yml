@@ -1,0 +1,240 @@
+# The golden query set: 50 queries, each with the result the index must put first and the suggestions it must
+# offer, against the catalogue tests/Fixtures/Catalogue.php generates (any size: the first 24 products are the
+# hand-written heroes these anchor on). Checked on every build; changing an expectation needs a reason in the
+# commit. Milestone 1 checks the file's shape and that every SKU and term exists; milestone 2 scores it in
+# memory; milestone 4 runs it through /suggest and /search.
+#
+# Fields: q, lang (en|fr, default en), kind (see GoldenQueries::KINDS), why, expect:
+#   top        the SKU (or "term:Name") that must rank first; omit when zero
+#   products   SKUs that must be among the product suggestions (default limit 6)
+#   absent     SKUs that must not appear
+#   terms      category, tag or brand names that must appear among the term suggestions
+#   corrected  the query after a dropped token, when one must be dropped
+#   zero       true when the query must return nothing
+#   hidden_only true when the top is a hidden product reachable only by exact SKU with hidden_by_sku on
+
+synonyms:
+  - { lang: en, word: board, means: deck, both_ways: false }
+  - { lang: en, word: tee, means: t-shirt, both_ways: false }
+  - { lang: en, word: hoody, means: hoodie, both_ways: false }
+  - { lang: fr, word: skate, means: planche, both_ways: false }
+
+queries:
+  # Exact names and phrases
+  - q: "kazumi skate deck dealer"
+    kind: exact
+    why: the whole query equals the name after folding (+12)
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [KAZUMI, Decks] }
+  - q: "kazumi dealer"
+    kind: phrase
+    why: brand and series in the name; the hidden Dealer Blank never appears without its SKU
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], absent: [KAZ-DBA-00021] }
+  - q: "philly's rascals"
+    kind: apostrophe
+    why: the apostrophe folds (phillys) and philly is a second token, so both spellings match
+    expect: { top: PHL-RAS-00002, products: [PHL-RAS-00002], terms: ["Philly's"] }
+  - q: "phillys horror party"
+    kind: phrase
+    why: adjacent in-order tokens in the name earn the phrase bonus (+8)
+    expect: { top: PHL-HPR-00003, products: [PHL-HPR-00003] }
+  - q: "\"horror party\""
+    kind: phrase
+    why: a quoted phrase is kept as a phrase; only the one deck has it
+    expect: { top: PHL-HPR-00003, products: [PHL-HPR-00003] }
+  - q: "night shift deck"
+    kind: stock
+    why: sold out still appears; it is the only Night Shift deck so it is first even at -6
+    expect: { top: PHL-NSG-00004, products: [PHL-NSG-00004] }
+  - q: "kazumi deck"
+    kind: stock
+    why: in-stock Dealer above the sold-out Ghost Tiger; both appear
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001, KAZ-GTO-00022], absent: [KAZ-DBA-00021], terms: [KAZUMI, Decks] }
+  - q: "ghost tiger"
+    kind: stock
+    why: a sold-out product is found and shown, below nothing because nothing else matches both words
+    expect: { top: KAZ-GTO-00022, products: [KAZ-GTO-00022] }
+  - q: "static bloom"
+    kind: phrase
+    why: series words appear in the name and short description; name wins (10 over 2)
+    expect: { top: RSC-SBA-00005, products: [RSC-SBA-00005] }
+  - q: "skatehouse starter complete"
+    kind: exact
+    why: the complete, not the shop-logo tee or hoodie
+    expect: { top: SKH-SCA-00020, products: [SKH-SCA-00020], absent: [SKH-SLO-00011, SKH-SLO-00012] }
+
+  # Prefixes (the unfinished last token)
+  - q: "kaz"
+    kind: prefix
+    why: a prefix finds KAZUMI's products and the brand itself
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [KAZUMI] }
+  - q: "phil"
+    kind: prefix
+    why: philly and phillys both start with phil
+    expect: { top: PHL-RAS-00002, products: [PHL-RAS-00002, PHL-HPR-00003], terms: ["Philly's"] }
+  - q: "kazumi dea"
+    kind: prefix
+    why: brand exact plus a prefix on the series
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], absent: [KAZ-DBA-00021] }
+  - q: "orbit cru"
+    kind: prefix
+    why: cruiser wheels, not classic
+    expect: { top: ORB-CRU-00008, products: [ORB-CRU-00008], absent: [ORB-CLA-00007] }
+  - q: "hoo"
+    kind: prefix
+    why: hoodie and hoodies, plus the Hoodies category
+    expect: { top: SKH-SLO-00012, products: [SKH-SLO-00012], terms: [Hoodies] }
+
+  # Typos (trigram candidates, Damerau–Levenshtein 1 for 4 to 7 characters, 2 for 8 or more)
+  - q: "kazumy"
+    kind: typo
+    why: one substitution at six characters
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [KAZUMI] }
+  - q: "dekc"
+    kind: typo
+    why: a transposition counts as one edit
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [Decks] }
+  - q: "horor party"
+    kind: typo
+    why: a deletion in horror
+    expect: { top: PHL-HPR-00003, products: [PHL-HPR-00003] }
+  - q: "bearrings"
+    kind: typo
+    why: an insertion at nine characters allows two edits
+    expect: { top: KEL-SEV-00010, products: [KEL-SEV-00010, KEL-SWI-00009], terms: [Bearings] }
+  - q: "griptape perforrated"
+    kind: typo
+    why: typo on a long word with an exact first token
+    expect: { top: MNL-PER-00016, products: [MNL-PER-00016] }
+  - q: "dck"
+    kind: typo
+    why: three characters are never fuzzed and dck is no prefix of anything, so nothing is found
+    expect: { zero: true }
+
+  # Numbers, sizes and SKUs are never fuzzed
+  - q: "8.25"
+    kind: number
+    why: a width as one token; 8.5 must not match
+    expect: { products: [KAZ-DEA-00001, PHL-RAS-00002, PHL-HPR-00003], absent: [RSC-SBA-00005] }
+  - q: "kazumi 8.25"
+    kind: attribute
+    why: brand plus a variation attribute folded into the parent
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001, KAZ-GTO-00022] }
+  - q: "rascals 8.125"
+    kind: number
+    why: 8.125 finds the Static Bloom deck and not 8.25 decks
+    expect: { top: RSC-SBA-00005, products: [RSC-SBA-00005], absent: [PHL-RAS-00002] }
+  - q: "54mm"
+    kind: attribute
+    why: a diameter with its unit stays one token
+    expect: { top: ORB-CLA-00007, products: [ORB-CLA-00007], absent: [ORB-CRU-00008, ORB-CLA-00024] }
+  - q: "wheels 101a"
+    kind: attribute
+    why: durometer distinguishes the two Classic listings
+    expect: { top: ORB-CLA-00024, products: [ORB-CLA-00024], absent: [ORB-CLA-00007] }
+  - q: "trucks 149"
+    kind: attribute
+    why: a truck size
+    expect: { top: FER-HFL-00006, products: [FER-HFL-00006] }
+  - q: "KAZ-DEA-00001"
+    kind: sku
+    why: an exact SKU match earns +6 and is never fuzzed
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001] }
+  - q: "kaz-dea-00001-825"
+    kind: variation-sku
+    why: a variation SKU finds its parent, once
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001] }
+  - q: "KAZ-DEA-00002"
+    kind: sku
+    why: a SKU-shaped token is never fuzzed, so a wrong digit finds nothing
+    expect: { zero: true }
+  - q: "KAZ-DBA-00021"
+    kind: hidden
+    why: a hidden product appears for its exact SKU only when the setting allows
+    expect: { top: KAZ-DBA-00021, products: [KAZ-DBA-00021], hidden_only: true }
+
+  # Stems, synonyms, stop words, accents
+  - q: "decks"
+    kind: category
+    why: decks stems to deck; the category also matches
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [Decks] }
+  - q: "bearing"
+    kind: stem
+    why: bearing matches bearings through the stem
+    expect: { top: KEL-SEV-00010, products: [KEL-SEV-00010, KEL-SWI-00009], terms: [Bearings] }
+  - q: "kazumi board"
+    kind: synonym
+    why: board means deck (one way); the typed word is kept as an alternative, never replaced
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001, KAZ-GTO-00022] }
+  - q: "skatehouse tee"
+    kind: synonym
+    why: tee means t-shirt
+    expect: { top: SKH-SLO-00011, products: [SKH-SLO-00011], absent: [SKH-SLO-00012] }
+  - q: "the deck"
+    kind: stopword
+    why: the stop word drops; deck searches
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [Decks] }
+  - q: "the"
+    kind: stopword
+    why: when every token is a stop word the query is kept, so "the" still searches (and finds the descriptions)
+    expect: { products: [KAZ-DEA-00001] }
+  - q: "quebecois"
+    kind: brand
+    why: accents fold both ways; the brand and the French descriptions match
+    expect: { top: QBC-FLE-00013, products: [QBC-FLE-00013], terms: [Québécois] }
+  - q: "québécois"
+    kind: accent
+    why: typed with accents, the same answer
+    expect: { top: QBC-FLE-00013, products: [QBC-FLE-00013], terms: [Québécois] }
+  - q: "montreal"
+    kind: tag
+    why: the tag montréal, folded
+    expect: { top: QBC-FLE-00013, products: [QBC-FLE-00013] }
+
+  # Minus words and dropped tokens
+  - q: "kazumi -dealer"
+    kind: minus
+    why: a minus word excludes; Ghost Tiger and the tee remain
+    expect: { top: KAZ-GTO-00022, products: [KAZ-GTO-00022, KAZ-SLO-00023], absent: [KAZ-DEA-00001] }
+  - q: "orbit wheels -cruiser"
+    kind: minus
+    why: both Classic listings, not the Cruiser
+    expect: { top: ORB-CLA-00007, products: [ORB-CLA-00007, ORB-CLA-00024], absent: [ORB-CRU-00008] }
+  - q: "kazumi dealer snowboard"
+    kind: drop-token
+    why: AND finds nothing; the least-matched token is dropped once and the suggestions say so
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], corrected: "kazumi dealer" }
+  - q: "snowboard"
+    kind: zero
+    why: nothing in the catalogue; the Analytics screen's first list
+    expect: { zero: true }
+  - q: "dealer skate deck kazumi maple popsicle canada ships across quebec extra words beyond eight"
+    kind: cap
+    why: queries are capped at 8 tokens; the rest is ignored, never an error
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001] }
+
+  # French
+  - q: "planche kazumi"
+    lang: fr
+    kind: french
+    why: the French document's name is "Planche KAZUMI, Dealer"
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [KAZUMI, Planches] }
+  - q: "roues 54mm"
+    lang: fr
+    kind: french
+    why: French name plus a unit
+    expect: { top: ORB-CLA-00007, products: [ORB-CLA-00007], terms: [Roues] }
+  - q: "roulement"
+    lang: fr
+    kind: french
+    why: the French stemmer takes roulements to roulement
+    expect: { top: KEL-SEV-00010, products: [KEL-SEV-00010, KEL-SWI-00009], terms: [Roulements] }
+  - q: "chandail capuchon"
+    lang: fr
+    kind: french
+    why: à is a French stop word; the two content words find the hoodies
+    expect: { top: SKH-SLO-00012, products: [SKH-SLO-00012], terms: ["Chandails à capuchon"] }
+  - q: "ghost tiger"
+    lang: fr
+    kind: fallback
+    why: a brand or series name is the same in both languages; the French documents carry the series word too
+    expect: { top: KAZ-GTO-00022, products: [KAZ-GTO-00022] }

@@ -1,0 +1,18 @@
+parameters:
+    level: 9
+    phpVersion: 80200
+    tmpDir: tmp/cache/phpstan
+    paths:
+        - src
+        - creative-search.php
+        - uninstall.php
+    excludePaths:
+        - vendor
+        - tests
+    bootstrapFiles:
+        - tools/phpstan-bootstrap.php
+    scanFiles:
+        - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+        - vendor/php-stubs/woocommerce-stubs/woocommerce-packages-stubs.php
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true

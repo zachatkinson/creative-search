@@ -1,13 +1,34 @@
+# Dependencies (composer.lock and package-lock.json are committed; the installs are not)
 /vendor/
 /node_modules/
-/tmp/
+
+# Build output and release zips (tools/build-zip.sh writes to tmp/; @wordpress/scripts to build/)
 /build/
+/tmp/
 /*.zip
+
+# Test and tool output
 /test-results/
 /playwright-report/
-/.phpunit.result.cache
-/.phpunit.cache/
-/.wp-env.override.json
-/.idea/
-.DS_Store
+/blob-report/
+/playwright/.cache/
 /coverage/
+/.phpunit.cache/
+/.phpunit.result.cache
+/infection.log
+/.eslintcache
+*.log
+
+# Local environment
+/.wp-env.override.json
+/.env
+/.env.*
+
+# Editors and OS
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+
+# PHPUnit 9.6 phar for the WordPress suite (tools/integration.sh fetches it)
+/tools/bin/

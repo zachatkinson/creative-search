@@ -1,0 +1,33 @@
+{
+	// Milestone 1: the classes the unit suite covers. src/Domain gets its own 100 % run in milestone 2 (docs/DECISIONS.md D-019).
+	"$schema": "vendor/infection/infection/resources/schema.json",
+	"source": {
+		"directories": [
+			"src/Settings",
+			"src"
+		],
+		"excludes": [
+			"Install",
+			"Support",
+			"Plugin.php",
+			"Hookable.php"
+		]
+	},
+	"bootstrap": "tests/bootstrap.php",
+	"timeout": 20,
+	"logs": {
+		"text": "tmp/infection.log",
+		"summary": "tmp/infection-summary.log",
+		"json": "tmp/infection.json"
+	},
+	"phpUnit": {
+		"configDir": "."
+	},
+	"testFramework": "phpunit",
+	"testFrameworkOptions": "--testsuite=unit --exclude-group=benchmark",
+	"mutators": {
+		"@default": true
+	},
+	"minMsi": 90,
+	"minCoveredMsi": 90
+}

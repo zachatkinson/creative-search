@@ -1,0 +1,72 @@
+{
+	"name": "creativebranding/creative-search",
+	"description": "Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, an index of its own, analytics, an accessible search bar.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"homepage": "https://creativebranding.ca",
+	"authors": [
+		{
+			"name": "Zach Atkinson",
+			"homepage": "https://zachatkinson.com"
+		}
+	],
+	"require": {
+		"php": ">=8.2"
+	},
+	"require-dev": {
+		"automattic/vipwpcs": "^3.1",
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.2",
+		"infection/infection": "^0.32",
+		"php-stubs/woocommerce-stubs": "^11.2",
+		"php-stubs/wordpress-stubs": "^7.1",
+		"phpcompatibility/phpcompatibility-wp": "^2.1",
+		"phpstan/extension-installer": "^1.4",
+		"phpstan/phpstan": "^2.3",
+		"phpunit/phpunit": "^11.5",
+		"symfony/yaml": "^7.3",
+		"szepeviktor/phpstan-wordpress": "^2.0",
+		"wp-coding-standards/wpcs": "^3.4",
+		"wp-phpunit/wp-phpunit": "^7.1",
+		"yoast/phpunit-polyfills": "^4.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"CreativeBranding\\Search\\": "src/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"CreativeBranding\\Search\\Tests\\": "tests/"
+		}
+	},
+	"scripts": {
+		"lint": "phpcs",
+		"lint:fix": "phpcbf",
+		"analyse": "phpstan analyse --memory-limit=2G",
+		"gates": "bash tools/gates.sh",
+		"test:unit": "phpunit -c phpunit.xml.dist --testsuite unit --exclude-group benchmark",
+		"test:coverage": "phpunit -c phpunit.xml.dist --testsuite unit --exclude-group benchmark --coverage-text --coverage-clover tmp/coverage.xml",
+		"test:benchmark": "phpunit -c phpunit.xml.dist --testsuite unit --group benchmark",
+		"test:integration": "bash tools/integration.sh",
+		"infection": "@php vendor/bin/infection --threads=max --configuration=infection.json5",
+		"build": "bash tools/build-zip.sh",
+		"i18n:pot": "npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- wp i18n make-pot . languages/creative-search.pot --domain=creative-search --exclude=node_modules,vendor,tests,tools,tmp,docs",
+		"check": [
+			"@lint",
+			"@analyse",
+			"@gates",
+			"@test:unit"
+		]
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true,
+			"phpstan/extension-installer": true,
+			"infection/extension-installer": true
+		},
+		"sort-packages": true,
+		"platform": {
+			"php": "8.2.99"
+		}
+	}
+}

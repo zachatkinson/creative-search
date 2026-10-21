@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  static:
+    name: Lint, analyse, gates, unit tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: pcov
+          tools: composer:v2
+      - uses: ramsey/composer-install@v3
+      - run: composer lint
+      - run: composer analyse
+      - run: composer gates
+      - run: composer test:coverage
+      - name: Coverage floors (100 % of src/Domain, 90 % overall)
+        run: php tools/coverage-floor.php tmp/coverage.xml
+
+  js:
+    name: JavaScript and CSS standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  mutation:
+    name: Mutation testing (Infection)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: pcov
+          tools: composer:v2
+      - uses: ramsey/composer-install@v3
+      - run: composer infection
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: infection-logs
+          path: tmp/infection*.log
+
+  benchmarks:
+    name: Benchmarks (the budgets are tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+      - uses: ramsey/composer-install@v3
+      - run: composer test:benchmark
+
+  integration:
+    name: Integration, Plugin Check, browser (${{ matrix.leg }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: ['newest', 'oldest']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+      - uses: ramsey/composer-install@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Pin the oldest supported WordPress, WooCommerce and PHP
+        if: matrix.leg == 'oldest'
+        run: npm run env:oldest
+      - run: npx wp-env start
+      - run: composer test:integration
+      - run: npm run plugin-check
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-${{ matrix.leg }}
+          path: test-results

@@ -1,0 +1,12 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(composer *)",
+			"Bash(npx wp-env *)",
+			"Bash(npx playwright *)",
+			"Bash(php vendor/bin/*)",
+			"Bash(php tools/*)",
+			"Bash(npm run *)"
+		]
+	}
+}
