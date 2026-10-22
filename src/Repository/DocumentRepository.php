@@ -147,6 +147,17 @@ final class DocumentRepository extends Repository {
 	}
 
 	/**
+	 * When a product was last written to a generation, or null when it is not in it.
+	 *
+	 * @param int $productId  Product id.
+	 * @param int $generation Generation.
+	 */
+	public function indexedAt( int $productId, int $generation ): ?string {
+		$at = $this->value( $this->prepare( 'SELECT MAX(indexed_at) FROM %i WHERE generation = %d AND type = %s AND object_id = %d', Tables::documents(), $generation, Document::PRODUCT, $productId ) );
+		return is_string( $at ) && '' !== $at ? $at : null;
+	}
+
+	/**
 	 * The boost-rule references of some products: `category:12`, `tag:7`, `brand:3` for each term they carry in
 	 * an indexed taxonomy (spec: Matching → owner's boost rules). Read only when the owner has rules.
 	 *

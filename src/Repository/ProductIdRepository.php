@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Repository;
 
+use CreativeBranding\Search\Support\Options;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -39,6 +41,26 @@ final class ProductIdRepository extends Repository {
 	public function publishedCount(): int {
 		global $wpdb;
 		return (int) $this->value( $this->prepare( 'SELECT COUNT(*) FROM %i WHERE post_type = %s AND post_status = %s', $wpdb->posts, 'product', 'publish' ) );
+	}
+
+	/**
+	 * How many published products the owner keeps out of search (`_csearch_exclude`).
+	 */
+	public function excludedCount(): int {
+		global $wpdb;
+		return (int) $this->value( $this->prepare( 'SELECT COUNT(*) FROM %i p INNER JOIN %i m ON m.post_id = p.ID AND m.meta_key = %s AND m.meta_value = %s WHERE p.post_type = %s AND p.post_status = %s', $wpdb->posts, $wpdb->postmeta, Options::META_EXCLUDE, 'yes', 'product', 'publish' ) );
+	}
+
+	/**
+	 * The products the owner keeps out of search, any status but trash, newest first.
+	 *
+	 * @param int $limit At most.
+	 * @return int[]
+	 */
+	public function excluded( int $limit ): array {
+		global $wpdb;
+		$rows = $this->rows( $this->prepare( 'SELECT p.ID FROM %i p INNER JOIN %i m ON m.post_id = p.ID AND m.meta_key = %s AND m.meta_value = %s WHERE p.post_type = %s AND p.post_status NOT IN (%s, %s) ORDER BY p.ID DESC LIMIT %d', $wpdb->posts, $wpdb->postmeta, Options::META_EXCLUDE, 'yes', 'product', 'trash', 'auto-draft', $limit ) );
+		return array_map( static fn( array $row ): int => (int) $row['ID'], $rows );
 	}
 
 	/**

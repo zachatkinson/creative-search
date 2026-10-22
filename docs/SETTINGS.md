@@ -2,7 +2,9 @@
 
 Everything the owner can set, with its default and its range. All of it lives in one autoloaded option, `csearch_settings`, read through `Settings\Settings` and sanitised by `Settings::sanitize()` whichever screen or command writes it. Unknown keys are dropped; a missing key takes its default; every value is coerced to its type and range (so a corrupt option never breaks a request).
 
-Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on admin requests), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, from milestone 7). Product meta: `_csearch_boost` and `_csearch_exclude` (milestone 7).
+Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on admin requests), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, a list of lower-case words, set on the Tools tab). Product meta: `_csearch_boost` (−10 to 10, absent for 0) and `_csearch_exclude` (`yes` or absent), set in the product editor's Search tab and carried by the product CSV (D-070). User meta: `csearch_dismissed_notices` (the warnings a user dismissed, until each clears; D-071). Transients: `csearch_notice_{user id}` (an action's answer, for one minute).
+
+**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` and the suggestion panel's defaults; the Boosts and exclusions tab sets `boost_rules`, `fallback_products` and `hidden_by_sku`. `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
 
 ## What to index
 
@@ -55,7 +57,7 @@ A block instance can override each of these; they are the defaults for new block
 
 ## The index state (`csearch_index_state`)
 
-Written by the plugin, not the owner. Not autoloaded: jobs read it fresh from the database each time and a search reads it once (D-053). Shown by `wp csearch status`, `GET /csearch/v1/status` and, from milestone 7, the Tools tab.
+Written by the plugin, not the owner. Not autoloaded: jobs read it fresh from the database each time and a search reads it once (D-053). Shown by `wp csearch status`, `GET /csearch/v1/status` and the Tools tab.
 
 | Key | Default | Meaning |
 | --- | --- | --- |

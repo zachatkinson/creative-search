@@ -55,7 +55,7 @@ final class ActivationTest extends IntegrationTestCase {
 		self::assertSame( '10.0', CSEARCH_MIN_WC );
 		self::assertInstanceOf( Container::class, Plugin::container() );
 		self::assertSame( Plugin::container(), Plugin::container() );
-		self::assertCount( 11, Plugin::container()->hookables(), 'index, jobs, CLI, install, REST, log, results and the four block entry points' );
+		self::assertCount( 12, Plugin::container()->hookables(), 'index, jobs, CLI, install, REST, log, results, the four block entry points and the admin' );
 		self::assertNotFalse( has_action( 'woocommerce_update_product' ), 'the index hooks are attached' );
 	}
 

@@ -245,6 +245,22 @@ add_filter( 'csearch_client_ip', static fn( string $ip, array $server ): string 
 
 `creative-search/search` (block, Interactivity API store `creative-search/search`), `[creative_search]` (shortcode, same options as the settings keys), the "Creative Search" widget, and, with the `theme_form_takeover` setting, `get_search_form`. All four render through `Block\SearchForm`.
 
+## Milestone 7: the admin (0.7.0)
+
+No new filter or action for other plugins. What the admin attaches, listed so nothing is a surprise:
+
+### Admin actions (`admin-post.php`)
+
+Internal endpoints, not for plugins to call; each checks `manage_woocommerce` and a nonce named after the action (D-068): `csearch_synonym_save`, `csearch_synonym_delete`, `csearch_synonym_import`, `csearch_synonym_export`, `csearch_analytics_export`, `csearch_boosts_save`, `csearch_tools_save`, `csearch_reindex`, `csearch_reindex_cancel`, `csearch_product_reindex`, `csearch_dismiss_notice`.
+
+### WooCommerce hooks the plugin uses
+
+`woocommerce_product_data_tabs` and `woocommerce_product_data_panels` (the product's Search tab), `woocommerce_admin_process_product_object` (its save), `woocommerce_product_export_product_default_columns`, `woocommerce_product_export_product_column_csearch_boost`, `woocommerce_product_export_product_column_csearch_exclude` and `woocommerce_product_export_skip_meta_keys` (the CSV columns), `woocommerce_product_import_pre_insert_product_object` (an import's values normalised; D-070).
+
+### WP-CLI
+
+`wp csearch search "<query>" [--lang=] [--limit=] [--format=]` (not logged), `wp csearch synonyms list [--lang=] [--search=] [--format=]`, `wp csearch synonyms add <word> <means> [--lang=] [--one-way] [--format=json]`, `wp csearch synonyms delete <id>...`, `wp csearch synonyms import <file|->`, `wp csearch synonyms export`, `wp csearch log purge [--days=] [--format=json]` (D-074), `wp csearch cache flush`. Each has `--help` and exits non-zero on failure.
+
 ## Format for later entries
 
 ### `csearch_example` (filter)

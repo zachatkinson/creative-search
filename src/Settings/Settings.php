@@ -133,17 +133,28 @@ final class Settings {
 	}
 
 	/**
-	 * Write one setting.
+	 * Write one setting, sanitised.
 	 *
 	 * @param string $key   Setting key.
 	 * @param mixed  $value Value.
 	 */
 	public static function set( string $key, $value ): void {
-		$all         = self::all();
-		$all[ $key ] = $value;
+		self::update( array( $key => $value ) );
+	}
+
+	/**
+	 * Write some settings: merged into the current ones, the whole sanitised (so a screen saving one tab never
+	 * resets another, and no value reaches the option unchecked).
+	 *
+	 * @param array<string, mixed> $changes Setting keys to new values.
+	 * @return array<string, mixed> The settings as stored.
+	 */
+	public static function update( array $changes ): array {
+		$all = self::sanitize( array_merge( self::all(), $changes ) );
 		// Autoloaded: the block and the routes read it on every request. Short scalars and small arrays.
 		update_option( Options::SETTINGS, $all, true );
 		self::$cache = $all;
+		return $all;
 	}
 
 	/**

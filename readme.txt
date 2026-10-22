@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -35,6 +35,12 @@ No. The index, the suggestions and the analytics are all on the server; nothing 
 Nothing. The search log holds the words typed, the result count, the language and the time, for 90 days by default. No IP address, user id, session or page URL; queries that look like personal details are redacted.
 
 == Changelog ==
+
+= 0.7.0 =
+* Admin: WooCommerce → Search, with Analytics (searches a day, top queries, searches with no results, most clicked, CSV export), Synonyms (add, edit, delete, test, CSV import and export), Boosts and exclusions, and Tools (index status, rebuild with progress, a test search that explains its ranking, stop words and settings).
+* A Search tab on the product edit screen (boost, exclude, last indexed, reindex now), and the two values in WooCommerce's product CSV.
+* Notices when the index is empty or missing products, when scheduled tasks are not running, and when a rebuild had errors.
+* WP-CLI: `wp csearch search`, `synonyms`, `log purge` and `cache flush`.
 
 = 0.6.0 =
 * Results page: product searches come back in relevance order, with the result count, the corrected query and a helpful no-results page.

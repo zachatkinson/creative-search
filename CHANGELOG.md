@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-21
+
+Milestone 7, Admin. The owner can now see what shoppers search for, teach the search their words, tune the ranking and look after the index without a terminal.
+
+### Added
+- WooCommerce → Search with four tabs, in WordPress's own admin markup (D-068):
+  - **Analytics:** the last 7, 30 or 90 days; searches a day as a chart, with the same numbers in a table (D-072); totals, click-through and suggestions against results-page use; the top 50 queries and the top 50 with no results, each with an Explain link; the most clicked suggestions; CSV export of the log's own columns, streamed.
+  - **Synonyms:** add, edit and delete in a list table with search, language filter, 20 a page and bulk Delete; a test box that shows what a word expands to; CSV import and export. A change applies to searches at once.
+  - **Boosts and exclusions:** rules that add −10 to 10 to a category, brand or tag; the excluded products, each of which can be let back in; fallback products chosen by SKU or ID (D-069); hidden products by exact SKU.
+  - **Tools:** the index's status, Rebuild with live progress and Cancel, a test search that shows the ranking and why (not logged, D-073), stop words per language, retention, what to index and the search bar's defaults.
+- A Search tab on the product edit screen: boost, Exclude from search, "Last indexed … ago" and Reindex now; `Meta: _csearch_boost` and `Meta: _csearch_exclude` in WooCommerce's product CSV export, normalised on import (D-070).
+- Notices for an empty index, more than 10 % of products missing, a queue that has not run for 15 minutes and a rebuild with errors, each dismissible until its condition clears (D-071).
+- `wp csearch search`, `wp csearch synonyms list|add|delete|import|export`, `wp csearch log purge [--days]` and `wp csearch cache flush` (D-074).
+- Tests: 15 integration tests for the admin and 3 more for the CLI; 9 browser tests with axe, by keyboard, on three engines and two viewports (45 runs).
+
+### Changed
+- `GET /csearch/v1/status` reads `Index\IndexHealth`, shared with the Tools tab and the notices; its JSON is unchanged.
+- `wp csearch explain`'s rows come from `Search\Explanation`, shared with the test search.
+- Uninstall also removes the `csearch_dismissed_notices` user meta.
+
+### Fixed before release (independent review of milestone 7)
+- `log purge` rolls up the days it deletes first; `synonyms delete` and `export` take `--format=json`; screens prime their users, products and terms; the log export streams; CSV is built in memory only; plurals and sentences are whole strings; reads are bounded (D-075).
+
 ## [0.6.0] - 2026-10-21
 
 Milestones 5 and 6, Results page and Search block, released together (D-066; there is no 0.5.0). A shopper's product search now comes back in the plugin's order with the words around it the spec asks for, and the search bar suggests products, categories and brands as they type.

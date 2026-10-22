@@ -41,6 +41,7 @@ function csearch_uninstall_site(): void {
 	$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s', $wpdb->options, $wpdb->esc_like( 'csearch_stopwords_' ) . '%', $wpdb->esc_like( '_transient_csearch_' ) . '%', $wpdb->esc_like( '_transient_timeout_csearch_' ) . '%' ) );
 	delete_post_meta_by_key( '_csearch_boost' );
 	delete_post_meta_by_key( '_csearch_exclude' );
+	delete_metadata( 'user', 0, 'csearch_dismissed_notices', '', true );
 	if ( class_exists( 'ActionScheduler' ) && ActionScheduler::is_initialized() ) {
 		$csearch_store = ActionScheduler::store();
 		do {

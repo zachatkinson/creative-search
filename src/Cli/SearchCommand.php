@@ -1,6 +1,6 @@
 <?php
 /**
- * `wp csearch explain`.
+ * `wp csearch search` and `wp csearch explain`.
  *
  * @package CreativeBranding\Search
  */
@@ -9,8 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Cli;
 
-use CreativeBranding\Search\Domain\Fields;
-use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Search\Explanation;
 use CreativeBranding\Search\Search\SearchService;
 use WP_CLI;
 
@@ -19,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Explains a ranking: each candidate with its tokens, fields, weights and bonuses (spec: Matching → Explain).
+ * Searches as the shop does (not logged), and explains a ranking: each candidate with its tokens, fields, weights and bonuses (spec: Matching → Explain).
  */
 final class SearchCommand {
 
@@ -29,6 +28,63 @@ final class SearchCommand {
 	 * @param SearchService $search The search service.
 	 */
 	public function __construct( private SearchService $search ) {
+	}
+
+	/**
+	 * Search as the shop does, without logging.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <query>
+	 * : The query, quoted.
+	 *
+	 * [--lang=<lang>]
+	 * : Language code; the site's by default.
+	 *
+	 * [--limit=<n>]
+	 * : Products to show.
+	 * ---
+	 * default: 10
+	 * ---
+	 *
+	 * [--format=<format>]
+	 * : table, csv, json or yaml.
+	 * ---
+	 * default: table
+	 * ---
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp csearch search "kazumi deck"
+	 *     wp csearch search planche --lang=fr --format=json
+	 *
+	 * @param string[]             $args  Positional arguments.
+	 * @param array<string, mixed> $assoc Flags.
+	 */
+	public function search( array $args, array $assoc ): void {
+		$query = SearchService::clean( $args[0] ?? '' );
+		if ( '' === $query ) {
+			WP_CLI::error( __( 'Give a query to search for.', 'creative-search' ) );
+		}
+		$lang   = $this->search->language( isset( $assoc['lang'] ) && is_string( $assoc['lang'] ) ? $assoc['lang'] : null );
+		$limit  = max( 1, isset( $assoc['limit'] ) && is_numeric( $assoc['limit'] ) ? (int) $assoc['limit'] : 10 );
+		$result = $this->search->run( $query, $lang, $limit, 3 );
+		$format = isset( $assoc['format'] ) && is_string( $assoc['format'] ) ? $assoc['format'] : 'table';
+		if ( 'table' === $format && null !== $result->corrected ) {
+			/* translators: 1: the query, 2: the query the results are for */
+			WP_CLI::log( sprintf( __( 'Nothing matched every word of "%1$s"; showing results for "%2$s".', 'creative-search' ), $query, $result->corrected ) );
+		}
+		$rows = array();
+		foreach ( array_merge( array_values( $result->products ), array_values( $result->terms ) ) as $i => $hit ) {
+			$rows[] = array(
+				'rank'  => $i + 1,
+				'type'  => $hit->document->type,
+				'id'    => $hit->document->objectId,
+				'title' => $hit->document->title,
+				'score' => round( $hit->score->total(), 2 ),
+			);
+		}
+		WP_CLI\Utils\format_items( $format, $rows, array( 'rank', 'type', 'id', 'title', 'score' ) );
 	}
 
 	/**
@@ -82,35 +138,6 @@ final class SearchCommand {
 				: sprintf( __( 'Query "%1$s" in %2$s, showing results for "%3$s": %4$s.', 'creative-search' ), $query, $result->lang, $result->corrected, $found )
 		);
 		$format = isset( $assoc['format'] ) && is_string( $assoc['format'] ) ? $assoc['format'] : 'table';
-		WP_CLI\Utils\format_items( $format, array_merge( self::rows( $result->products ), self::rows( $result->terms ) ), array( 'rank', 'type', 'id', 'title', 'total', 'tokens', 'phrase', 'exact', 'stock', 'owner' ) );
-	}
-
-	/**
-	 * Explain rows.
-	 *
-	 * @param Hit[] $hits Hits.
-	 * @return array<int, array<string, mixed>>
-	 */
-	public static function rows( array $hits ): array {
-		$out = array();
-		foreach ( array_values( $hits ) as $i => $hit ) {
-			$tokens = array();
-			foreach ( $hit->score->tokens as $t ) {
-				$tokens[] = sprintf( '%s→%s %s %s w%d×m%.1f tf%d df%d = %.2f', $t['token'], $t['term'], $t['kind'], Fields::NAMES[ $t['field'] ] ?? (string) $t['field'], $t['weight'], $t['m'], $t['tf'], $t['df'], $t['score'] );
-			}
-			$out[] = array(
-				'rank'   => $i + 1,
-				'type'   => $hit->document->type,
-				'id'     => $hit->document->objectId,
-				'title'  => $hit->document->title,
-				'total'  => round( $hit->score->total(), 2 ),
-				'tokens' => implode( '; ', $tokens ),
-				'phrase' => $hit->score->phrase,
-				'exact'  => $hit->score->exact,
-				'stock'  => $hit->score->stock,
-				'owner'  => $hit->score->owner,
-			);
-		}
-		return $out;
+		WP_CLI\Utils\format_items( $format, array_merge( Explanation::rows( $result->products ), Explanation::rows( $result->terms ) ), array( 'rank', 'type', 'id', 'title', 'total', 'tokens', 'phrase', 'exact', 'stock', 'owner' ) );
 	}
 }

@@ -44,6 +44,17 @@ final class CastTest extends TestCase {
 		self::assertSame( array(), Cast::strings( 'a' ) );
 	}
 
+	public function test_float(): void {
+		self::assertSame( 2.5, Cast::float( '2.5' ) );
+		self::assertSame( 3.0, Cast::float( 3 ) );
+		self::assertSame( 1.5, Cast::float( 'x', 1.5 ) );
+	}
+
+	public function test_arrays(): void {
+		self::assertSame( array( array( 'a' => 1 ), array() ), Cast::arrays( array( 'x' => array( 'a' => 1 ), 'y' => 'no', 3 => array() ) ) );
+		self::assertSame( array(), Cast::arrays( 'no' ) );
+	}
+
 	public function test_fields(): void {
 		self::assertSame(
 			array(

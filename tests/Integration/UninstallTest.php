@@ -34,6 +34,7 @@ final class UninstallTest extends IntegrationTestCase {
 		$product->save();
 		update_post_meta( $product->get_id(), Options::META_BOOST, 5 );
 		update_post_meta( $product->get_id(), Options::META_EXCLUDE, 'yes' );
+		update_user_meta( self::factory()->user->create(), Options::USER_DISMISSED, array( 'missing' => 1 ) );
 		wp_cache_set( 'suggest:abc', array( 1 ), Options::CACHE_GROUP );
 		$wpdb->insert( Tables::terms(), array( 'term' => 'deck', 'df' => 1 ) );
 		$actionId = as_schedule_single_action( time() + DAY_IN_SECONDS, 'csearch_job_index_product', array( $product->get_id() ), Options::QUEUE_GROUP );
@@ -50,6 +51,7 @@ final class UninstallTest extends IntegrationTestCase {
 		self::assertSame( array(), $options, 'options or transients left behind' );
 		$meta = $wpdb->get_col( $wpdb->prepare( 'SELECT meta_key FROM %i WHERE meta_key LIKE %s', $wpdb->postmeta, $wpdb->esc_like( '_csearch_' ) . '%' ) );
 		self::assertSame( array(), $meta, 'product meta left behind' );
+		self::assertSame( array(), $wpdb->get_col( $wpdb->prepare( 'SELECT umeta_id FROM %i WHERE meta_key = %s', $wpdb->usermeta, Options::USER_DISMISSED ) ), 'user meta left behind' );
 		self::assertSame( array(), as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => '', 'per_page' => 5 ), 'ids' ), 'actions of any status left behind' );
 		self::assertFalse( wp_cache_get( 'suggest:abc', Options::CACHE_GROUP ), 'cache group not flushed' );
 		self::assertNotEmpty( get_post( $product->get_id() ), 'products are never touched' );
@@ -74,6 +76,7 @@ final class UninstallTest extends IntegrationTestCase {
 			self::assertStringContainsString( "'{$key}'", $source, "uninstall.php fallback misses meta {$key}" );
 		}
 		self::assertStringContainsString( "'" . Options::STOPWORDS_PREFIX . "'", $source );
+		self::assertStringContainsString( "'" . Options::USER_DISMISSED . "'", $source );
 		self::assertStringContainsString( "'" . Options::QUEUE_GROUP . "'", $source );
 		self::assertStringContainsString( "wp_cache_flush_group( '" . Options::CACHE_GROUP . "' )", $source );
 	}

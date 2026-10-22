@@ -74,6 +74,7 @@ final class Uninstaller {
 		foreach ( Options::metaKeys() as $key ) {
 			delete_post_meta_by_key( $key );
 		}
+		delete_metadata( 'user', 0, Options::USER_DISMISSED, '', true );
 
 		self::deleteJobs();
 

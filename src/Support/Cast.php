@@ -41,6 +41,16 @@ final class Cast {
 	}
 
 	/**
+	 * A float from a number or numeric string, else the fallback.
+	 *
+	 * @param mixed $value    Value.
+	 * @param float $fallback When the value is not numeric.
+	 */
+	public static function float( mixed $value, float $fallback = 0.0 ): float {
+		return is_numeric( $value ) ? (float) $value : $fallback;
+	}
+
+	/**
 	 * A list of integers from an array (non-numeric members dropped); anything else is empty.
 	 *
 	 * @param mixed $value Value.
@@ -70,6 +80,16 @@ final class Cast {
 			}
 		}
 		return $out;
+	}
+
+	/**
+	 * A list of arrays from an array (other members dropped); anything else is empty.
+	 *
+	 * @param mixed $value Value.
+	 * @return array<int, array<mixed>>
+	 */
+	public static function arrays( mixed $value ): array {
+		return array_values( array_filter( is_array( $value ) ? $value : array(), 'is_array' ) );
 	}
 
 	/**

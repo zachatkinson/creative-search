@@ -55,6 +55,11 @@ final class Options {
 	public const META_EXCLUDE = '_csearch_exclude';
 
 	/**
+	 * User meta: the admin notices a user dismissed, notice id to the moment (`Admin\Notices`).
+	 */
+	public const USER_DISMISSED = 'csearch_dismissed_notices';
+
+	/**
 	 * The generation a reindex was asked to stop building (`Index\IndexState`, D-053).
 	 */
 	public const REINDEX_CANCEL = 'csearch_reindex_cancel';

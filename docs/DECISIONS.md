@@ -428,3 +428,52 @@ The block (milestone 6) was started in parallel and registered in the same conta
 Under PHP-FPM the connection stays open until `shutdown` callbacks finish, so the one-row INSERT is on the response's tail. Calling `fastcgi_finish_request()` from a plugin would cut off any later `shutdown` output another plugin prints (Query Monitor among them).
 
 **Why:** One prepared INSERT is well under a millisecond; flagged rather than forced.
+
+### D-068 · Every admin change is a form to `admin-post.php`, with three conventional exceptions · 2026-10-21
+
+Each change on WooCommerce → Search is a POST to `admin-post.php?action=csearch_*`, answered by `Admin\Actions`: capability (`manage_woocommerce`), then the nonce named after the action, then the change, a notice kept for one minute in a per-user transient, and a redirect back to the tab. Three follow WordPress's own conventions instead: a synonym's Delete row action and the product panel's "Reindex now" are links carrying a nonce (as core's list tables do), and the synonyms table's bulk Delete comes back to the screen itself (by GET, as the list tables of core's Users and Comments screens do) with the list table's own `bulk-synonyms` nonce, because the bulk select is named `action` and would collide with `admin-post.php`'s. Read-only controls (the Analytics period, the synonym test box, the test search, the table's search and filter) are GET forms without a nonce; they change nothing.
+
+**Why:** the spec asks for "every action a form with a nonce"; these three are where WordPress itself uses a link or a self-post, and each still checks the capability and a nonce (tested).
+
+### D-069 · Fallback products are chosen by SKU or ID, not WooCommerce's product picker · 2026-10-21
+
+The Boosts and exclusions tab lists the chosen fallback products, each with a Remove box, and adds more from a labelled text field that takes SKUs or IDs separated by commas; an unknown one is named in the notice.
+
+**Why:** WooCommerce's `wc-product-search` picker (selectWoo) fails axe on our screen: its search field has no label and its selection uses `aria-expanded` on a role that does not allow it. The spec's gate is "axe clean on every tab", and the fix belongs in WooCommerce, not in a plugin's override of selectWoo's markup.
+
+### D-070 · The product's Search panel is a tab of the product data box; the CSV columns are always there · 2026-10-21
+
+The boost and Exclude from search are a "Search" tab in the product data box, with "Last indexed … ago" and Reindex now. There is no field in the variation panel: variations are folded into their parent's document (spec: Data model), so a boost or an exclusion is the parent's. The exporter always carries `Meta: _csearch_boost` and `Meta: _csearch_exclude` (untranslated, the header WooCommerce's importer maps to meta in every language), and the keys are left out of its "export custom meta" columns so they are not repeated. An import is normalised before the save as the panel would: the boost clamped to −10..10 and 0 cleared, exclude `yes` or cleared.
+
+**Why:** the spec's "and in the variation panel for SKUs" has nothing to set per variation in this design; flagged for Zach rather than inventing a per-variation boost.
+
+### D-071 · The notices: when they show and how a dismissal lasts · 2026-10-21
+
+"Missing from the index" compares the live generation's products with published products less those the owner excludes, and warns above 10 %; "empty" when it holds none. Neither shows while a rebuild runs. "The queue is not running" shows when a job of the plugin's group is still pending 15 minutes after it was due. "Errors" shows the last rebuild's recorded lines (at most ten). A dismissal is per user (`csearch_dismissed_notices` user meta, removed on uninstall) and lasts until the condition clears; when it comes back, so does the notice. Only users with `manage_woocommerce` see them.
+
+**Why:** the spec says "persistent, dismissible" without saying for how long; until-it-clears means a dismissed problem that returns is not hidden for good.
+
+### D-072 · The Analytics chart is drawn on the server · 2026-10-21
+
+Searches a day are an inline SVG bar chart (searches, and those with no results) with a text description and a `<title>` per day, and the same numbers in a table under a disclosure. No chart library, no script.
+
+**Why:** no dependency to ask for, nothing to load, and the table is the accessible form of the chart.
+
+### D-073 · The Tools test search, `wp csearch search` and the rebuild's progress · 2026-10-21
+
+The test search and `wp csearch search` call `SearchService::run()` directly: no log row and no cached answer, so testing does not change the Analytics. The rebuild's progress bar reads `GET /csearch/v1/status` every three seconds through `wp.apiFetch` (WordPress's own script, with its REST nonce) from a small unbuilt script in `assets/admin/`, and reloads the tab when the rebuild finishes. `/status` now reads `Admin\IndexHealth`, which the Tools tab and the notices share; its JSON is unchanged.
+
+**Why:** the spec says the test search shows "the ranked answer and its explanation"; logging it would count the owner's tests as shoppers' searches.
+
+### D-074 · `wp csearch log purge --days=0` deletes every row; synonym CLI rows have no author · 2026-10-21
+
+`--days` keeps that many days; 0 deletes the whole log; without it the retention setting applies. Synonyms added by WP-CLI have no `created_by` and show as "Import or WP-CLI"; synonyms imported from the Synonyms tab are credited to the user who imported them. The purge rolls up the days it is about to delete first (`LogMaintenance::rollUp()`), as the nightly job does, so the charts keep them.
+
+**Why:** the spec gives the flag without its range; a CLI process has no user to credit; and the spec says the aggregates survive the purge.
+
+### D-075 · The review's fixes: streaming, bounded reads, whole sentences · 2026-10-21
+
+The log export streams to the response 1,000 rows a read (`Analytics::exportTo()`), and CSV text is built in `php://memory`, never `php://temp`, which spills to a temporary file above 2 MB (spec: no file is written). Reads the admin makes are bounded: synonyms at 50,000 (`SynonymRepository::MAX_ROWS`), terms in the rule picker at 500 a taxonomy, excluded products at 100. Users, products and terms named on a screen are primed in one query each (`cache_users()`, `_prime_post_caches()`, `_prime_term_caches()`). Every sentence is one translatable string ("Category: Decks", "Creative Search: …", "… products (stopping)"). `IndexHealth` moved to `Index\` and the explain rows to `Search\Explanation`, so REST and the admin depend on neither each other nor the CLI. The warnings still run their five small queries on each admin screen for users with `manage_woocommerce`; caching them would hide a fixed problem for a minute, and the cost is a few milliseconds.
+
+**Why:** the independent review of milestone 7 found these against the spec's quality bar (no N+1, no unbounded query, no concatenated sentences); docs/reviews/M7.md lists all 17 findings and what was done with each.
+

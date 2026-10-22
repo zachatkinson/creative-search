@@ -1,0 +1,118 @@
+/*
+ * WooCommerce → Search. WordPress's admin styles do the work; this adds the chart, the totals and spacing.
+ */
+.csearch-admin .csearch-inline {
+	display: inline-block;
+	margin-inline-end: 0.5rem;
+}
+
+.csearch-admin .csearch-period {
+	margin-block: 1rem;
+}
+
+.csearch-totals {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+	gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.csearch-totals li {
+	margin: 0;
+	padding: 0.75rem 1rem;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.csearch-total-value {
+	display: block;
+	font-size: 1.5rem;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.csearch-chart {
+	display: block;
+	inline-size: 100%;
+	max-inline-size: 60rem;
+	block-size: 10rem;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.csearch-bar {
+	fill: #2271b1;
+}
+
+.csearch-bar-zero {
+	fill: #d63638;
+}
+
+.csearch-axis {
+	stroke: #50575e;
+	stroke-width: 1;
+}
+
+.csearch-chart-key {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.csearch-key {
+	display: inline-block;
+	inline-size: 0.75rem;
+	block-size: 0.75rem;
+}
+
+.csearch-key-all {
+	background: #2271b1;
+}
+
+.csearch-key-zero {
+	background: #d63638;
+}
+
+.csearch-daily-table {
+	margin-block: 1rem;
+}
+
+.csearch-daily-table table {
+	max-inline-size: 40rem;
+}
+
+.csearch-why {
+	margin: 0;
+}
+
+.csearch-why code {
+	font-size: 0.8125rem;
+}
+
+.csearch-muted {
+	color: #50575e;
+}
+
+.csearch-progress {
+	margin-block: 1rem;
+}
+
+.csearch-progress progress {
+	inline-size: 20rem;
+	max-inline-size: 100%;
+	vertical-align: middle;
+}
+
+.csearch-excluded {
+	margin-inline-start: 0;
+}
+
+.csearch-rules {
+	max-inline-size: 40rem;
+}
+
+.csearch-notice form {
+	display: inline-block;
+}

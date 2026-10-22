@@ -52,6 +52,7 @@ final class Container {
 			Block\Shortcode::class,
 			Block\WidgetRegistrar::class,
 			Block\FormTakeover::class,
+			Hooks\AdminHooks::class,
 		);
 	}
 
