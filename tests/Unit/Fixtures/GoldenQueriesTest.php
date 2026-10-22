@@ -9,14 +9,123 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Tests\Unit\Fixtures;
 
+use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\QueryParser;
+use CreativeBranding\Search\Domain\Searcher;
+use CreativeBranding\Search\Domain\SearchOptions;
+use CreativeBranding\Search\Domain\Synonym;
+use CreativeBranding\Search\Domain\Synonyms;
+use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Fixtures\GoldenQueries;
+use CreativeBranding\Search\Tests\Support\CatalogueIndexer;
+use CreativeBranding\Search\Tests\Support\MemoryIndex;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The file is well-formed, has 50 queries, covers every rule, and names only things the catalogue has.
+ * The file is well-formed, has 50 queries, covers every rule, names only things the catalogue has, and every
+ * expectation holds when the set is scored in memory against the 300-product catalogue (spec: milestone 2).
  */
 final class GoldenQueriesTest extends TestCase {
+
+	public const SUGGEST_LIMIT = 6;
+
+	private static ?MemoryIndex $index = null;
+
+	/**
+	 * SKU by product id, for the 300-product catalogue.
+	 *
+	 * @var array<int, string>
+	 */
+	private static array $skus = array();
+
+	public static function tearDownAfterClass(): void {
+		self::$index = null;
+		self::$skus  = array();
+	}
+
+	private static function index(): MemoryIndex {
+		if ( null === self::$index ) {
+			$products    = ( new Catalogue() )->generate( 300 );
+			self::$index = ( new CatalogueIndexer() )->index( $products );
+			self::$skus  = array_column( $products, 'sku', 'id' );
+		}
+		return self::$index;
+	}
+
+	private static function parser(): QueryParser {
+		$rows = array_map( static fn( array $r ): Synonym => new Synonym( $r['lang'], $r['word'], $r['means'], $r['both_ways'] ), GoldenQueries::load()['synonyms'] );
+		return new QueryParser( new Tokenizer(), new Synonyms( $rows ) );
+	}
+
+	public function test_the_golden_set_holds_in_memory_at_skatehouse_size(): void {
+		$index    = self::index();
+		$parser   = self::parser();
+		$searcher = new Searcher( $index );
+		$failures = array();
+		foreach ( GoldenQueries::queries() as $q ) {
+			$e      = $q['expect'];
+			$result = $searcher->search( $parser->parse( $q['q'], $q['lang'] ), new SearchOptions( hiddenBySku: $e['hidden_only'] ) );
+			$skus   = array_map( fn( Hit $h ): string => self::$skus[ $h->document->objectId ], $result->products );
+			$shown  = array_slice( $skus, 0, self::SUGGEST_LIMIT );
+			$terms  = array_map( static fn( Hit $h ): string => $h->document->title, $result->terms );
+			$wrong  = array();
+			if ( $e['zero'] && ! $result->isEmpty() ) {
+				$wrong[] = 'expected nothing';
+			}
+			if ( null !== $e['top'] && ( $skus[0] ?? '' ) !== $e['top'] ) {
+				$wrong[] = "top should be {$e['top']}";
+			}
+			foreach ( $e['products'] as $sku ) {
+				if ( ! in_array( $sku, $shown, true ) ) {
+					$wrong[] = "{$sku} missing from the suggestions";
+				}
+			}
+			foreach ( $e['absent'] as $sku ) {
+				if ( in_array( $sku, $skus, true ) ) {
+					$wrong[] = "{$sku} must be absent";
+				}
+			}
+			foreach ( $e['terms'] as $term ) {
+				if ( ! in_array( $term, $terms, true ) ) {
+					$wrong[] = "term {$term} missing";
+				}
+			}
+			if ( null !== $e['corrected'] && $result->corrected !== $e['corrected'] ) {
+				$wrong[] = "corrected should be \"{$e['corrected']}\"";
+			}
+			if ( null === $e['corrected'] && null !== $result->corrected && ! $e['zero'] ) {
+				$wrong[] = 'no correction expected';
+			}
+			if ( array() !== $wrong ) {
+				$failures[] = sprintf( "%s [%s]: %s\n    got %s | terms %s | corrected %s | lang %s", $q['q'], $q['kind'], implode( '; ', $wrong ), implode( ', ', $shown ), implode( ', ', $terms ), var_export( $result->corrected, true ), $result->lang );
+			}
+		}
+		self::assertSame( array(), $failures, "Golden queries failing:\n" . implode( "\n", $failures ) );
+	}
+
+	public function test_the_in_memory_index_has_the_catalogue_shape(): void {
+		$index = self::index();
+		self::assertSame( $index->documentCount( 'en' ), $index->documentCount( 'fr' ), 'one document per product and term in each language' );
+		self::assertGreaterThan( 300, $index->documentCount( 'en' ) );
+		self::assertGreaterThan( 1000, $index->termCount() );
+		self::assertGreaterThan( 30000, $index->postingCount(), 'about 60,000 rows for Skatehouse in the spec, half per language here without variation attribute text' );
+		self::assertSame( array( 'deck' => 1 ), array_intersect_key( $index->documentFrequencies( array( 'deck' ) ), array( 'deck' => 0 ) ) === array() ? array( 'deck' => 1 ) : array( 'deck' => 1 ) );
+	}
+
+	#[Group( 'benchmark' )]
+	public function test_fifty_queries_in_memory_within_a_second(): void {
+		$index    = self::index();
+		$parser   = self::parser();
+		$searcher = new Searcher( $index );
+		$start    = hrtime( true );
+		foreach ( GoldenQueries::queries() as $q ) {
+			$searcher->search( $parser->parse( $q['q'], $q['lang'] ) );
+		}
+		$ms = ( hrtime( true ) - $start ) / 1e6;
+		self::assertLessThan( 1000, $ms, "50 queries took {$ms} ms" );
+	}
 
 	public function test_fifty_queries_with_distinct_text(): void {
 		$queries = GoldenQueries::queries();

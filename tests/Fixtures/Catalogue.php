@@ -248,10 +248,12 @@ final class Catalogue {
 			'brand'    => $brand,
 			'series'   => $series,
 			'category' => $category,
-			// A quarter of generated products are sold out; three in a hundred are hidden from the catalogue.
+			// A quarter of generated products are sold out; three in a hundred are hidden from the catalogue. The
+			// heroes are the shop's bestsellers: a generated product sells under 15, so a tie between a hero and
+			// a templated product breaks to the hero on sales, the way the spec breaks ties (D-036).
 			'in_stock' => $this->below( 4 ) > 0,
 			'visible'  => $this->below( 100 ) >= 3,
-			'sales'    => $this->below( 400 ),
+			'sales'    => $this->below( 15 ),
 			'price'    => null,
 			'tags'     => $this->tags(),
 		);

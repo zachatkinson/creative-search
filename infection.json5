@@ -1,14 +1,15 @@
 {
-	// Milestone 1: the classes the unit suite covers. src/Domain gets its own 100 % run in milestone 2 (docs/DECISIONS.md D-019).
+	// The plugin outside the domain, at 90 %. src/Domain has its own 100 % run in infection-domain.json5 (docs/DECISIONS.md D-019, D-030).
 	"$schema": "vendor/infection/infection/resources/schema.json",
 	"source": {
 		"directories": [
-			"src/Settings",
 			"src"
 		],
 		"excludes": [
+			"Domain",
 			"Install",
-			"Support",
+			"Support/Options.php",
+			"Support/Tables.php",
 			"Plugin.php",
 			"Hookable.php"
 		]

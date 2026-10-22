@@ -17,6 +17,7 @@ composer.lock
 docs
 eslint.config.js
 infection.json5
+infection-domain.json5
 node_modules
 package.json
 package-lock.json

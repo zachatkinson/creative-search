@@ -48,7 +48,7 @@ final class ActivationTest extends IntegrationTestCase {
 
 	public function test_plugin_booted_with_a_container_and_constants(): void {
 		self::assertTrue( defined( 'CSEARCH_VERSION' ) );
-		self::assertSame( '0.1.0', CSEARCH_VERSION );
+		self::assertSame( get_plugin_data( CSEARCH_FILE, false, false )['Version'], CSEARCH_VERSION, 'the constant and the header agree' );
 		self::assertSame( '10.0', CSEARCH_MIN_WC );
 		self::assertInstanceOf( Container::class, Plugin::container() );
 		self::assertSame( Plugin::container(), Plugin::container() );

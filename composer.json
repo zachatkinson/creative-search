@@ -47,7 +47,12 @@
 		"test:coverage": "phpunit -c phpunit.xml.dist --testsuite unit --exclude-group benchmark --coverage-text --coverage-clover tmp/coverage.xml",
 		"test:benchmark": "phpunit -c phpunit.xml.dist --testsuite unit --group benchmark",
 		"test:integration": "bash tools/integration.sh",
-		"infection": "@php vendor/bin/infection --threads=max --configuration=infection.json5",
+		"infection": [
+			"@infection:core",
+			"@infection:domain"
+		],
+		"infection:core": "@php vendor/bin/infection --threads=max --configuration=infection.json5",
+		"infection:domain": "@php vendor/bin/infection --threads=max --configuration=infection-domain.json5",
 		"build": "bash tools/build-zip.sh",
 		"i18n:pot": "npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- wp i18n make-pot . languages/creative-search.pot --domain=creative-search --exclude=node_modules,vendor,tests,tools,tmp,docs",
 		"check": [

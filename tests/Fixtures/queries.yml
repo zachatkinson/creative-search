@@ -105,9 +105,9 @@ queries:
     kind: typo
     why: typo on a long word with an exact first token
     expect: { top: MNL-PER-00016, products: [MNL-PER-00016] }
-  - q: "dck"
+  - q: "dek"
     kind: typo
-    why: three characters are never fuzzed and dck is no prefix of anything, so nothing is found
+    why: three characters are never fuzzed and dek is no prefix of anything, so nothing is found (dck would be a SKU prefix, D-032)
     expect: { zero: true }
 
   # Numbers, sizes and SKUs are never fuzzed
@@ -145,8 +145,8 @@ queries:
     expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001] }
   - q: "KAZ-DEA-00002"
     kind: sku
-    why: a SKU-shaped token is never fuzzed, so a wrong digit finds nothing
-    expect: { zero: true }
+    why: a number is never fuzzed, so the wrong digit matches no SKU; the search drops that token once and says so (D-032, D-034)
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], corrected: "kaz dea" }
   - q: "KAZ-DBA-00021"
     kind: hidden
     why: a hidden product appears for its exact SKU only when the setting allows
@@ -175,8 +175,8 @@ queries:
     expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [Decks] }
   - q: "the"
     kind: stopword
-    why: when every token is a stop word the query is kept, so "the" still searches (and finds the descriptions)
-    expect: { products: [KAZ-DEA-00001] }
+    why: when every token is a stop word the query is kept and runs, but stop words are not in the index, so it finds nothing and is logged for the Analytics no-results list (D-026, D-032)
+    expect: { zero: true }
   - q: "quebecois"
     kind: brand
     why: accents fold both ways; the brand and the French descriptions match
@@ -193,8 +193,8 @@ queries:
   # Minus words and dropped tokens
   - q: "kazumi -dealer"
     kind: minus
-    why: a minus word excludes; Ghost Tiger and the tee remain
-    expect: { top: KAZ-GTO-00022, products: [KAZ-GTO-00022, KAZ-SLO-00023], absent: [KAZ-DEA-00001] }
+    why: a minus word excludes the Dealer (and the hidden Blank); the tee leads what remains, and the sold-out Ghost Tiger sits below every KAZUMI product in stock (D-032)
+    expect: { top: KAZ-SLO-00023, products: [KAZ-SLO-00023], absent: [KAZ-DEA-00001, KAZ-DBA-00021] }
   - q: "orbit wheels -cruiser"
     kind: minus
     why: both Classic listings, not the Cruiser

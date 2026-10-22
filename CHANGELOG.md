@@ -4,7 +4,27 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-21
+
+Milestone 2, Domain. The whole search algorithm as pure PHP under `src/Domain`, with no WordPress import, run in the tests against an in-memory index built from the catalogue fixture. Nothing a shopper or owner sees yet; milestone 3 gives it a database.
+
+### Added
+- `Domain\Tokenizer` with `Folding` (lower-case, accents, ligatures) and `StopWords` (Snowball's English and French lists): one token per word, inch marks read with the number and dropped (D-024), apostrophes indexed as the joined form and both sides at one position (D-025), stop words out and positions counted over the tokens kept (D-026, D-027), tokens capped at 64 characters.
+- `Domain\Stemmer`: exact ports of Snowball's `porter.sbl` and `french.sbl` (`PorterStemmer`, `FrenchStemmer`), an `IdentityStemmer` for other languages, and `Stemmers::for()`; both ports pass every vector in Snowball's distribution, vendored under `tests/Fixtures/snowball/` (D-031).
+- `Domain\Trigrams` (padded, distinct, half-shared minimum, D-035) and `Domain\Distance` (bounded Damerau–Levenshtein with transpositions; one edit for 4 to 7 characters, two from 8).
+- `Domain\QueryParser` and `Query`: quoted phrases, `-word` exclusion, a prefix flag on the unfinished last token, curly quotes straightened, 200 characters and 8 tokens, synonyms attached (`Synonym`, `Synonyms`, D-029), an all-stop-word query that runs and finds nothing.
+- `Domain\Analyzer`: a product or term as fields to the postings an index stores (term, field, frequency, first position), the stem as a second posting at the same position, the SKU field counted once (D-038).
+- `Domain\IndexStore`, the interface the searcher reads through (D-028), with `Document`, `TermMatch`, `TokenWidening`, `SearchOptions`, `SearchResult`, `Hit` and `Score` as the value objects around it.
+- `Domain\Searcher`: the widening plan as calls on the store (exact, variants, stem, synonyms and prefix together, D-033; typo candidates only when those find nothing), exclusions, the AND with phrase adjacency, the hidden-product rule, the retry that drops the least-matched token when nothing matched (D-034) and the term suggestions (D-037); a fallback language when a language finds nothing.
+- `Domain\Scorer` and `Score`: the spec's formula (field weight × match kind × `1 + ln(1 + tf)` × `ln((N + 1) / (df + 1))`, best field per token), phrase bonus, exact-name and exact-SKU bonuses, the stock penalty, owner boosts; every figure kept on the `Score` for `explain` in milestone 4.
+- `Domain\Scrub`: emails, phone numbers, card numbers and postal codes replaced before anything reaches the log (D-039).
+- Tests: a case table for every tokenizer, parser, scrub, distance and trigram rule; xorshift property tests on the tokenizer; Snowball's 64,256 vectors; scorer tests against hand-built documents; a searcher test on a hand-built index; and the golden set scored in memory against the catalogue at 300 products (`tests/Support/MemoryIndex`, `CatalogueIndexer`), with a benchmark that runs the fifty queries inside a second.
+- A second Infection configuration, `infection-domain.json5`, with a 100 % floor on `src/Domain`; `composer infection` runs both.
+
 ### Changed
+- Four golden expectations rewritten to match the algorithm the spec describes (D-032: `dck` → `dek`, the missing-SKU correction, `the` finds nothing, the exclusion query asserts absence). Generated products in the catalogue fixture now sell under 15 units so the hero products are the deterministic tie-break winners (D-036); SKUs, names and prices are unchanged.
+- `Support\Clock` joins the core Infection run; `Plugin`, `Hookable`, `Support\Options` and `Support\Tables` leave it as WordPress-bound (M1 review).
+- `phpcs.xml` says `minimum_supported_wp_version` 7.0, matching the floor (M1 review item 4).
 - Floors raised: WordPress 7.0 or later and PHP 8.5 or later (were 6.8 and 8.2; D-023). The toolchain moves to PHPUnit 13 and Infection 0.35; the WordPress integration suite keeps PHPUnit 9.6 in `tools/integration/`.
 - Firefox launches under Playwright on macOS 27 (D-022); the FiboSearch benchmark plan no longer needs a Pro licence (D-005).
 

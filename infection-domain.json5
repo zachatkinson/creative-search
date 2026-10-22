@@ -1,0 +1,47 @@
+{
+	// src/Domain at 100 % (docs/DECISIONS.md D-019, D-030): every mutant of the pure domain must die. `composer infection` runs this after infection.json5.
+	"$schema": "vendor/infection/infection/resources/schema.json",
+	"source": {
+		"directories": [
+			"src/Domain"
+		]
+	},
+	"bootstrap": "tests/bootstrap.php",
+	"timeout": 30,
+	"logs": {
+		"text": "tmp/infection-domain.log",
+		"summary": "tmp/infection-domain-summary.log",
+		"json": "tmp/infection-domain.json"
+	},
+	"phpUnit": {
+		"configDir": "."
+	},
+	"testFramework": "phpunit",
+	"testFrameworkOptions": "--testsuite=unit --exclude-group=benchmark",
+	"mutators": {
+		"@default": true,
+		// Equivalent mutants, each proven so in docs/reviews/M2.md: the mutated code behaves the same on every
+		// input the method can receive. Listed by method so a new mutant of another kind in the same method still counts.
+		"MBString": {
+			"ignore": [
+				// `mb_strlen( $token->text ) >= 2`: the tokenizer drops one-character tokens unless they are digits, which are one byte.
+				"CreativeBranding\\Search\\Domain\\QueryParser::parse"
+			]
+		},
+		"CastString": {
+			"ignore": [
+				// A numeric string can share no trigram with a token that has letters, and a token without letters is never fuzzed.
+				"CreativeBranding\\Search\\Domain\\Searcher::typoCandidates"
+			]
+		},
+		"GreaterThan": {
+			"ignore": [
+				// Two different suffixes of one length cannot both end the word, so `>` and `>=` pick the same one.
+				"CreativeBranding\\Search\\Domain\\Stemmer\\FrenchStemmer::among",
+				"CreativeBranding\\Search\\Domain\\Stemmer\\PorterStemmer::longestSuffix"
+			]
+		}
+	},
+	"minMsi": 100,
+	"minCoveredMsi": 100
+}

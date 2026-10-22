@@ -15,6 +15,9 @@
 	displayDetailsOnTestsThatTriggerWarnings="true"
 	cacheDirectory="tmp/.phpunit.cache"
 >
+	<php>
+		<ini name="memory_limit" value="512M"/>
+	</php>
 	<testsuites>
 		<testsuite name="unit">
 			<directory suffix="Test.php">tests/Unit</directory>
