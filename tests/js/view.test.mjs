@@ -1,9 +1,9 @@
 /**
  * The search block's state machine (assets/src/block/view.js): typing, debounce, stale answers, the cache,
  * keyboard moves, the live region's words, failures, the click beacon and recent searches.
- * Run with `npm run test:js`.
+ * Run with `npm run test:js` (Vitest).
  */
-import { test, beforeEach, afterEach, mock } from 'node:test';
+import { test, beforeEach, afterEach, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { installDom } from './support/dom.mjs';
 import { scope } from './support/interactivity.mjs';
@@ -104,7 +104,7 @@ let calls;
 let input;
 
 beforeEach( () => {
-	mock.timers.enable( { apis: [ 'setTimeout' ] } );
+	vi.useFakeTimers( { toFake: [ 'setTimeout', 'clearTimeout' ] } );
 	dom.elements.clear();
 	dom.beacons.length = 0;
 	dom.assigned.length = 0;
@@ -120,7 +120,7 @@ beforeEach( () => {
 	};
 } );
 
-afterEach( () => mock.timers.reset() );
+afterEach( () => vi.useRealTimers() );
 
 function type( text ) {
 	input.value = text;
@@ -128,7 +128,7 @@ function type( text ) {
 }
 
 async function settle( ms = 150 ) {
-	mock.timers.tick( ms );
+	vi.advanceTimersByTime( ms );
 	for ( let i = 0; i < 12; i++ ) {
 		await Promise.resolve();
 	}
@@ -145,9 +145,9 @@ test( 'nothing is asked below the minimum, and after 150 ms of quiet above it', 
 	await settle( 500 );
 	assert.equal( calls.length, 0 );
 	type( 'ka' );
-	mock.timers.tick( 100 );
+	vi.advanceTimersByTime( 100 );
 	type( 'kaz' );
-	mock.timers.tick( 100 );
+	vi.advanceTimersByTime( 100 );
 	assert.equal( calls.length, 0, 'still typing' );
 	await settle( 50 );
 	assert.equal( calls.length, 1 );
@@ -258,7 +258,7 @@ test( 'a slow answer says Searching after 400 ms', async () => {
 	type( 'kazumi' );
 	await settle();
 	assert.equal( scope.ctx.searching, false );
-	mock.timers.tick( 400 );
+	vi.advanceTimersByTime( 400 );
 	assert.equal( scope.ctx.searching, true );
 	assert.equal( scope.ctx.panel, true );
 } );

@@ -387,6 +387,8 @@ The spec says "jsdom for the state machine". This version of `@wordpress/scripts
 
 **Flagged for Zach:** approving `vitest` and `jsdom` as dev dependencies would let these tests move to the spec's tool with no change to what they check.
 
+**Update, 2026-10-22:** Zach approved Vitest. `npm run test:js` now runs the same 13 tests on Vitest 5.0.3 (`vitest.config.mjs` aliases `@wordpress/interactivity` to the double, which replaces Node's module hook; fake timers through `vi`). jsdom was not needed: the module makes a dozen browser calls, and the existing DOM double covers them.
+
 ### D-061 · The results page counts and filters what WooCommerce shows · 2026-10-21
 
 Found in review. The count line and the no-results state use the main query's `found_posts`, after WooCommerce's filters, visibility and "hide out of stock", not the ranked list's length. The ranking runs at `pre_get_posts` priority 5 (WooCommerce's own pass reads it) and sets `post__in` again at 20 (WooCommerce resets it from `loop_shop_post_in`). WooCommerce's "exclude from search" visibility is lifted for the ranked query, because the ranking already admits a hidden product only for an exact SKU with `hidden_by_sku` on; "hide out of stock" and catalogue visibility stay. The query's `search_terms` are cleared, and WooCommerce's classic layered-nav, attribute and price filter widgets get `posts.ID IN (ranked ids)` through their SQL filters, so their counts are over the ranked set. The words are unslashed (WordPress slashes `$_GET` before `pre_get_posts`) and decoded on a pretty search URL. Empty searches and feeds are left alone; a second page or a re-sort is not logged as a new search.
@@ -544,3 +546,14 @@ The first full-size run (`CSEARCH_BENCH_PRODUCTS=10000`, 10,000 products and the
 Measured again through the API: `/suggest` p95 cold 81.4 ms (budget 100), warm 0.4 ms (60), `/search` 76.9 ms (100). **Memory p95 is 8.41 MB against a budget of 4 MB: missed.** The postings of one common term, held as the Domain's arrays, take 3.3 MB on their own; wpdb's buffered result and its conversion to arrays roughly double that at the peak. The spec's design for this is one SQL statement that intersects and scores in the database (spec, "Query and API"). The milestone 4 searcher reads level by level and scores in PHP instead (D-028, D-055), which holds at 300 products and not at 10,000 for memory.
 
 **Why:** the time fixes are exact and cheap. Meeting 4 MB needs either the spec's in-database scoring, which duplicates the Domain in SQL, or a compact postings structure in the Domain and a streamed read past wpdb. Either is a design change for Zach to choose, not something to slip into the 1.0 milestone overnight. The benchmark still asserts 4 MB, so the 10,000-product CI leg stays red until that choice is made.
+
+### Zach's answers on the flagged decisions · 2026-10-22
+
+- **D-001 to D-004:** confirmed (Zach was told that anything not mentioned stands).
+- **D-034:** kept: the retry runs only when the AND finds nothing.
+- **D-048:** try running Infection inside the tests container against the repositories as part of the in-database scoring work (D-086); if that cannot be made to work, the integration tests stay the check for that code.
+- **D-051:** the shops' host (the same company as the demo site) is believed to run LiteSpeed. The answer is a persistent object cache, not a transient fallback: the plugin keeps using `wp_cache_*()`, and the host's object cache provides persistence. Which one depends on what the host offers. Checked 2026-10-22: the demo (zachatkinson.com/demos/skate) is on Foxpress Cloud (warren.foxpress.cloud; cPanel with CloudLinux), answers with `server: Apache` and no LiteSpeed headers, and has no object-cache drop-in or cache plugin installed; Foxpress's plan pages do not mention Redis or Memcached. Open: ask Foxpress whether Redis is available. If it is, Redis Object Cache (Till Krüss, the most installed standalone one) is the choice; if not, the spec's transient fallback comes back on the table.
+- **D-060:** `vitest` approved as a dev dependency, and `jsdom` too if Vitest alone is not enough.
+- **D-062:** confirmed.
+- **D-070:** confirmed: the boost and exclusion stay on the parent product.
+- **The exact-name bonus under in-database scoring:** a `name_key` column on `csearch_documents` is approved (the schema change CLAUDE.md asks about after milestone 1). See D-086.
