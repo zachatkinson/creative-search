@@ -126,13 +126,26 @@ final class ApiTest extends IndexTestCase {
 		self::assertSame( 'public, max-age=60', $first->get_headers()['Cache-Control'] );
 		$etag = $first->get_headers()['ETag'];
 		self::assertMatchesRegularExpression( '/^"2-[0-9a-f]{32}"$/', $etag, 'the generation and the query' );
-		self::assertSame( $etag, $this->call( 'GET', '/suggest', array( 'q' => '  KAZUMI ' ) )->get_headers()['ETag'], 'normalised' );
+		self::assertSame( $etag, $this->call( 'GET', '/suggest', array( 'q' => 'kazumi' ) )->get_headers()['ETag'], 'the same answer, the same ETag' );
 		$again = $this->call( 'GET', '/suggest', array( 'q' => 'kazumi' ), array( 'If-None-Match' => $etag ) );
 		self::assertSame( 304, $again->get_status() );
-		self::assertNotSame( $etag, $this->call( 'GET', '/suggest', array( 'q' => 'kazumi', 'limit' => 3 ) )->get_headers()['ETag'] );
+		self::assertNotSame( $etag, $this->call( 'GET', '/suggest', array( 'q' => 'kazumi', 'limit' => 1 ) )->get_headers()['ETag'], 'a different answer' );
 
 		$this->service( Reindex::class )->runInline();
 		self::assertNotSame( $etag, $this->call( 'GET', '/suggest', array( 'q' => 'kazumi' ) )->get_headers()['ETag'], 'a new generation' );
+
+		// A single product's change, once the answer's 60 seconds are up, is a new ETag: revalidation cannot keep
+		// the old body.
+		$etag    = $this->call( 'GET', '/suggest', array( 'q' => 'kazumi' ) )->get_headers()['ETag'];
+		$product = wc_get_product( $this->ids[0] );
+		self::assertInstanceOf( \WC_Product::class, $product );
+		$product->set_name( 'KAZUMI Skate Deck, Dealer Pro' );
+		$product->save();
+		$this->service( Indexer::class )->indexProduct( $this->ids[0] );
+		wp_cache_flush();
+		$fresh = $this->call( 'GET', '/suggest', array( 'q' => 'kazumi' ), array( 'If-None-Match' => $etag ) );
+		self::assertSame( 200, $fresh->get_status() );
+		self::assertNotSame( $etag, $fresh->get_headers()['ETag'] );
 	}
 
 	public function test_answers_are_cached_by_generation(): void {
@@ -173,6 +186,23 @@ final class ApiTest extends IndexTestCase {
 		self::assertSame( 200, $this->call( 'GET', '/search', array( 'q' => 'deck' ) )->get_status(), 'each route has its own limit' );
 		$_SERVER['REMOTE_ADDR'] = '203.0.113.10';
 		self::assertSame( 200, $this->call( 'GET', '/suggest', array( 'q' => 'deck' ) )->get_status(), 'another client' );
+
+		// A forged session cookie, new on every request, does not buy a new bucket.
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.11';
+		$statuses               = array();
+		for ( $i = 0; $i < 5; $i++ ) {
+			$_COOKIE = array( 'wp_woocommerce_session_abc' => 'customer' . $i . '||' . ( time() + 3600 ) . '||1||forged' );
+			$statuses[] = $this->call( 'GET', '/suggest', array( 'q' => 'deck' ) )->get_status();
+		}
+		$_COOKIE = array();
+		self::assertSame( array( 200, 200, 200, 429, 429 ), $statuses );
+
+		// A real one is its own client.
+		$expiry = time() + 3600;
+		$data   = 'shopper|' . $expiry;
+		$_COOKIE = array( 'wp_woocommerce_session_abc' => 'shopper||' . $expiry . '||1||' . hash_hmac( 'md5', $data, wp_hash( $data ) ) );
+		self::assertSame( 200, $this->call( 'GET', '/suggest', array( 'q' => 'deck' ) )->get_status(), 'a signed session is a client of its own' );
+		$_COOKIE = array();
 		unset( $_SERVER['REMOTE_ADDR'] );
 	}
 
@@ -189,7 +219,7 @@ final class ApiTest extends IndexTestCase {
 		$log->flush();
 		$rows = $this->service( LogRepository::class )->latest( 10 );
 		self::assertCount( 3, $rows );
-		self::assertSame( array( 'nothing-matches-this', '[redacted]', 'Kazumi Deck' ), array_column( $rows, 'query' ) );
+		self::assertSame( array( 'nothing-matches-this', '[redacted]', 'Kazumi  Deck' ), array_column( $rows, 'query' ) );
 		self::assertSame( 'kazumi deck', $rows[2]['normalised'] );
 		self::assertSame( array( 'page', 'suggest', 'suggest' ), array_column( $rows, 'source' ) );
 		self::assertSame( '0', $rows[0]['results'] );

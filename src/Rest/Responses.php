@@ -56,17 +56,19 @@ final class Responses {
 	}
 
 	/**
-	 * A cacheable answer: `Cache-Control: public, max-age=60` and an ETag of the generation and the normalised
-	 * request; a 304, without computing the answer, when the client already holds it.
+	 * A cacheable answer: `Cache-Control: public, max-age=60` and an ETag of the generation and the answer
+	 * itself, so a product's change, a setting or a synonym that changes what the shopper would see changes the
+	 * ETag; a 304 when the client already holds it. The answer is computed either way (from the cache when
+	 * warm), which also logs the search.
 	 *
 	 * @param WP_REST_Request<array<string, mixed>> $request    The request.
 	 * @param int                                   $generation The live generation.
-	 * @param array<int, mixed>                     $vary       The normalised request.
-	 * @param callable(): array<string, mixed>      $answer     Builds the answer.
+	 * @param callable(): array<mixed>              $answer     Builds the answer.
 	 */
-	public static function cacheable( WP_REST_Request $request, int $generation, array $vary, callable $answer ): WP_REST_Response {
-		$etag     = '"' . $generation . '-' . md5( (string) wp_json_encode( $vary ) ) . '"';
-		$response = $etag === $request->get_header( 'if_none_match' ) ? new WP_REST_Response( null, 304 ) : new WP_REST_Response( $answer(), 200 );
+	public static function cacheable( WP_REST_Request $request, int $generation, callable $answer ): WP_REST_Response {
+		$data     = $answer();
+		$etag     = '"' . $generation . '-' . md5( (string) wp_json_encode( $data ) ) . '"';
+		$response = $etag === $request->get_header( 'if_none_match' ) ? new WP_REST_Response( null, 304 ) : new WP_REST_Response( $data, 200 );
 		$response->header( 'Cache-Control', 'public, max-age=60' );
 		$response->header( 'ETag', $etag );
 		return $response;

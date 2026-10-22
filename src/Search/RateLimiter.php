@@ -78,8 +78,9 @@ final class RateLimiter {
 	}
 
 	/**
-	 * A key for the client: WooCommerce's session cookie when it has one, else the remote address; hashed, so
-	 * neither is kept even in the cache.
+	 * A key for the client: WooCommerce's session cookie when its signature checks out (a forged or rotated
+	 * cookie would otherwise buy a fresh bucket on every request), else the remote address; hashed, so neither
+	 * is kept even in the cache. Behind a proxy or CDN, `csearch_client_ip` supplies the shopper's address.
 	 *
 	 * @param array<string, mixed> $server  `$_SERVER`.
 	 * @param array<string, mixed> $cookies `$_COOKIE`.
@@ -87,12 +88,37 @@ final class RateLimiter {
 	public static function client( array $server, array $cookies ): string {
 		$session = '';
 		foreach ( $cookies as $name => $value ) {
-			if ( str_starts_with( (string) $name, 'wp_woocommerce_session_' ) && is_string( $value ) ) {
-				$session = $value;
+			if ( str_starts_with( (string) $name, 'wp_woocommerce_session_' ) && is_string( $value ) && self::validSession( wp_unslash( $value ) ) ) {
+				$session = wp_unslash( $value );
 				break;
 			}
 		}
-		$source = '' !== $session ? 's:' . $session : 'a:' . Cast::str( $server['REMOTE_ADDR'] ?? '' );
+		/**
+		 * The shopper's IP address for the rate limit. Default `REMOTE_ADDR`; a site behind a proxy or CDN
+		 * returns the address its trusted proxy forwards.
+		 *
+		 * @since 0.6.0
+		 *
+		 * @param string               $ip     The remote address.
+		 * @param array<string, mixed> $server `$_SERVER`.
+		 */
+		$ip     = Cast::str( apply_filters( 'csearch_client_ip', Cast::str( $server['REMOTE_ADDR'] ?? '' ), $server ) );
+		$source = '' !== $session ? 's:' . $session : 'a:' . $ip;
 		return substr( hash( 'sha256', wp_salt( 'nonce' ) . $source ), 0, 32 );
+	}
+
+	/**
+	 * Whether a WooCommerce session cookie carries a valid signature (`customer||expiry||expiring||hash`, the
+	 * hash an HMAC of `customer|expiry`, as `WC_Session_Handler` checks it) and has not expired.
+	 *
+	 * @param string $cookie The cookie's value.
+	 */
+	public static function validSession( string $cookie ): bool {
+		$parts = explode( '||', $cookie );
+		if ( 4 !== count( $parts ) || ! is_numeric( $parts[1] ) || (int) $parts[1] < Clock::timestamp() ) {
+			return false;
+		}
+		$data = $parts[0] . '|' . $parts[1];
+		return hash_equals( hash_hmac( 'md5', $data, wp_hash( $data ) ), $parts[3] );
 	}
 }

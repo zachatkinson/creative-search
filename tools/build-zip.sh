@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 version="$(grep -E '^ \* Version:' creative-search.php | awk '{print $3}')"
+npm run build >/dev/null
 stage="$(mktemp -d)/creative-search"
 mkdir -p "$stage"
 rsync -a --exclude-from=.distignore ./ "$stage/"

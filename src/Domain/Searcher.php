@@ -71,7 +71,7 @@ final class Searcher {
 		$extra     = array();
 		$reduced   = $query;
 		$kept      = $widenings;
-		if ( array() === $matched && count( $widenings ) >= 2 ) {
+		if ( array() === $matched && $options->retry && count( $widenings ) >= 2 ) {
 			$drop    = self::leastMatched( $widenings );
 			$reduced = $query->without( $drop );
 			$kept    = array_values( array_filter( $widenings, static fn( int $i ): bool => $i !== $drop, ARRAY_FILTER_USE_KEY ) );

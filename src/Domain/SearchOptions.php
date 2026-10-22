@@ -26,6 +26,8 @@ final class SearchOptions {
 	 * @param array<string, int> $boostRules   The owner's rules: a document's term ref (`category:12`) to a boost.
 	 * @param int                $limit        At most this many products (the results page's cap).
 	 * @param int                $termLimit    At most this many categories, tags and brands.
+	 * @param bool               $retry        Whether a query that matches nothing is retried without its least-matched
+	 *                                         token (off for "search instead for", the shopper's exact words).
 	 */
 	public function __construct(
 		public readonly array $weights = array(),
@@ -33,7 +35,8 @@ final class SearchOptions {
 		public readonly ?string $fallbackLang = 'en',
 		public readonly array $boostRules = array(),
 		public readonly int $limit = 500,
-		public readonly int $termLimit = 3
+		public readonly int $termLimit = 3,
+		public readonly bool $retry = true
 	) {
 	}
 

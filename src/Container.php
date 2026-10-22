@@ -47,6 +47,11 @@ final class Container {
 			Hooks\InstallHooks::class,
 			Hooks\RestHooks::class,
 			Hooks\LogHooks::class,
+			Hooks\ResultsHooks::class,
+			Block\SearchBlock::class,
+			Block\Shortcode::class,
+			Block\WidgetRegistrar::class,
+			Block\FormTakeover::class,
 		);
 	}
 

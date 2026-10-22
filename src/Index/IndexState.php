@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Index;
 
+use CreativeBranding\Search\Repository\OptionRepository;
 use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Clock;
 use CreativeBranding\Search\Support\Options;
@@ -19,12 +20,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * `csearch_index_state`: the live generation, the generation being built and its progress, the last reindex
- * (spec: Data model → Options, Generations). Read fresh from the database on every call, never from the request's
- * option cache: an Action Scheduler process runs many jobs, and each must see what the others wrote (D-053). The
+ * (spec: Data model → Options, Generations). Read straight from the options table on every call, never from a
+ * cache: an Action Scheduler process runs many jobs, and each must see what the others wrote (D-053). The
  * cancel flag lives in its own option, `csearch_reindex_cancel`, so a batch writing its progress cannot
  * overwrite it.
  */
 final class IndexState {
+
+	/**
+	 * Constructor.
+	 *
+	 * @param OptionRepository $options Reads options past every cache.
+	 */
+	public function __construct( private OptionRepository $options = new OptionRepository() ) {
+	}
 
 	public const LIVE         = 'live';
 	public const BUILDING     = 'building';
@@ -45,11 +54,21 @@ final class IndexState {
 	 * @return array<string, mixed>
 	 */
 	public function all(): array {
-		$stored = Options::fresh( Options::INDEX_STATE, array() );
-		$state  = array_merge( self::defaults(), is_array( $stored ) ? $stored : array() );
+		$state = $this->raw();
 
-		$state[ self::CANCELLED ] = null !== $state[ self::BUILDING ] && Cast::int( $state[ self::BUILDING ] ) === self::cancelledGeneration();
+		$state[ self::CANCELLED ] = null !== $state[ self::BUILDING ] && Cast::int( $state[ self::BUILDING ] ) === $this->cancelledGeneration();
 		return $state;
+	}
+
+	/**
+	 * The stored state alone, read fresh: one query, without the cancel flag.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function raw(): array {
+		$stored  = $this->options->raw( Options::INDEX_STATE );
+		$decoded = null === $stored ? null : json_decode( $stored, true );
+		return array_merge( self::defaults(), is_array( $decoded ) ? $decoded : array() );
 	}
 
 	/**
@@ -78,14 +97,14 @@ final class IndexState {
 	 * The generation the shop searches.
 	 */
 	public function live(): int {
-		return max( 1, Cast::int( $this->all()[ self::LIVE ] ) );
+		return max( 1, Cast::int( $this->raw()[ self::LIVE ] ) );
 	}
 
 	/**
 	 * The generation a reindex is writing, or null.
 	 */
 	public function building(): ?int {
-		$building = $this->all()[ self::BUILDING ];
+		$building = $this->raw()[ self::BUILDING ];
 		return null === $building ? null : Cast::int( $building );
 	}
 
@@ -217,17 +236,18 @@ final class IndexState {
 	/**
 	 * The generation the owner asked to stop, read fresh, or 0.
 	 */
-	private static function cancelledGeneration(): int {
-		return Cast::int( Options::fresh( Options::REINDEX_CANCEL, 0 ) );
+	private function cancelledGeneration(): int {
+		return Cast::int( $this->options->raw( Options::REINDEX_CANCEL ) );
 	}
 
 	/**
-	 * Write the state, without the derived cancel flag. Not autoloaded: it is read fresh anyway.
+	 * Write the state as JSON, without the derived cancel flag. Not autoloaded: it is read straight from the
+	 * table each time. JSON, not a serialised array, so the direct read never needs to unserialise.
 	 *
 	 * @param array<string, mixed> $state State.
 	 */
 	private function save( array $state ): void {
 		unset( $state[ self::CANCELLED ] );
-		update_option( Options::INDEX_STATE, $state, false );
+		update_option( Options::INDEX_STATE, (string) wp_json_encode( $state ), false );
 	}
 }

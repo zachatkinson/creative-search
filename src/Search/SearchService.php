@@ -36,6 +36,7 @@ final class SearchService {
 
 	public const MAX_QUERY = 200;
 	public const MAX_IDS   = 500;
+	public const MAX_TERMS = 10;
 
 	/**
 	 * Constructor.
@@ -85,9 +86,10 @@ final class SearchService {
 	 * @param string $lang     Checked language.
 	 * @param int    $limit    Products at most.
 	 * @param int    $termLimit Terms at most.
+	 * @param bool   $retry     Retry without the least-matched token when nothing matches.
 	 */
-	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0 ): SearchResult {
-		$options  = $this->options( $limit, $termLimit );
+	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true ): SearchResult {
+		$options  = $this->options( $limit, $termLimit, $retry );
 		$store    = $this->index->at( $this->index->generation() )->withTermRefs( array() !== $options->boostRules );
 		$langs    = array_values( array_unique( array_filter( array( $lang, $options->fallbackLang ) ) ) );
 		$parser   = new QueryParser( $this->analyzers->tokenizer(), new Synonyms( $this->synonyms->forLanguages( $langs ), $this->analyzers->tokenizer() ) );
@@ -100,10 +102,11 @@ final class SearchService {
 	 *
 	 * @param string      $raw    Query as received.
 	 * @param string|null $lang   Language asked for.
-	 * @param string      $source page or suggest.
+	 * @param string      $source page or suggest; empty for a repeat of a search already logged.
+	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
 	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}
 	 */
-	public function rankedIds( string $raw, ?string $lang, string $source = 'page' ): array {
+	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false ): array {
 		$query = self::clean( $raw );
 		$lang  = $this->language( $lang );
 		if ( '' === $query ) {
@@ -114,10 +117,10 @@ final class SearchService {
 				'lang'      => $lang,
 			);
 		}
-		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $this->settingsKey() ) );
+		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $this->settingsKey() ) );
 		$cached = $this->cache->get( $key );
 		if ( null === $cached ) {
-			$result = $this->run( $query, $lang );
+			$result = $this->run( $query, $lang, self::MAX_IDS, 0, ! $exact );
 			$cached = array(
 				'ids'       => $result->productIds(),
 				'corrected' => $result->corrected,
@@ -125,7 +128,9 @@ final class SearchService {
 			$this->cache->set( $key, $cached );
 		}
 		$ids = Cast::ints( $cached['ids'] ?? array() );
-		$this->log->record( $query, $lang, count( $ids ), $source );
+		if ( '' !== $source ) {
+			$this->log->record( $query, $lang, count( $ids ), $source );
+		}
 		return array(
 			'ids'       => $ids,
 			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
@@ -137,10 +142,11 @@ final class SearchService {
 	/**
 	 * The search options from the settings.
 	 *
-	 * @param int $limit     Products at most.
-	 * @param int $termLimit Terms at most.
+	 * @param int  $limit     Products at most.
+	 * @param int  $termLimit Terms at most.
+	 * @param bool $retry     Retry without the least-matched token.
 	 */
-	public function options( int $limit, int $termLimit ): SearchOptions {
+	public function options( int $limit, int $termLimit, bool $retry = true ): SearchOptions {
 		$weights = Settings::fieldWeights();
 		/**
 		 * The field weights the score uses, by field name (name, sku, short, long, category, tag, brand, attribute).
@@ -160,7 +166,8 @@ final class SearchService {
 			Settings::isOn( 'fallback_to_default_language' ) ? Languages::siteCode() : null,
 			self::boostRules( Settings::get( 'boost_rules' ) ),
 			max( 1, min( self::MAX_IDS, $limit ) ),
-			max( 0, min( Settings::TERMS_MAX, $termLimit ) )
+			max( 0, min( self::MAX_TERMS, $termLimit ) ),
+			$retry
 		);
 	}
 
@@ -194,7 +201,7 @@ final class SearchService {
 	 * @return array<int, mixed>
 	 */
 	public function settingsKey(): array {
-		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ) );
+		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ) );
 	}
 
 	/**

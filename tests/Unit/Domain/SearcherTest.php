@@ -290,6 +290,13 @@ final class SearcherTest extends TestCase {
 		self::assertNull( $this->search( 'snowboard' )->corrected );
 	}
 
+	public function test_the_retry_can_be_turned_off_for_the_shoppers_exact_words(): void {
+		$exact = $this->search( 'kazumi wheels', 'en', new SearchOptions( retry: false ) );
+		self::assertSame( array(), $exact->products, 'no product matches both, and nothing is dropped' );
+		self::assertNull( $exact->corrected );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $this->search( 'kazumi dealer', 'en', new SearchOptions( retry: false ) ) ), 'a query that matches is unaffected' );
+	}
+
 	public function test_the_retry_sorts_what_it_adds(): void {
 		$this->product( 'Alpha Snowboard', 'SNO-ALP-00001', array(), false, 500, array() );
 		$this->product( 'Beta Snowboard', 'SNO-BET-00002', array(), true, 1, array() );

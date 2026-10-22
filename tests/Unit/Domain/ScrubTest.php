@@ -43,6 +43,11 @@ final class ScrubTest extends TestCase {
 			'postal code with dash'  => array( 'H2X-1Y4' ),
 			'zip plus four'          => array( '12345-6789' ),
 			'mixed with words'       => array( 'deliver to H2X 1Y4 tomorrow' ),
+			'email being typed'      => array( 'jean.tremblay@g' ),
+			'email before the dot'   => array( 'jean.tremblay@gmail' ),
+			'phone being typed'      => array( '514 555 12' ),
+			'phone typed plain'      => array( '5145551' ),
+			'phone typed brackets'   => array( '(514) 555-1' ),
 		);
 	}
 
@@ -76,6 +81,10 @@ final class ScrubTest extends TestCase {
 			'phone too short'    => array( '555 1234' ),
 			'year'               => array( '2026 catalogue' ),
 			'price'              => array( '84.99' ),
+			'at the end'         => array( 'deck@' ),
+			'sizes then a digit' => array( '139 144 1' ),
+			'seven digit code'   => array( '1234567' ),
+			'phone in the middle of typing words' => array( '514 555 deck' ),
 		);
 	}
 

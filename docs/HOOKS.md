@@ -199,6 +199,52 @@ Each route's argument and response schemas are served on an `OPTIONS` request.
 
 `csearch_purge_log` (Action Scheduler, daily at 03:00 UTC): yesterday's counts rolled into `csearch_settings['stats']`, then log rows past the retention period deleted 1,000 at a time. `wp csearch explain "<query>" [--lang=] [--limit=] [--format=]` prints each candidate with its tokens, fields, weights and bonuses.
 
+## Milestones 5 and 6: the results page (0.6.0)
+
+### `csearch_rank_query` (filter)
+
+- **Since:** 0.6.0
+- **Signature:** `apply_filters( 'csearch_rank_query', bool $ours, WP_Query $query ): bool`
+- **What it does:** whether the plugin ranks a search. True for the main query of a product search (`?s=…&post_type=product`) on the front end; return false to hand a search back to WordPress, or true to rank another main-query search.
+- **Where it runs:** `Results\ProductSearch::isProductSearch()`, on `pre_get_posts` of the main query.
+- **Example:**
+
+```php
+add_filter( 'csearch_rank_query', static fn( bool $ours, WP_Query $q ): bool => $ours || ( $q->is_main_query() && $q->is_search() && ! is_admin() ), 10, 2 );
+```
+
+The page also reads `csearch_exact=1` (the "search instead for" link: the shopper's words with no token dropped) and `lang` (the language to search; the site's by default).
+
+## Milestone 6: the search block
+
+### `csearch_min_chars` (filter)
+
+- **Since:** 0.6.0
+- **Signature:** `apply_filters( 'csearch_min_chars', int $chars ): int`
+- **What it does:** characters typed before the block asks for suggestions; default the `min_chars` setting (2), clamped to 1 to 5.
+- **Where it runs:** `Block\FormOptions::fromSettingKeys()`, when a form renders.
+- **Example:**
+
+```php
+add_filter( 'csearch_min_chars', static fn(): int => 3 );
+```
+
+### `csearch_client_ip` (filter)
+
+- **Since:** 0.6.0
+- **Signature:** `apply_filters( 'csearch_client_ip', string $ip, array $server ): string`
+- **What it does:** the shopper's address for the rate limit; default `REMOTE_ADDR`. Behind a proxy or CDN, return the address your trusted proxy forwards (a forwarded header alone can be forged).
+- **Where it runs:** `Search\RateLimiter::client()`, on each public route.
+- **Example:**
+
+```php
+add_filter( 'csearch_client_ip', static fn( string $ip, array $server ): string => (string) ( $server['HTTP_CF_CONNECTING_IP'] ?? $ip ), 10, 2 );
+```
+
+### The block, the shortcode, the widget
+
+`creative-search/search` (block, Interactivity API store `creative-search/search`), `[creative_search]` (shortcode, same options as the settings keys), the "Creative Search" widget, and, with the `theme_form_takeover` setting, `get_search_form`. All four render through `Block\SearchForm`.
+
 ## Format for later entries
 
 ### `csearch_example` (filter)

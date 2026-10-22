@@ -17,5 +17,9 @@
 	},
 	"lifecycleScripts": {
 		"afterStart": "wp-env run cli wp plugin activate woocommerce plugin-check creative-search && wp-env run tests-cli wp plugin activate woocommerce creative-search"
-	}
+	},
+	"themes": [
+		"https://downloads.wordpress.org/theme/storefront.4.6.2.zip",
+		"https://downloads.wordpress.org/theme/kadence.1.5.2.zip"
+	]
 }

@@ -91,22 +91,4 @@ final class Options {
 	public static function metaKeys(): array {
 		return array( self::META_BOOST, self::META_EXCLUDE );
 	}
-
-	/**
-	 * An option read from the database, not from the request's cache: both the option's own cache entry and
-	 * the "does not exist" entry are dropped first, so a value another process wrote is seen (D-053).
-	 *
-	 * @param string $name     Option name (not autoloaded).
-	 * @param mixed  $fallback Value when missing.
-	 * @return mixed
-	 */
-	public static function fresh( string $name, $fallback = false ) {
-		wp_cache_delete( $name, 'options' );
-		$missing = wp_cache_get( 'notoptions', 'options' );
-		if ( is_array( $missing ) && isset( $missing[ $name ] ) ) {
-			unset( $missing[ $name ] );
-			wp_cache_set( 'notoptions', $missing, 'options' );
-		}
-		return get_option( $name, $fallback );
-	}
 }

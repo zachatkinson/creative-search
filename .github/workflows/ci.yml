@@ -90,6 +90,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run build
       - name: Pin the oldest supported WordPress, WooCommerce and PHP
         if: matrix.leg == 'oldest'
         run: npm run env:oldest
@@ -120,6 +121,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run build
       - run: npx wp-env start
       - run: composer install --working-dir=tools/integration --no-interaction
       - name: Full reindex (5 minutes) and the golden set through the API (p95 budgets), 10,000 products

@@ -32,7 +32,9 @@ final class Args {
 				'description'       => __( 'The search query, 200 characters at most.', 'creative-search' ),
 				'type'              => 'string',
 				'default'           => '',
-				'sanitize_callback' => static fn( $value ): string => SearchService::clean( sanitize_text_field( is_scalar( $value ) ? (string) $value : '' ) ),
+				// The same cleaning as the results page, so both paths search the same words (control characters
+				// removed, 200 characters); the query is only ever output escaped.
+				'sanitize_callback' => static fn( $value ): string => SearchService::clean( is_scalar( $value ) ? (string) $value : '' ),
 			),
 		);
 	}

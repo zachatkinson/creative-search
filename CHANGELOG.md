@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-21
+
+Milestones 5 and 6, Results page and Search block, released together (D-066; there is no 0.5.0). A shopper's product search now comes back in the plugin's order with the words around it the spec asks for, and the search bar suggests products, categories and brands as they type.
+
+### Added
+- `Results\ProductSearch`: the main product search on `?s=` gets the ranked ids as `post__in`, WordPress's search clause removed, "Relevance" in the plugin's order and every other sort over the same match set; WooCommerce's filters (categories, price, attributes) narrow the ranked set; other searches are left to WordPress; `csearch_rank_query` filter.
+- `Results\ResultsView`: "23 results for “kazumi”", "Showing results for *kazumi*; search instead for *kazumi wheels*" (`csearch_exact=1`), and a no-results state with the three nearest categories and the owner's fallback products, in classic templates and block templates (D-057, D-058).
+- `SearchOptions::$retry` in the Domain, so the shopper's exact words can be searched.
+- The `creative-search/search` block: a server-rendered search form that works with no script and becomes the ARIA list-autocomplete combobox with the Interactivity API (suggestions after 150 ms of quiet, one request in flight, stale answers dropped, 20 answers cached, keyboard parity, a polite live region, "Searching…" after 400 ms, silent failures, recent searches off by default, the click beacon); the `[creative_search]` shortcode, a widget and the theme-form takeover render the same form; 2.6 kB of script and 1.1 kB of CSS compressed; `csearch_min_chars` and `csearch_client_ip` filters.
+- Tests: 15 integration tests on the archive query and 6 on the block's rendering; 13 state-machine tests on Node's runner (D-060); browser tests on Storefront, Kadence and Twenty Twenty-Five, and the block's APG keyboard script, network delay, error and no-script runs, across three engines and two viewports, with axe on every state (85 runs).
+
+### Fixed before release (review of milestones 4 and 5)
+- The results page searches the shopper's words unslashed, so `Philly's` is searched as typed (D-061).
+- The ETag is the generation and the answer, so revalidation cannot keep a stale suggestion (D-062).
+- A forged WooCommerce session cookie no longer buys a fresh rate-limit bucket; `csearch_client_ip` for proxies (D-051).
+- The count line and the no-results state follow what WooCommerce shows after its filters; hidden-by-SKU products reach the results page; the classic filter widgets count the ranked set; the count line prints once on block themes (D-061).
+- Emails and phone numbers are redacted while they are being typed (D-063).
+- Empty searches and feeds are left to WordPress; a second page or a re-sort is not logged again; the "search instead" link keeps the page's language and filters; the nearest categories are three categories even when brands rank higher, and are cached; `show_prices` is part of the cache key; REST and the results page clean queries the same way; the index state is read straight from its table without writing to the object cache.
+
+### Changed
+- `IndexState::live()` reads one option, so a warm results page costs one extra query.
+- wp-env installs Storefront 4.6.2 and Kadence 1.5.2; Playwright's global setup launches the store and loads the hero products (D-059).
+
 ## [0.4.0] - 2026-10-21
 
 Milestones 3 and 4, Index and Query and API, released together (D-056; there is no 0.3.0). The Domain gets a database: products, categories, tags and brands are written to the four index tables in the background whenever they change, a full reindex builds the next generation beside the live one and switches when complete, and WP-CLI can index, rebuild and report. The searcher answers four REST routes from that index, cached, rate-limited and logged without the shopper. Nothing a shopper sees yet; the block in milestone 6 calls these routes.

@@ -327,6 +327,8 @@ Answers are kept with `wp_cache_set()` under a key of the live generation, a sal
 
 **Why:** The spec keeps rate-limit counters out of the database by name, and a transient fallback for the answer cache would write one row per distinct query. A shop that needs the rate limit has, or should have, a persistent object cache; the status screen in milestone 7 says which.
 
+**Spec deviation, flagged for Zach:** the spec's Compatibility line says "with and without a persistent object cache (transients fall back)". Without one, answers are not shared between requests and the rate limit does not hold. The rate limit's client key trusts a WooCommerce session cookie only when its HMAC verifies (a forged cookie per request would otherwise buy a new bucket each time), and `csearch_client_ip` lets a site behind a proxy supply the shopper's address.
+
 ### D-052 · A click finds its log row by query, not by id · 2026-10-21
 
 `POST /csearch/v1/click` takes the query, the language and what was clicked. It marks the newest unclicked log row with that normalised query and language written in the last ten minutes. Log rows are written after the response (spec: Logging), so the suggest response cannot carry the row's id.
@@ -349,10 +351,80 @@ Each reindex batch carries the last product id it walked and asks `ProductIdRepo
 
 The spec says a suggest call is "one SQL statement against the index plus one against the documents table". The searcher from milestone 2 asks the store level by level: a cold `/suggest` runs 15 to 18 statements, all on primary or unique keys (the index state, the synonyms, a prefix lookup, the postings of each token's terms for products and for terms, a trigram lookup only when nothing else matched, the document count, the documents and their SKU keys). At 300 products in two languages the golden set's p95 is 6.3 ms cold and 0.4 ms warm against budgets of 100 and 60.
 
+The same holds for a results page without a persistent object cache: the warm page adds one query (the live generation, every table counted in the test), a cold one 15 to 18, and a no-results page adds the nearest-categories search (cached with the answer).
+
 **Why:** Compiling the widening plan into one statement would duplicate the Domain's logic in SQL and lose the in-memory store the golden set is proven against (D-028). The budgets are what the statement count was for, and they hold. Flagged for Zach: if a shop shows a slow database round trip, the first step is to merge the two postings reads per level.
 
-### D-056 · Milestones 3 and 4 ship as one commit · 2026-10-21
+### D-056 · Milestones 3 and 4 ship as one commit (and 5 and 6, D-066) · 2026-10-21
 
 The milestone 3 review's fixes (the store interface, the container's hook list, the CLI registration) touched files milestone 4 was already changing in the same tree, and the integration suite runs only against the working tree wp-env mounts. Milestone 3 alone could not be verified, so both are one commit, tagged `v0.4.0`, with a review for each in `docs/reviews/`. There is no `v0.3.0` tag.
 
 **Why:** A tag for a state no test ran against would be a claim, not a check.
+
+## Milestone 5: the results page
+
+### D-057 · How the results page is changed, in classic and block themes · 2026-10-21
+
+The plugin ranks the main query of a product search (`post_type=product`, WooCommerce's own search form and the block's) and nothing else. It hooks `pre_get_posts` at priority 20, after WooCommerce, sets `post__in` to the ranked ids (or `array( 0 )` when there are none) and removes the `posts_search` clause for that query. WooCommerce already makes "Relevance" the first entry and the default sort on a search; the plugin maps it to `post__in` order through `woocommerce_get_catalog_ordering_args`. The count and corrected lines print on `woocommerce_before_shop_loop` (priority 5) in classic templates and before the `woocommerce/product-results-count` block in block templates; the no-results state prints on `woocommerce_no_products_found` and after `woocommerce/product-collection-no-results`. A search that leaves exactly one product redirects to it, as WooCommerce does by default.
+
+**Why:** The spec says "unchanged template" and names Kadence and Storefront (classic) while the shop may move to a block theme; hooking WooCommerce's own extension points serves both without a template override.
+
+### D-058 · "Search instead for" turns the retry off; the nearest categories come from the term suggestions · 2026-10-21
+
+The corrected line's link adds `csearch_exact=1`, which runs the shopper's words with `SearchOptions::$retry` off (new in the Domain, default on, tested to 100 % mutation). The no-results state's "three nearest categories" are the category documents the query's words point to (the same term suggestions the panel shows); when the words point nowhere, the three largest categories, without WooCommerce's "Uncategorized". The owner's fallback products are rendered with WooCommerce's own `[products]` shortcode class, four at most.
+
+**Why:** The spec names both features without saying how "search instead" avoids correcting itself or what "nearest" means.
+
+### D-059 · Storefront 4.6.2 and Kadence 1.5.2 in wp-env; a shared browser fixture · 2026-10-21
+
+`.wp-env.json` installs both themes from WordPress.org, pinned. `tests/e2e/fixtures/shop.php`, run once by Playwright's global setup, launches the store (WooCommerce's "coming soon" mode is on in a fresh install, which hid the shop from every logged-out test), restores WooCommerce's placeholder image and its sizes (missing in the environment; WebKit requested the 768 px one and logged a 404), loads ten hero products and reindexes. The axe helper moved to `tests/e2e/support/axe.ts`.
+
+**Why:** The milestone's tests are named against Kadence and Storefront. Themes in the test environment are not plugin dependencies; nothing ships with them.
+
+### D-060 · The block's state machine is tested on Node's own test runner · 2026-10-21
+
+The spec says "jsdom for the state machine". This version of `@wordpress/scripts` runs unit tests with Vitest, and neither Vitest, Jest nor jsdom is installed; CLAUDE.md says to ask before adding a dependency, and Zach was not there to ask. `npm run test:js` runs `tests/js/view.test.mjs` on `node --test`, importing the shipped `assets/src/block/view.js` through a module hook that swaps `@wordpress/interactivity` for a double with the runtime's generator-as-async behaviour, and a small DOM double for the dozen browser calls the module makes. The 13 tests cover typing, the debounce, stale answers, the cache, keyboard moves, the live region's words, failures, the beacon and recent searches; the real DOM is covered by 35 Playwright runs of the block on three engines.
+
+**Flagged for Zach:** approving `vitest` and `jsdom` as dev dependencies would let these tests move to the spec's tool with no change to what they check.
+
+### D-061 · The results page counts and filters what WooCommerce shows · 2026-10-21
+
+Found in review. The count line and the no-results state use the main query's `found_posts`, after WooCommerce's filters, visibility and "hide out of stock", not the ranked list's length. The ranking runs at `pre_get_posts` priority 5 (WooCommerce's own pass reads it) and sets `post__in` again at 20 (WooCommerce resets it from `loop_shop_post_in`). WooCommerce's "exclude from search" visibility is lifted for the ranked query, because the ranking already admits a hidden product only for an exact SKU with `hidden_by_sku` on; "hide out of stock" and catalogue visibility stay. The query's `search_terms` are cleared, and WooCommerce's classic layered-nav, attribute and price filter widgets get `posts.ID IN (ranked ids)` through their SQL filters, so their counts are over the ranked set. The words are unslashed (WordPress slashes `$_GET` before `pre_get_posts`) and decoded on a pretty search URL. Empty searches and feeds are left alone; a second page or a re-sort is not logged as a new search.
+
+**Why:** Each was a way the page could say one thing and show another, or rank `Philly\'s` instead of `Philly's`.
+
+### D-062 · The ETag is the generation and the answer · 2026-10-21
+
+Found in review. The spec names "an ETag of the index generation plus the normalised query", but the generation changes only on a full reindex, so a browser or CDN revalidating every 60 seconds would have kept a sold-out or renamed product's row indefinitely. The ETag is now a hash of the answer itself with the generation; the answer comes from the cache when warm, so a 304 still costs no search then, and every request (304 included) is logged.
+
+**Why:** "A single product's change is at most one TTL stale" has to hold through revalidation too. Spec deviation in wording, not in intent; flagged for Zach.
+
+### D-063 · Partial personal data is redacted as it is typed · 2026-10-21
+
+Found in review: `/suggest` logs as the shopper types, so `jean.tremblay@g` reached the log. `Domain\Scrub` now also redacts any text with characters on both sides of an `@`, and a North American phone number being typed (area code and exchange each starting 2 to 9, then at least one digit, at the end of the query). Partial postal codes (`H2X 1Y`) and partial card numbers are not redacted: the first is indistinguishable from the product codes the case table protects (`a1b 2c`) and names a neighbourhood, not a person; the second from long product numbers.
+
+**Why:** The reviewer's broader rule ("seven digits in a row") would also have redacted truck sizes (`139 144 149`), which the spec's own Scrub tests protect.
+
+### D-064 · The block's classes are hyphenated, and an option's name is its text · 2026-10-21
+
+The block's classes follow WordPress's stylelint pattern (`csearch-option-product`, not BEM's `csearch__option--product`). A suggestion's accessible name is its visible text with visually hidden comma separators ("KAZUMI Skate Deck, Dealer, $84.99, In stock"), not an `aria-label`, which axe flagged under WCAG 2.5.3 (label in name). The stock dot is drawn, not a `●` glyph that screen readers read.
+
+**Why:** Both were found by the gates: stylelint and axe.
+
+### D-065 · Suggestion term types and the click beacon follow the API · 2026-10-21
+
+The block's term rows are typed `category`, `tag` and `brand`, as `/suggest` returns them, and the click beacon sends the query, the language, the type and the id (D-052), not a log row id.
+
+**Why:** The block agent wrote the script against a guessed API before milestone 4 existed.
+
+### D-066 · Milestones 5 and 6 ship as one commit · 2026-10-21
+
+The block (milestone 6) was started in parallel and registered in the same container list as the results page's hooks; the review's fixes to milestone 5 landed in the same files. As with D-056, both ship as `v0.6.0`, with a review for each.
+
+**Why:** A tag for a state no test ran against would be a claim, not a check.
+
+### D-067 · The log is written at shutdown, without `fastcgi_finish_request()` · 2026-10-21
+
+Under PHP-FPM the connection stays open until `shutdown` callbacks finish, so the one-row INSERT is on the response's tail. Calling `fastcgi_finish_request()` from a plugin would cut off any later `shutdown` output another plugin prints (Query Monitor among them).
+
+**Why:** One prepared INSERT is well under a millisecond; flagged rather than forced.

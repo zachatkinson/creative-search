@@ -1,0 +1,228 @@
+/*
+ * The search block. Every colour, radius and length is a custom property that inherits the theme's
+ * presets, so a dark theme and a right-to-left site need no override; logical properties throughout.
+ */
+.wp-block-creative-search-search {
+	--csearch-bg: var(--wp--preset--color--base, #fff);
+	--csearch-fg: var(--wp--preset--color--contrast, #1e1e1e);
+	--csearch-border: color-mix(in srgb, var(--csearch-fg) 25%, transparent);
+	--csearch-highlight: color-mix(in srgb, var(--csearch-fg) 9%, var(--csearch-bg));
+	--csearch-muted: color-mix(in srgb, var(--csearch-fg) 65%, var(--csearch-bg));
+	--csearch-radius: 4px;
+	--csearch-gap: 0.5rem;
+	--csearch-row: 44px;
+	--csearch-thumb: 48px;
+	--csearch-shadow: 0 8px 24px color-mix(in srgb, var(--csearch-fg) 18%, transparent);
+
+	position: relative;
+	color: var(--csearch-fg);
+}
+
+.csearch-sr {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+.csearch-form {
+	position: relative;
+	margin: 0;
+}
+
+.csearch-label {
+	display: block;
+	margin-block-end: calc(var(--csearch-gap) / 2);
+}
+
+.csearch-field {
+	display: flex;
+	align-items: stretch;
+	background: var(--csearch-bg);
+	border: 1px solid var(--csearch-border);
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-field:focus-within {
+	outline: 2px solid currentcolor;
+	outline-offset: 1px;
+}
+
+.csearch-input {
+	flex: 1 1 auto;
+	min-inline-size: 0;
+	min-block-size: var(--csearch-row);
+	margin: 0;
+	padding-block: 0;
+	padding-inline: var(--csearch-gap);
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-input:focus {
+	outline: none;
+}
+
+.csearch-clear,
+.csearch-submit {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: var(--csearch-row);
+	min-block-size: var(--csearch-row);
+	margin: 0;
+	padding: 0;
+	color: inherit;
+	cursor: pointer;
+	background: transparent;
+	border: 0;
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-clear:focus-visible,
+.csearch-submit:focus-visible {
+	outline: 2px solid currentcolor;
+	outline-offset: -4px;
+}
+
+.csearch-icon {
+	fill: currentcolor;
+}
+
+.csearch-panel {
+	position: absolute;
+	inset-inline: 0;
+	inset-block-start: 100%;
+	z-index: 50;
+	max-block-size: min(70vh, 36rem);
+	margin-block-start: calc(var(--csearch-gap) / 2);
+	overflow-y: auto;
+	color: var(--csearch-fg);
+	background: var(--csearch-bg);
+	border: 1px solid var(--csearch-border);
+	border-radius: var(--csearch-radius);
+	box-shadow: var(--csearch-shadow);
+}
+
+.csearch-panel.is-above {
+	inset-block-start: auto;
+	inset-block-end: 100%;
+	margin-block-start: 0;
+	margin-block-end: calc(var(--csearch-gap) / 2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+
+	.csearch-panel {
+		animation: csearch-fade 120ms ease-out;
+	}
+}
+
+@keyframes csearch-fade {
+
+	from {
+		opacity: 0;
+	}
+}
+
+.csearch-status {
+	margin: 0;
+	padding-block: var(--csearch-gap);
+	padding-inline: var(--csearch-gap);
+	color: var(--csearch-muted);
+}
+
+.csearch-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.csearch-option {
+	display: flex;
+	gap: var(--csearch-gap);
+	align-items: center;
+	min-block-size: var(--csearch-row);
+	margin: 0;
+	padding-block: calc(var(--csearch-gap) / 2);
+	padding-inline: var(--csearch-gap);
+	cursor: pointer;
+	border-inline-start: 3px solid transparent;
+}
+
+.csearch-option.is-active {
+	background: var(--csearch-highlight);
+	border-inline-start-color: currentcolor;
+}
+
+.csearch-option-all {
+	font-weight: 600;
+	border-block-start: 1px solid var(--csearch-border);
+}
+
+.csearch-thumb {
+	flex: none;
+	inline-size: var(--csearch-thumb);
+	block-size: var(--csearch-thumb);
+	overflow: hidden;
+	background: var(--csearch-highlight);
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-thumb img {
+	display: block;
+	inline-size: 100%;
+	block-size: 100%;
+	object-fit: cover;
+}
+
+.csearch-text {
+	display: flex;
+	flex-direction: column;
+	min-inline-size: 0;
+}
+
+.csearch-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.csearch-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--csearch-gap);
+	font-size: 0.875em;
+	color: var(--csearch-muted);
+}
+
+.csearch-stock::before {
+	display: inline-block;
+	inline-size: 0.5em;
+	block-size: 0.5em;
+	margin-inline-end: 0.3em;
+	border: 1px solid currentcolor;
+	border-radius: 50%;
+	background: currentcolor;
+	content: "";
+}
+
+.csearch-stock.is-out::before {
+	background: transparent;
+}
+
+@media (pointer: coarse), (width <= 600px) {
+
+	.wp-block-creative-search-search {
+		--csearch-row: 48px;
+	}
+}

@@ -93,7 +93,6 @@ final class SearchRoute implements Route {
 		return Responses::cacheable(
 			$request,
 			$this->search->index()->generation(),
-			array( 'search', SearchLog::normalise( $query ), $lang, $page, $perPage ),
 			function () use ( $query, $lang, $page, $perPage ): array {
 				$ranked = $this->search->rankedIds( $query, $lang, 'page' );
 				$total  = count( $ranked['ids'] );

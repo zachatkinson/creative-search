@@ -1,0 +1,4 @@
+/* The preview is the shop's markup; the editor only keeps it from reacting to the cursor. */
+.wp-block-creative-search-search .csearch-form {
+	pointer-events: none;
+}

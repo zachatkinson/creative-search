@@ -80,7 +80,6 @@ final class SuggestRoute implements Route {
 		return Responses::cacheable(
 			$request,
 			$this->search->index()->generation(),
-			array( 'suggest', SearchLog::normalise( $query ), $lang, $limit, get_locale() ),
 			fn(): array => $this->suggestions->answer( $query, $lang, $limit )
 		);
 	}

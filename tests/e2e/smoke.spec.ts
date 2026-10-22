@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
+import { axe } from './support/axe';
 
 /**
  * Milestone 1 has no screen of its own, so the smoke test proves the plugin is active, raises no console
@@ -17,27 +17,6 @@ async function login( page: Page ) {
 	await page.fill( '#user_pass', PASS );
 	await page.click( '#wp-submit' );
 	await page.waitForURL( /wp-admin/ );
-}
-
-export async function axe( page: Page, name: string, include = 'body' ) {
-	const results = await new AxeBuilder( { page } )
-		.withTags( [ 'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa' ] )
-		.include( include )
-		.analyze();
-	const serious = results.violations.filter(
-		( v ) => v.impact === 'serious' || v.impact === 'critical'
-	);
-	expect(
-		serious,
-		`${ name }: ${ JSON.stringify(
-			serious.map( ( v ) => ( {
-				id: v.id,
-				nodes: v.nodes.map( ( n ) => n.html ),
-			} ) ),
-			null,
-			2
-		) }`
-	).toEqual( [] );
 }
 
 // WooCommerce's own dashboard widgets load over admin-ajax after login; WebKit reports those requests as
