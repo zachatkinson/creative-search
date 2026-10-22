@@ -61,8 +61,10 @@ interface IndexStore {
 	/**
 	 * Documents by id.
 	 *
-	 * @param int[] $ids Document ids; may be empty, which answers an empty array.
+	 * @param int[]  $ids Document ids; may be empty, which answers an empty array.
+	 * @param string $key The query's key: when given, a document's SKU keys hold that key alone, when it has it,
+	 *                    since the search only compares them with it; empty gives them all.
 	 * @return array<int, Document> Keyed by id; a missing id is absent.
 	 */
-	public function documents( array $ids ): array;
+	public function documents( array $ids, string $key = '' ): array;
 }

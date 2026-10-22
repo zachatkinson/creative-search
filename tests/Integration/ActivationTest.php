@@ -81,4 +81,50 @@ final class ActivationTest extends IntegrationTestCase {
 		$blocks = \Automattic\WooCommerce\Utilities\FeaturesUtil::get_compatible_plugins_for_feature( 'cart_checkout_blocks', false );
 		self::assertContains( $plugin, $blocks['compatible'] );
 	}
+
+	public function test_the_bundled_canadian_french_loads_from_the_domain_path(): void {
+		// For an active plugin, wp-settings.php registers the `Domain Path` header's folder and WordPress loads
+		// `languages/` just in time (D-076). The test suite loads the plugin from its bootstrap, not as an active
+		// plugin, so the test registers the folder the way wp-settings.php does; the French browser run covers a
+		// real site.
+		$path     = WP_PLUGIN_DIR . '/creative-search/creative-search.php';
+		$data     = get_plugin_data( $path, false, false );
+		$registry = $GLOBALS['wp_textdomain_registry'];
+		$paths    = new \ReflectionProperty( $registry, 'custom_paths' );
+		$before   = $paths->getValue( $registry );
+		$registry->set_custom_path( $data['TextDomain'], dirname( $path ) . $data['DomainPath'] );
+		// switch_to_locale() needs WordPress's own fr_CA files, which the test site lacks; the locale filter does not.
+		$locale = static fn(): string => 'fr_CA';
+		add_filter( 'locale', $locale );
+		add_filter( 'determine_locale', $locale );
+		unload_textdomain( 'creative-search' );
+		$french = __( 'Search products', 'creative-search' );
+		// The scripts' strings: WordPress finds each JSON file by the script's path inside the plugin (D-084).
+		$scripts = array();
+		foreach ( array( 'build/block/editor.js', 'assets/admin/tools.js' ) as $file ) {
+			wp_register_script( 'csearch-i18n-test-' . md5( $file ), plugins_url( $file, CSEARCH_FILE ), array(), CSEARCH_VERSION, true );
+			$json             = load_script_textdomain( 'csearch-i18n-test-' . md5( $file ), 'creative-search', CSEARCH_PATH . 'languages' );
+			$scripts[ $file ] = is_string( $json ) ? json_decode( $json, true )['locale_data']['messages'] ?? array() : array();
+			wp_deregister_script( 'csearch-i18n-test-' . md5( $file ) );
+		}
+		remove_filter( 'locale', $locale );
+		remove_filter( 'determine_locale', $locale );
+		unload_textdomain( 'creative-search' );
+		$paths->setValue( $registry, $before );
+		self::assertSame( 'Rechercher des produits', $french );
+		self::assertSame( 'Search products', __( 'Search products', 'creative-search' ), 'English again' );
+		self::assertSame( array( 'Texte indicatif' ), $scripts['build/block/editor.js']['Placeholder'] ?? null, 'the editor script in French' );
+		self::assertArrayHasKey( '%1$s of %2$s product', $scripts['assets/admin/tools.js'], 'the Tools script in French' );
+	}
+
+	public function test_the_matrix_leg_is_the_one_asked_for(): void {
+		// tools/integration.sh's switches (D-083) must change what they say, or a leg proves nothing.
+		$hpos = getenv( 'CSEARCH_HPOS' );
+		if ( 'off' === $hpos || 'on' === $hpos ) {
+			self::assertSame( 'on' === $hpos, \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled() );
+		}
+		self::assertSame( 'persistent' === getenv( 'CSEARCH_OBJECT_CACHE' ), (bool) wp_using_ext_object_cache() );
+		$host = getenv( 'WORDPRESS_DB_HOST' );
+		self::assertSame( false === $host ? DB_HOST : $host, DB_HOST );
+	}
 }

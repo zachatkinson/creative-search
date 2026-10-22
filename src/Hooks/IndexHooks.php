@@ -138,6 +138,20 @@ final class IndexHooks implements Hookable {
 	 */
 	public function termsSet( $objectId, $terms = null, $ttIds = array(), $taxonomy = '', $append = false, $oldTtIds = array() ): void {
 		$taxonomy = Cast::str( $taxonomy );
+		if ( 'product_visibility' === $taxonomy ) {
+			$new     = Cast::ints( $ttIds );
+			$old     = Cast::ints( $oldTtIds );
+			$changed = array_merge( array_diff( $new, $old ), array_diff( $old, $new ) );
+			// The out-of-stock flag moves WooCommerce's counts only when the shop hides out-of-stock products.
+			$soldOut = get_term_by( 'slug', 'outofstock', 'product_visibility' );
+			if ( $soldOut instanceof WP_Term && 'yes' !== get_option( 'woocommerce_hide_out_of_stock_items' ) ) {
+				$changed = array_diff( $changed, array( $soldOut->term_taxonomy_id ) );
+			}
+			if ( array() !== $changed ) {
+				$this->visibilityChanged( Cast::int( $objectId ) );
+			}
+			return;
+		}
 		if ( ! self::isProductTaxonomy( $taxonomy ) ) {
 			return;
 		}
@@ -149,6 +163,25 @@ final class IndexHooks implements Hookable {
 			$new = Cast::ints( $ttIds );
 			$old = Cast::ints( $oldTtIds );
 			$this->queue->termTaxonomies( $taxonomy, array_merge( array_diff( $new, $old ), array_diff( $old, $new ) ) );
+		}
+	}
+
+	/**
+	 * A product's catalogue visibility or out-of-stock flag changed: WooCommerce's count of its categories, tags
+	 * and brands (and their parents) may have changed with it, so their documents are rewritten (D-078).
+	 *
+	 * @param int $productId Product id.
+	 */
+	private function visibilityChanged( int $productId ): void {
+		if ( 'product' !== get_post_type( $productId ) ) {
+			return;
+		}
+		foreach ( array_keys( TermReader::TYPES ) as $taxonomy ) {
+			// From the term cache the save has already filled, so the save request stays free of queries.
+			$terms = get_the_terms( $productId, $taxonomy );
+			if ( is_array( $terms ) ) {
+				$this->queue->termTaxonomies( $taxonomy, array_map( static fn( WP_Term $term ): int => $term->term_taxonomy_id, $terms ) );
+			}
 		}
 	}
 

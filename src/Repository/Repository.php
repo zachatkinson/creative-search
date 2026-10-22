@@ -42,6 +42,8 @@ abstract class Repository {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- prepared by the caller.
 		$rows = $wpdb->get_results( $prepared, ARRAY_A );
+		// wpdb keeps its own copy of the last result as objects; a search reads thousands of postings, so let it go.
+		$wpdb->flush();
 		/** @var array<int, array<string, string|null>> $rows */
 		return is_array( $rows ) ? $rows : array();
 	}

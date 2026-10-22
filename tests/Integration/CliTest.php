@@ -75,7 +75,7 @@ final class CliTest extends IndexTestCase {
 
 		WP_CLI::$lines = array();
 		$command->reindex( array(), array( 'inline' => true ) );
-		self::assertSame( 'log: 1 of 1 products', WP_CLI::$lines[0] );
+		self::assertSame( 'log: 1 of 1 product', WP_CLI::$lines[0] );
 		self::assertStringStartsWith( 'success: Generation 2 is live (', (string) end( WP_CLI::$lines ) );
 
 		WP_CLI::$lines = array();
@@ -109,7 +109,7 @@ final class CliTest extends IndexTestCase {
 		self::assertSame( 1, $rows['products'] );
 		self::assertSame( 1, $rows['documents'] );
 		self::assertGreaterThan( 20, $rows['postings'] );
-		self::assertMatchesRegularExpression( '/^\d+ \(\d+ in use\)$/', $rows['terms'] );
+		self::assertMatchesRegularExpression( '/^\d+; in use: \d+$/', $rows['terms'] );
 		self::assertSame( 0, $rows['errors'] );
 		self::assertSame( 'json', WP_CLI::$format );
 		self::assertSame( 1, $this->service( IndexState::class )->live() );

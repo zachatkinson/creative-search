@@ -23,6 +23,7 @@ $csearch_file        = $csearch_placeholder > 0 ? get_attached_file( $csearch_pl
 if ( is_string( $csearch_file ) && ! file_exists( $csearch_file ) ) {
 	$csearch_source = WC()->plugin_path() . '/assets/images/placeholder.webp';
 	if ( file_exists( $csearch_source ) ) {
+		wp_mkdir_p( dirname( $csearch_file ) );
 		copy( $csearch_source, $csearch_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy -- a test fixture restoring WooCommerce's own file.
 	}
 }
@@ -44,7 +45,20 @@ if ( ! get_page_by_path( 'search-block' ) ) {
 	);
 }
 
+// The French run (tests/e2e/french.spec.ts): products answer in French too (the must-use plugin in
+// tests/e2e/fixtures/french.php reads this option on every request; this process adds its filter itself).
+$csearch_french_new = 'yes' !== get_option( 'csearch_e2e_french' );
+update_option( 'csearch_e2e_french', 'yes', false );
+add_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
+Plugin::container()->get( \CreativeBranding\Search\Index\Languages::class )->flush();
+Plugin::container()->get( \CreativeBranding\Search\Index\AnalyzerFactory::class )->flush();
+
 if ( wc_get_product_id_by_sku( 'KAZ-DEA-00001' ) ) {
+	if ( $csearch_french_new ) {
+		Plugin::container()->get( Reindex::class )->runInline();
+		echo "present, reindexed in French\n";
+		return;
+	}
 	echo "present\n";
 	return;
 }

@@ -39,7 +39,10 @@ function context( overrides = {} ) {
 				'1 recent search',
 				'2 recent searches',
 			],
-			seeAll: 'See all %1$s results for %2$s',
+			seeAll: [
+				'See %1$s result for %2$s',
+				'See all %1$s results for %2$s',
+			],
 			inStock: 'In stock',
 			outOfStock: 'Out of stock',
 			separator: ', ',
@@ -224,6 +227,7 @@ test( 'a stale answer is dropped', async () => {
 		scope.ctx.rows.map( ( r ) => r.key ),
 		[ 'p11', 'all' ]
 	);
+	assert.equal( scope.ctx.rows[ 1 ].name, 'See 1 result for kazumi d' );
 } );
 
 test( 'answers are cached for the page', async () => {
@@ -275,6 +279,15 @@ test( 'Down and Up move through the rows and wrap; activedescendant follows', as
 	actions.keydown( key( 'ArrowDown' ) );
 	actions.keydown( key( 'ArrowDown' ) );
 	assert.equal( ctx.active, 0, 'wrapped' );
+	actions.keydown( key( 'Escape' ) );
+	actions.keydown( key( 'ArrowDown', { altKey: true } ) );
+	assert.equal( ctx.active, -1 );
+	actions.keydown( key( 'ArrowUp' ) );
+	assert.equal(
+		ctx.active,
+		ctx.rows.length - 1,
+		'Up with no row chosen goes to the last'
+	);
 } );
 
 test( 'Escape closes, then clears; Tab closes; Alt+Down opens without moving', async () => {

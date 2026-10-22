@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 0.7.0
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -34,7 +34,29 @@ No. The index, the suggestions and the analytics are all on the server; nothing 
 
 Nothing. The search log holds the words typed, the result count, the language and the time, for 90 days by default. No IP address, user id, session or page URL; queries that look like personal details are redacted.
 
+= Which languages does it speak? =
+
+English and French are built in: stop words, stemming (Porter and Snowball French) and accent folding, so `vetements` finds Vêtements and `roues` finds roue. The plugin's screens and the search bar ship in English and Canadian French (`fr_CA`). A shop with a French site adds its French product text through the `csearch_languages` filter (documented in the plugin's repository, docs/HOOKS.md); a French search that finds nothing falls back to the site language, because a brand name is the same in both.
+
+= Is the search bar accessible? =
+
+It is an ARIA combobox built to the WAI-ARIA Authoring Practices list-autocomplete pattern, checked with axe on every state in Chromium, Firefox and WebKit at desktop and phone widths, in English and in French. The manual pass with VoiceOver and NVDA by an independent tester has not been run yet; the script for it is in the plugin's repository (docs/A11Y.md).
+
+= How does it compare with FiboSearch? =
+
+The plugin's repository (docs/BENCHMARK.md) has a feature-by-feature comparison with FiboSearch free and Pro, built from FiboSearch's own documentation. A measured run against FiboSearch free on a generated catalogue is there too; it is interim until it is repeated on a real shop's catalogue.
+
+= How do I see why a product ranks where it does? =
+
+WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi deck"`.
+
 == Changelog ==
+
+= 1.0.0 =
+* Languages: French end to end, with the plugin translated into Canadian French; a French search falls back to the site language (Settings → General) when it finds nothing.
+* Category and tag suggestions count their subcategories' products, as the shop does.
+* The suggestion panel says "See 1 result" for one result, and Up from the field goes to the last suggestion.
+* Documentation complete: hooks, settings, security, accessibility, benchmarks against FiboSearch, query plans and decisions.
 
 = 0.7.0 =
 * Admin: WooCommerce → Search, with Analytics (searches a day, top queries, searches with no results, most clicked, CSV export), Synonyms (add, edit, delete, test, CSV import and export), Boosts and exclusions, and Tools (index status, rebuild with progress, a test search that explains its ranking, stop words and settings).

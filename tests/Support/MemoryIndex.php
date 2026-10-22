@@ -55,6 +55,13 @@ final class MemoryIndex implements IndexStore {
 	private array $counts = array();
 
 	/**
+	 * The query keys documents() was asked with, in order.
+	 *
+	 * @var string[]
+	 */
+	public array $keysAsked = array();
+
+	/**
 	 * Add a document with its postings.
 	 *
 	 * @param Document                                        $document The document.
@@ -167,8 +174,9 @@ final class MemoryIndex implements IndexStore {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function documents( array $ids ): array {
-		$out = array();
+	public function documents( array $ids, string $key = '' ): array {
+		$this->keysAsked[] = $key;
+		$out               = array();
 		foreach ( $ids as $id ) {
 			if ( isset( $this->documents[ $id ] ) ) {
 				$out[ $id ] = $this->documents[ $id ];

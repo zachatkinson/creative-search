@@ -201,7 +201,7 @@ final class SynonymsCommand {
 			return;
 		}
 		/* translators: 1: synonyms added, 2: rows already present, 3: rows that were not synonyms */
-		WP_CLI::success( sprintf( __( 'Import finished: %1$d added, %2$d already there, %3$d skipped.', 'creative-search' ), $done['added'], $done['existing'], $done['skipped'] ) );
+		WP_CLI::success( sprintf( __( 'Import finished. Added: %1$d. Already there: %2$d. Skipped: %3$d.', 'creative-search' ), $done['added'], $done['existing'], $done['skipped'] ) );
 	}
 
 	/**

@@ -19,8 +19,8 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
-| `languages` | `[]` (the site's language) | codes, 2 to 8 characters | Languages to index; the `csearch_languages` filter adds how to read a product in each. |
-| `fallback_to_default_language` | `yes` | yes/no | When a language's documents find nothing, search the site language's. |
+| `languages` | `[]` (the site's language: the one set under Settings → General, D-076) | codes, 2 to 8 characters | Languages to index; the `csearch_languages` filter adds how to read a product in each. |
+| `fallback_to_default_language` | `yes` | yes/no | When a language's documents find nothing, search the site language's (Settings → General, not the visitor's locale; D-076). |
 
 ## Matching
 

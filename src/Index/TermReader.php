@@ -61,6 +61,18 @@ final class TermReader {
 	}
 
 	/**
+	 * How many products a term lists, as the shop shows it: WooCommerce's count for a category, tag or brand
+	 * (visible products, the subcategories' included), kept in term meta; the term's own count when the meta has
+	 * not been written yet (D-078).
+	 *
+	 * @param WP_Term $term The term.
+	 */
+	public static function count( WP_Term $term ): int {
+		$counted = get_term_meta( $term->term_id, 'product_count_' . $term->taxonomy, true );
+		return is_numeric( $counted ) ? max( 0, (int) $counted ) : max( 0, $term->count );
+	}
+
+	/**
 	 * The term in every language.
 	 *
 	 * @param WP_Term $term The term.
@@ -94,7 +106,7 @@ final class TermReader {
 				true,
 				true,
 				0,
-				Cast::int( $term->count )
+				self::count( $term )
 			);
 		}
 		return $out;

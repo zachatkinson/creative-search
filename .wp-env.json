@@ -5,7 +5,8 @@
 	"mappings": {
 		"wp-content/plugins/woocommerce": "https://downloads.wordpress.org/plugin/woocommerce.11.2.1.zip",
 		"wp-content/plugins/plugin-check": "https://downloads.wordpress.org/plugin/plugin-check.2.1.0.zip",
-		"wp-content/plugins/creative-search": "."
+		"wp-content/plugins/creative-search": ".",
+		"wp-content/mu-plugins/csearch-e2e-french.php": "./tests/e2e/fixtures/french.php"
 	},
 	"port": 8890,
 	"testsPort": 8891,

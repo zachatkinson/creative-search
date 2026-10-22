@@ -31,10 +31,21 @@ final class Languages {
 	private ?array $languages = null;
 
 	/**
-	 * The site's language code (`en` for `en_US`).
+	 * The site's language code (`en` for `en_US`): the language set under Settings → General, not this request's
+	 * locale, which a multilingual plugin or a language switcher changes per visitor (D-076).
 	 */
 	public static function siteCode(): string {
-		return StopWords::code( get_locale() );
+		// `get_locale()`'s order without its `locale` filter: the constant, overridden by the site's option when
+		// it exists (an empty string is the site choosing English), on multisite the network's when it does not.
+		$locale = defined( 'WPLANG' ) ? constant( 'WPLANG' ) : '';
+		$stored = get_option( 'WPLANG' );
+		if ( false === $stored && is_multisite() ) {
+			$stored = get_site_option( 'WPLANG' );
+		}
+		if ( false !== $stored ) {
+			$locale = $stored;
+		}
+		return StopWords::code( is_string( $locale ) && '' !== $locale ? $locale : 'en_US' );
 	}
 
 	/**

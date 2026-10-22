@@ -77,7 +77,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        leg: ['newest', 'oldest']
+        # The spec's matrix (Compatibility; D-011, D-083): both ends of WordPress and WooCommerce, MySQL 8.0 and
+        # MariaDB 10.6 beside wp-env's own MariaDB, HPOS off (WooCommerce's default is on), a persistent object cache.
+        leg: ['newest', 'oldest', 'mysql80', 'mariadb106', 'hpos-off', 'object-cache']
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -95,10 +97,30 @@ jobs:
         if: matrix.leg == 'oldest'
         run: npm run env:oldest
       - run: npx wp-env start
+      - name: The i18n check (the POT current, the fr_CA translation complete)
+        if: matrix.leg == 'newest'
+        run: composer i18n:check
+      - name: A database server for the leg
+        if: matrix.leg == 'mysql80' || matrix.leg == 'mariadb106'
+        run: tools/matrix-db.sh ${{ matrix.leg == 'mysql80' && 'mysql:8.0' || 'mariadb:10.6' }} csearch-${{ matrix.leg }}
       - run: composer test:integration
+        env:
+          CSEARCH_DB_HOST: ${{ (matrix.leg == 'mysql80' || matrix.leg == 'mariadb106') && format('csearch-{0}', matrix.leg) || '' }}
+          CSEARCH_HPOS: ${{ matrix.leg == 'hpos-off' && 'off' || '' }}
+          CSEARCH_OBJECT_CACHE: ${{ matrix.leg == 'object-cache' && 'persistent' || '' }}
+      - name: The benchmark group (query plans and the 300-product budgets)
+        if: matrix.leg == 'newest' || matrix.leg == 'mysql80'
+        run: composer test:integration -- --group benchmark
+        env:
+          CSEARCH_DB_HOST: ${{ matrix.leg == 'mysql80' && 'csearch-mysql80' || '' }}
+      # The browser site runs on wp-env's own database, so the browser tests and Plugin Check run on the two
+      # version legs only; the database, HPOS and cache legs are integration legs.
       - run: npm run plugin-check
+        if: matrix.leg == 'newest' || matrix.leg == 'oldest'
       - run: npx playwright install --with-deps
+        if: matrix.leg == 'newest' || matrix.leg == 'oldest'
       - run: npm run test:e2e
+        if: matrix.leg == 'newest' || matrix.leg == 'oldest'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

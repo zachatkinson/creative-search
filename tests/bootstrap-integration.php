@@ -36,6 +36,17 @@ if ( ! defined( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' ) ) {
 
 require_once $csearch_tests_dir . '/includes/functions.php';
 
+// The compatibility matrix's switches (spec: Compatibility; D-083), set by tools/integration.sh from the
+// environment: HPOS off or on, and WordPress told a persistent object cache is present, so transients and the
+// plugin's caches take the object-cache path.
+$csearch_hpos = getenv( 'CSEARCH_HPOS' );
+if ( 'off' === $csearch_hpos || 'on' === $csearch_hpos ) {
+	tests_add_filter( 'pre_option_woocommerce_custom_orders_table_enabled', static fn(): string => 'on' === $csearch_hpos ? 'yes' : 'no' );
+}
+if ( 'persistent' === getenv( 'CSEARCH_OBJECT_CACHE' ) ) {
+	tests_add_filter( 'muplugins_loaded', static fn() => wp_using_ext_object_cache( true ), 0 );
+}
+
 tests_add_filter(
 	'muplugins_loaded',
 	static function () use ( $csearch_plugin_dir ): void {

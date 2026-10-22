@@ -205,7 +205,7 @@ final class Actions {
 			$done['added'] > 0 ? 'success' : 'warning',
 			sprintf(
 				/* translators: 1: synonyms added, 2: rows already present, 3: rows that were not synonyms */
-				__( 'Import finished: %1$s added, %2$s already there, %3$s skipped.', 'creative-search' ),
+				__( 'Import finished. Added: %1$s. Already there: %2$s. Skipped: %3$s.', 'creative-search' ),
 				number_format_i18n( $done['added'] ),
 				number_format_i18n( $done['existing'] ),
 				number_format_i18n( $done['skipped'] )

@@ -55,6 +55,8 @@ final class SearchBlock implements Hookable {
 				'render_callback' => array( $this, 'render' ),
 			)
 		);
+		// The editor's strings from the translations shipped in languages/ (the block's own words are rendered on the server).
+		wp_set_script_translations( generate_block_asset_handle( BlockAssets::BLOCK, 'editorScript' ), 'creative-search', CSEARCH_PATH . 'languages' );
 	}
 
 	/**

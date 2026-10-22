@@ -55,7 +55,13 @@
 		"infection:core": "@php vendor/bin/infection --threads=max --configuration=infection.json5",
 		"infection:domain": "@php vendor/bin/infection --threads=max --configuration=infection-domain.json5",
 		"build": "bash tools/build-zip.sh",
-		"i18n:pot": "npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- wp i18n make-pot . languages/creative-search.pot --domain=creative-search --exclude=node_modules,vendor,tests,tools,tmp,docs",
+		"i18n:pot": "npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- wp i18n make-pot . languages/creative-search.pot --domain=creative-search --exclude=node_modules,vendor,tests,tools,tmp,docs,assets/src",
+		"i18n:po": "npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- wp i18n update-po languages/creative-search.pot languages/",
+		"i18n:check": [
+			"npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- wp i18n make-pot . tmp/i18n-check.pot --domain=creative-search --exclude=node_modules,vendor,tests,tools,tmp,docs,assets/src",
+			"php tools/i18n-check.php tmp/i18n-check.pot languages/creative-search.pot languages/creative-search-fr_CA.po"
+		],
+		"i18n:mo": "npx wp-env run cli --env-cwd=wp-content/plugins/creative-search -- bash -c 'rm -f languages/*.json languages/*.mo && wp i18n make-mo languages/ languages/ && wp i18n make-json languages/ --no-purge'",
 		"check": [
 			"@lint",
 			"@analyse",

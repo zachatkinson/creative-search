@@ -146,7 +146,7 @@ final class IndexCommand {
 				static function ( array $state ) use ( $json ): void {
 					if ( ! $json ) {
 						/* translators: 1: products walked, 2: products to walk */
-						WP_CLI::log( sprintf( __( '%1$d of %2$d products', 'creative-search' ), Cast::int( $state[ IndexState::OFFSET ] ), Cast::int( $state[ IndexState::TOTAL ] ) ) );
+						WP_CLI::log( sprintf( _n( '%1$d of %2$d product', '%1$d of %2$d products', Cast::int( $state[ IndexState::TOTAL ] ), 'creative-search' ), Cast::int( $state[ IndexState::OFFSET ] ), Cast::int( $state[ IndexState::TOTAL ] ) ) );
 					}
 				}
 			);
@@ -196,7 +196,7 @@ final class IndexCommand {
 			? '-'
 			: sprintf(
 				/* translators: 1: generation, 2: products walked, 3: products to walk */
-				__( 'generation %1$d: %2$d of %3$d products', 'creative-search' ),
+				_n( 'generation %1$d: %2$d of %3$d product', 'generation %1$d: %2$d of %3$d products', Cast::int( $state[ IndexState::TOTAL ] ), 'creative-search' ),
 				Cast::int( $state[ IndexState::BUILDING ] ),
 				Cast::int( $state[ IndexState::OFFSET ] ),
 				Cast::int( $state[ IndexState::TOTAL ] )
@@ -225,7 +225,7 @@ final class IndexCommand {
 			array(
 				'key'   => 'terms',
 				/* translators: 1: terms in the dictionary, 2: terms some document carries */
-				'value' => sprintf( __( '%1$d (%2$d in use)', 'creative-search' ), $terms['terms'], $terms['used'] ),
+				'value' => sprintf( __( '%1$d; in use: %2$d', 'creative-search' ), $terms['terms'], $terms['used'] ),
 			),
 			array(
 				'key'   => 'last finished',

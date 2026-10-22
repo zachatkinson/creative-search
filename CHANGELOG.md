@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-22
+
+Milestone 8, Languages and 1.0. The shop works in French end to end, the plugin speaks Canadian French, and the documentation is complete.
+
+### Added
+- Canadian French (`fr_CA`) translations in `languages/`: the PHP strings (`.po`, `.mo`) and the editor and Tools scripts (JSON), loaded by WordPress from the plugin's `Domain Path` (D-076). `composer i18n:pot`, `i18n:po` and `i18n:mo` rebuild them.
+- A French run of the browser tests (`tests/e2e/french.spec.ts`, 14 tests on three engines and two viewports): French suggestions with French prices, accent folding, French stems on the results page, the fallback to English, no results, and the admin in French, with axe on each state. It uses a must-use fixture that makes the shop bilingual the way skatehouse-core will (D-080).
+- `QueriesExplainTest` (group `benchmark`): every search statement `EXPLAIN`ed on the 300-product bilingual catalogue, failing when a plugin table has no key to use; docs/QUERIES.md holds its plans (D-082).
+- docs/BENCHMARK.md: the FiboSearch comparison, documented (free and Pro, each row with its source) and measured against FiboSearch free on the generated catalogue, labelled interim until it is run on a copy of Skatehouse (D-081).
+- readme.txt: FAQ on languages, accessibility, the FiboSearch comparison and explaining a ranking.
+
+### Fixed
+- The fallback to the site language failed when a visitor's locale was French: the site language is now the one set under Settings → General, not the request's locale (D-076).
+- Parent categories suggested "(0)" products: counts are WooCommerce's, subcategories included, and parents are re-indexed when a child's products change (D-078).
+- "See all 1 results": the panel's last row has a singular (D-077).
+- Up from the field with no suggestion chosen went to the second-to-last row; it goes to the last, as the APG pattern says (D-079).
+
+### Changed
+- A search reads only the SKU key it compares (the query's), not every SKU key of every matching product, and lets go of wpdb's copy of each result. At 10,000 products, `/suggest` p95 cold fell from 214 ms to 81 ms and `/search` from 209 ms to 77 ms (D-085).
+
+### Known issues
+- At 10,000 products a cold suggestion peaks at 8.4 MB above WordPress's baseline at p95, against the spec's 4 MB (D-085). At Skatehouse's size (300 products) it is 0.44 MB.
+
 ## [0.7.0] - 2026-10-21
 
 Milestone 7, Admin. The owner can now see what shoppers search for, teach the search their words, tune the ranking and look after the index without a terminal.

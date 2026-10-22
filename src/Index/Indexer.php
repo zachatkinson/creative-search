@@ -122,17 +122,23 @@ final class Indexer {
 	}
 
 	/**
-	 * Rewrite the documents of terms known by term taxonomy id (what `set_object_terms` hands over).
+	 * Rewrite the documents of terms known by term taxonomy id (what `set_object_terms` hands over), and of
+	 * their parents, whose product count includes their subcategories' (D-078).
 	 *
 	 * @param string $taxonomy Taxonomy.
 	 * @param int[]  $ttIds    Term taxonomy ids.
 	 */
 	public function indexTermTaxonomies( string $taxonomy, array $ttIds ): void {
+		$termIds = array();
 		foreach ( $ttIds as $ttId ) {
 			$term = get_term_by( 'term_taxonomy_id', (int) $ttId, $taxonomy );
 			if ( $term instanceof WP_Term ) {
-				$this->indexTerm( $taxonomy, $term->term_id );
+				$termIds[] = $term->term_id;
+				array_push( $termIds, ...array_map( 'intval', get_ancestors( $term->term_id, $taxonomy, 'taxonomy' ) ) );
 			}
+		}
+		foreach ( array_unique( $termIds ) as $termId ) {
+			$this->indexTerm( $taxonomy, $termId );
 		}
 	}
 

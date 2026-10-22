@@ -477,3 +477,70 @@ The log export streams to the response 1,000 rows a read (`Analytics::exportTo()
 
 **Why:** the independent review of milestone 7 found these against the spec's quality bar (no N+1, no unbounded query, no concatenated sentences); docs/reviews/M7.md lists all 17 findings and what was done with each.
 
+
+### D-076 · The site language is the setting; translations load from the plugin's `Domain Path` · 2026-10-21
+
+`Languages::siteCode()`, which the query falls back to and which the index always holds, reads the language set under Settings → General (`WPLANG`, the network's on multisite, `en_US` when empty), not `get_locale()`. The plugin does not call `load_plugin_textdomain()`. WordPress has registered an active plugin's `Domain Path` folder for just-in-time loading since 6.8, and the floor is 7.0, so `languages/creative-search-fr_CA.mo` loads without a call. A WordPress.org language pack would still win where it has a string.
+
+**Why:** the French browser run found the fallback to English failing. A visitor whose locale a language switcher or multilingual plugin sets to `fr_CA` made `get_locale()` say `fr`, so French fell back to French. An early draft of this milestone added the call; Plugin Check warned about it, and it is redundant on the floor, so it was taken out before the tag.
+
+### D-077 · "See all" has a singular and a plural · 2026-10-21
+
+The suggestion panel's last row was one string, "See all %1$s results for %2$s", which said "See all 1 results". It is now `_n()` evaluated for 1 and for 2 on the server and passed to the script as two forms; the script picks the first when the total is 1. That is right for English and French. A language with more plural forms (Polish, Russian, Arabic) would need the count's own form chosen by its plural rule, through script translations in the view module; the panel's other count strings already avoid this by being built for every count from 0 to the maximum on the server.
+
+**Why:** the rule is `_n()` for plurals; the French run showed the row as "Voir les 1 résultats".
+
+### D-078 · A category's count is WooCommerce's, subcategories included · 2026-10-21
+
+A category, tag or brand document's product count is WooCommerce's `product_count_{taxonomy}` term meta (visible products, the subcategories' included; WooCommerce keeps it for `product_brand` too), falling back to the term's own `count` until WooCommerce has written the meta. When a product's terms change, the terms' parents are re-indexed too, since their count includes it; when its catalogue visibility or its out-of-stock flag changes (WooCommerce's `product_visibility` terms), its categories, tags and brands are re-indexed, since WooCommerce's count follows visibility.
+
+**Why:** a parent category such as "Skateboards" or "Apparel" showed "(0)" because the raw term count leaves out products that only sit in subcategories. The spec's "Decks (122)" means the number the shop shows.
+
+### D-079 · axe's `scrollable-region-focusable` is exempt on the open panel · 2026-10-21
+
+When nine rows (six products, two terms and "See all") are taller than the panel's `min(70vh, 36rem)`, the panel scrolls. axe then reports `scrollable-region-focusable` (serious), because nothing inside the panel takes focus. In the APG list-autocomplete pattern, focus stays in the input and the options are reached with `aria-activedescendant`, and the script scrolls the active option into view on every arrow key. A keyboard user therefore reaches every row, which is the need the rule protects. The French browser test proves it: Up from the field brings the last row into view. That one rule is turned off for that one check, through the shared axe helper's `exempt` list. It applies in every other state and region. The same run found and fixed a bug: Up with no row chosen went to the second-to-last row, not the last.
+
+**Why:** making the panel focusable to satisfy the rule would add a tab stop that the pattern says must not exist. Hiding rows to avoid scrolling would drop suggestions.
+
+### D-080 · The French browser run uses a must-use fixture and a cookie · 2026-10-21
+
+`tests/e2e/fixtures/french.php`, mapped into wp-env as a must-use plugin, answers `csearch_languages` with the catalogue's French text the way skatehouse-core will. For a visitor with the `csearch_lang=fr` cookie, it sets the locale to `fr_CA` and WooCommerce's price format to `84,99 $`. It does nothing unless the shop fixture set the `csearch_e2e_french` option, so the integration tests never see it. No multilingual plugin is installed.
+
+**Why:** the spec asks for a French run of the browser tests, and Skatehouse makes its French site with its own code, not WPML or Polylang. A cookie lets the English and French specs share one site and one index.
+
+### D-081 · The FiboSearch comparison's measured half was run on the generated catalogue · 2026-10-21
+
+The spec asks for the measured run on a copy of Skatehouse. That copy needs Zach, so the run in docs/BENCHMARK.md used the generated 300-product catalogue and says so in its heading. FiboSearch free 1.34.3 was installed in wp-env for the run and then removed, with its options. The golden set's pass rate is reported with its bias: the set describes this plugin's rules.
+
+**Why:** the comparison was due in this milestone. An interim run on known data is better than none, provided it is labelled as interim and repeated on the real shop.
+
+### D-082 · docs/QUERIES.md is a test · 2026-10-21
+
+`QueriesExplainTest` (group `benchmark`) catches every statement a suggestion and a results page run on the 300-product bilingual catalogue and `EXPLAIN`s it. It fails when a read of a plugin table has no key it could use; it accepts the optimiser reading a small table whole when a key exists. The plans in docs/QUERIES.md are copied from its report.
+
+**Why:** the spec says the EXPLAIN output is "kept current whenever the schema changes". A test is the only way that stays true.
+
+### D-083 · The matrix's other legs, and the i18n check · 2026-10-21
+
+The compatibility matrix gains four integration legs beside the two version legs (D-011): MySQL 8.0 and MariaDB 10.6, each a throwaway container on wp-env's Docker network that the test suite reaches through `WORDPRESS_DB_HOST` (`tools/matrix-db.sh`); HPOS off, through a `pre_option` filter in the test bootstrap; and a persistent object cache, by telling WordPress one is present (`wp_using_ext_object_cache( true )`), so transients and the plugin's caches take the object-cache path. `tools/integration.sh` passes `CSEARCH_DB_HOST`, `CSEARCH_HPOS`, `CSEARCH_OBJECT_CACHE` and `CSEARCH_BENCH_PRODUCTS` into the container, so a leg runs the same way on a laptop and in CI. Plugin Check and the browser tests stay on the two version legs, whose site runs on wp-env's own database. The object-cache leg uses WordPress's in-memory cache, not Redis or Memcached: it proves the code paths, not a particular server, and adds no dependency.
+
+`composer i18n:check` (`tools/i18n-check.php`, run on the newest leg in CI) fails when the committed POT is missing a string the code has or keeps one it lost, and when `fr_CA` has an untranslated or fuzzy entry, a missing plural form or placeholders that differ from the source's.
+
+**Why:** the spec's matrix names MySQL 8.0, MariaDB 10.6, HPOS on and off, and with and without a persistent object cache; D-011 left the MySQL leg to this milestone; and the spec's i18n evidence is "the i18n check in CI". Without a check, the translation is complete today and nothing keeps it so.
+
+### D-084 · The POT is made from the built scripts · 2026-10-21
+
+`composer i18n:pot` excludes `assets/src`, so the JavaScript strings are read from `build/block/editor.js` and the unbuilt `assets/admin/tools.js`, the files WordPress loads. WordPress names a script's translation file after the MD5 of the script's path relative to the plugin. Strings read from the source files would produce JSON files that WordPress never looks for. Run `npm run build` before `composer i18n:pot`.
+
+**Why:** reading the source files would name the JSON files after paths WordPress never loads, and the editor would stay in English.
+
+### D-085 · The 10,000-product run: two time fixes, and the memory budget missed · 2026-10-22
+
+The first full-size run (`CSEARCH_BENCH_PRODUCTS=10000`, 10,000 products and their variations, two languages) met the reindex budget (99.9 s against 300 s) but missed every request budget: `/suggest` p95 cold 214 ms, `/search` 209 ms, memory 14.5 MB. A query matching a common word reads thousands of documents: "deck" reaches 2,740 products. Two changes followed, neither touching the schema:
+
+- `IndexStore::documents()` takes the query's key. The repository then reads that one SKU key by the terms table's unique index, not every SKU key of every matched document. The SKU keys are only ever compared with the query's key (the exact-SKU bonus and the hidden-by-SKU rule), so the answer is the same. That one read was the slowest statement on common words.
+- `Repository::rows()` releases wpdb's own copy of the last result once it has been converted, so thousands of postings are not held twice through the next statement.
+
+Measured again through the API: `/suggest` p95 cold 81.4 ms (budget 100), warm 0.4 ms (60), `/search` 76.9 ms (100). **Memory p95 is 8.41 MB against a budget of 4 MB: missed.** The postings of one common term, held as the Domain's arrays, take 3.3 MB on their own; wpdb's buffered result and its conversion to arrays roughly double that at the peak. The spec's design for this is one SQL statement that intersects and scores in the database (spec, "Query and API"). The milestone 4 searcher reads level by level and scores in PHP instead (D-028, D-055), which holds at 300 products and not at 10,000 for memory.
+
+**Why:** the time fixes are exact and cheap. Meeting 4 MB needs either the spec's in-database scoring, which duplicates the Domain in SQL, or a compact postings structure in the Domain and a streamed read past wpdb. Either is a design change for Zach to choose, not something to slip into the 1.0 milestone overnight. The benchmark still asserts 4 MB, so the 10,000-product CI leg stays red until that choice is made.

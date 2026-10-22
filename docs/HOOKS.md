@@ -107,7 +107,7 @@ add_filter(
 
 - **Since:** 0.4.0
 - **Signature:** `apply_filters( 'csearch_languages', array $languages ): array`
-- **What it does:** the languages to index, as code to readers. `product` receives the `WC_Product`, the field texts read from the product and the code, and returns the field texts in that language; `term` receives the `WP_Term`, its name and the code, and returns the name. Leave a reader out to read the product as it is. The default is the site language plus the `languages` setting (D-045).
+- **What it does:** the languages to index, as code to readers. `product` receives the `WC_Product`, the field texts read from the product and the code, and returns the field texts in that language; `term` receives the `WP_Term`, its name and the code, and returns the name. Leave a reader out to read the product as it is. The default is the site language (the one set under Settings → General, not the visitor's locale; D-076) plus the `languages` setting (D-045).
 - **Where it runs:** `Index\Languages::all()`, once per request.
 - **Example:**
 
@@ -260,6 +260,10 @@ Internal endpoints, not for plugins to call; each checks `manage_woocommerce` an
 ### WP-CLI
 
 `wp csearch search "<query>" [--lang=] [--limit=] [--format=]` (not logged), `wp csearch synonyms list [--lang=] [--search=] [--format=]`, `wp csearch synonyms add <word> <means> [--lang=] [--one-way] [--format=json]`, `wp csearch synonyms delete <id>...`, `wp csearch synonyms import <file|->`, `wp csearch synonyms export`, `wp csearch log purge [--days=] [--format=json]` (D-074), `wp csearch cache flush`. Each has `--help` and exits non-zero on failure.
+
+## Milestone 8: languages and 1.0 (1.0.0)
+
+No new hook. `csearch_languages` now starts from the language set under Settings → General rather than the request's locale (D-076), and the plugin's translations load through WordPress's just-in-time loading from its `Domain Path`, so the plugin hooks nothing for them.
 
 ## Format for later entries
 

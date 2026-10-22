@@ -131,8 +131,11 @@ final class BoostsTab {
 				/* translators: %s: a product */
 				echo '<li><label for="csearch-include-' . esc_attr( (string) $productId ) . '"><input type="checkbox" id="csearch-include-' . esc_attr( (string) $productId ) . '" name="include[]" value="' . esc_attr( (string) $productId ) . '"> ' . esc_html( sprintf( __( 'Let %s back in', 'creative-search' ), $name ) ) . '</label>';
 				if ( is_string( $edit ) ) {
+					// The two strings apart, so the translators' comment belongs to the second alone.
+					$link = __( 'Edit', 'creative-search' );
 					/* translators: %s: a product */
-					echo ' <a href="' . esc_url( $edit ) . '" aria-label="' . esc_attr( sprintf( __( 'Edit %s', 'creative-search' ), $name ) ) . '">' . esc_html__( 'Edit', 'creative-search' ) . '</a>';
+					$label = sprintf( __( 'Edit %s', 'creative-search' ), $name );
+					echo ' <a href="' . esc_url( $edit ) . '" aria-label="' . esc_attr( $label ) . '">' . esc_html( $link ) . '</a>';
 				}
 				echo '</li>';
 			}

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Repository;
 
+use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Support\Tables;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -117,21 +118,22 @@ final class PostingRepository extends Repository {
 	 * The SKU keys of some documents: the SKU-field postings whose term is a whole key, stored with the `=`
 	 * prefix (D-041) and returned without it.
 	 *
-	 * @param int[] $documentIds Document ids.
-	 * @param int   $field       The SKU field id.
+	 * @param int[]  $documentIds Document ids.
+	 * @param int    $field       The SKU field id.
+	 * @param string $key         One key to look for (one term, by its unique index), or empty for every key.
 	 * @return array<int, string[]> Document id to keys.
 	 */
-	public function skuKeysOf( array $documentIds, int $field ): array {
+	public function skuKeysOf( array $documentIds, int $field, string $key = '' ): array {
 		if ( array() === $documentIds ) {
 			return array();
 		}
 		$rows = $this->rows(
 			$this->prepare(
-				'SELECT p.document_id, t.term FROM %i p INNER JOIN %i t ON t.id = p.term_id WHERE p.document_id IN (' . self::ints( $documentIds ) . ') AND p.field = %d AND t.term LIKE %s',
+				'SELECT p.document_id, t.term FROM %i p INNER JOIN %i t ON t.id = p.term_id WHERE p.document_id IN (' . self::ints( $documentIds ) . ') AND p.field = %d AND ' . ( '' === $key ? 't.term LIKE %s' : 't.term = %s' ),
 				Tables::postings(),
 				Tables::terms(),
 				$field,
-				'=%'
+				'' === $key ? '=%' : '=' . mb_substr( $key, 0, Tokenizer::MAX_LENGTH - 1, 'UTF-8' )
 			)
 		);
 		$out  = array();

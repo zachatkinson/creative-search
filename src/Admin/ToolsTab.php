@@ -115,9 +115,9 @@ final class ToolsTab {
 	public static function progressText( int $done, int $total, bool $cancelled ): string {
 		return $cancelled
 			/* translators: 1: products done, 2: products in all */
-			? sprintf( __( '%1$s of %2$s products (stopping)', 'creative-search' ), number_format_i18n( $done ), number_format_i18n( $total ) )
+			? sprintf( _n( '%1$s of %2$s product (stopping)', '%1$s of %2$s products (stopping)', $total, 'creative-search' ), number_format_i18n( $done ), number_format_i18n( $total ) )
 			/* translators: 1: products done, 2: products in all */
-			: sprintf( __( '%1$s of %2$s products', 'creative-search' ), number_format_i18n( $done ), number_format_i18n( $total ) );
+			: sprintf( _n( '%1$s of %2$s product', '%1$s of %2$s products', $total, 'creative-search' ), number_format_i18n( $done ), number_format_i18n( $total ) );
 	}
 
 	/**

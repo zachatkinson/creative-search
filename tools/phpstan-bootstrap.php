@@ -7,7 +7,7 @@
 
 declare( strict_types=1 );
 
-define( 'CSEARCH_VERSION', '0.7.0' );
+define( 'CSEARCH_VERSION', '1.0.0' );
 define( 'CSEARCH_FILE', __DIR__ . '/../creative-search.php' );
 define( 'CSEARCH_PATH', __DIR__ . '/../' );
 define( 'CSEARCH_URL', 'https://example.com/wp-content/plugins/creative-search/' );

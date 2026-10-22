@@ -202,7 +202,7 @@ function showAnswer( ctx, data, input ) {
 	const total = Number( data.total || 0 );
 	if ( total > 0 ) {
 		const name = fill(
-			ctx.i18n.seeAll,
+			ctx.i18n.seeAll[ 1 === total ? 0 : 1 ],
 			num( total, ctx.lang ),
 			data.query || ctx.query.trim()
 		);
@@ -393,7 +393,11 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 							setActive( ctx, n - 1 );
 						}
 					} else if ( n ) {
-						setActive( ctx, ( ctx.active - 1 + n ) % n );
+						// With no row chosen, Up goes to the last row (APG).
+						setActive(
+							ctx,
+							ctx.active < 0 ? n - 1 : ( ctx.active - 1 + n ) % n
+						);
 					}
 					break;
 				case 'Enter':

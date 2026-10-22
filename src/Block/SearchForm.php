@@ -177,8 +177,13 @@ final class SearchForm {
 			'i18n'      => array(
 				'counts'     => $counts,
 				'recents'    => $recent,
-				/* translators: 1: number of results, 2: the query typed */
-				'seeAll'     => __( 'See all %1$s results for %2$s', 'creative-search' ),
+				// One result, then many: the two forms English and French need (D-077).
+				'seeAll'     => array(
+					/* translators: 1: number of results, 2: the query typed */
+					_n( 'See %1$s result for %2$s', 'See all %1$s results for %2$s', 1, 'creative-search' ),
+					/* translators: 1: number of results, 2: the query typed */
+					_n( 'See %1$s result for %2$s', 'See all %1$s results for %2$s', 2, 'creative-search' ),
+				),
 				'inStock'    => __( 'In stock', 'creative-search' ),
 				'outOfStock' => __( 'Out of stock', 'creative-search' ),
 				/* translators: used between the parts of a suggestion's accessible name (name, price, stock); there is a space after the comma */

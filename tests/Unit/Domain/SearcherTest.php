@@ -173,6 +173,7 @@ final class SearcherTest extends TestCase {
 		$on = $this->search( 'KAZ-DBA-00021', 'en', new SearchOptions( hiddenBySku: true ) );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer Blank' ), self::titles( $on ) );
 		self::assertSame( 6.0, $on->products[0]->score->exact );
+		self::assertContains( 'kaz dba 00021', $this->index->keysAsked, 'the store reads that one SKU key, not every key' );
 		$off = $this->search( 'KAZ-DBA-00021', 'en', new SearchOptions( hiddenBySku: false ) );
 		self::assertSame( array(), self::titles( $off ) );
 		self::assertNull( $off->corrected, 'the retry found nothing visible either' );

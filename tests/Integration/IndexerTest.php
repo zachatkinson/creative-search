@@ -213,6 +213,34 @@ final class IndexerTest extends IndexTestCase {
 		self::assertSame( array( 'en' ), $this->service( Languages::class )->codes(), 'back to the site language' );
 	}
 
+	public function test_the_site_language_is_the_setting_not_the_visitors_locale(): void {
+		$french = static fn(): string => 'fr_CA';
+		add_filter( 'locale', $french );
+		self::assertSame( 'en', Languages::siteCode(), 'a per-visitor locale leaves the site language alone' );
+		remove_filter( 'locale', $french );
+		// WordPress refuses to store a language whose core files are not installed, so the setting is filtered.
+		$setting = static fn(): string => 'fr_CA';
+		add_filter( 'pre_option_WPLANG', $setting );
+		self::assertSame( 'fr', Languages::siteCode() );
+		remove_filter( 'pre_option_WPLANG', $setting );
+		self::assertSame( 'en', Languages::siteCode() );
+		// An empty setting is the site choosing English, as `get_locale()` reads it.
+		$english = static fn(): string => '';
+		add_filter( 'pre_option_WPLANG', $english );
+		self::assertSame( 'en', Languages::siteCode() );
+		remove_filter( 'pre_option_WPLANG', $english );
+	}
+
+	public function test_a_term_without_woocommerces_count_uses_its_own(): void {
+		$this->products( array( 0 ) );
+		$cat = get_term_by( 'slug', 'decks', 'product_cat' );
+		self::assertInstanceOf( \WP_Term::class, $cat );
+		update_term_meta( $cat->term_id, 'product_count_product_cat', 7 );
+		self::assertSame( 7, \CreativeBranding\Search\Index\TermReader::count( $cat ) );
+		delete_term_meta( $cat->term_id, 'product_count_product_cat' );
+		self::assertSame( $cat->count, \CreativeBranding\Search\Index\TermReader::count( $cat ), 'the meta not written yet' );
+	}
+
 	public function test_category_tag_and_brand_documents(): void {
 		$this->products( array( 0, 21 ) );
 		$cat   = get_term_by( 'slug', 'decks', 'product_cat' );
@@ -232,6 +260,13 @@ final class IndexerTest extends IndexTestCase {
 		self::assertSame( get_term_link( $cat ), $doc['url'] );
 		self::assertSame( 'KAZUMI', $this->documents( 'brand', $brand->term_id )[0]['title'] );
 		self::assertSame( 'popsicle', $this->documents( 'tag', $tag->term_id )[0]['title'] );
+
+		// A parent category lists its subcategories' products, as WooCommerce counts them.
+		$parent = get_term( $cat->parent, 'product_cat' );
+		self::assertInstanceOf( \WP_Term::class, $parent );
+		wc_recount_all_terms();
+		$this->indexer()->indexTermTaxonomies( 'product_cat', array( $cat->term_taxonomy_id ) );
+		self::assertSame( '2', $this->documents( 'category', $parent->term_id )[0]['total_sales'], 'counted through its children (D-078)' );
 
 		wp_delete_term( $brand->term_id, 'product_brand' );
 		self::assertFalse( $this->indexer()->indexTerm( 'product_brand', $brand->term_id ) );
@@ -265,6 +300,10 @@ final class IndexerTest extends IndexTestCase {
 		self::assertSame( 'kazumi skate deck dealer', $doc->nameKey );
 		self::assertContains( 'kaz dea 00001', $doc->skuKeys );
 		self::assertSame( 4, count( $doc->skuKeys ), 'the product and its three variations' );
+		$one = array_values( $store->documents( array_keys( $docs ), 'kaz dea 00001 825' ) )[0];
+		self::assertSame( array( 'kaz dea 00001 825' ), $one->skuKeys, 'with the query key, that key alone' );
+		$none = array_values( $store->documents( array_keys( $docs ), 'kaz dea' ) )[0];
+		self::assertSame( array(), $none->skuKeys, 'and nothing when it has not that key' );
 		self::assertSame( 8, $store->documentCount( 'en' ) - 1, 'seven products and a category' );
 	}
 

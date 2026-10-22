@@ -7,7 +7,7 @@
 	if ( ! box || box.dataset.building !== '1' || ! window.wp?.apiFetch ) {
 		return;
 	}
-	const { __, sprintf } = window.wp.i18n;
+	const { _n, sprintf } = window.wp.i18n;
 	const bar = document.getElementById( 'csearch-progress-bar' );
 	const text = document.getElementById( 'csearch-progress-text' );
 	const format = ( n ) =>
@@ -29,8 +29,10 @@
 				text.textContent = cancelled
 					? sprintf(
 							/* translators: 1: products done, 2: products in all */
-							__(
+							_n(
+								'%1$s of %2$s product (stopping)',
 								'%1$s of %2$s products (stopping)',
+								total,
 								'creative-search'
 							),
 							format( offset ),
@@ -38,7 +40,12 @@
 						)
 					: sprintf(
 							/* translators: 1: products done, 2: products in all */
-							__( '%1$s of %2$s products', 'creative-search' ),
+							_n(
+								'%1$s of %2$s product',
+								'%1$s of %2$s products',
+								total,
+								'creative-search'
+							),
 							format( offset ),
 							format( total )
 						);

@@ -107,12 +107,13 @@ final class IndexRepository implements IndexStore {
 	/**
 	 * Documents by id, with the name key computed from the title and the SKU keys from the postings.
 	 *
-	 * @param int[] $ids Document ids.
+	 * @param int[]  $ids Document ids.
+	 * @param string $key The query's key: only that SKU key is read (one term, not every key of every document).
 	 * @return array<int, Document>
 	 */
-	public function documents( array $ids ): array {
+	public function documents( array $ids, string $key = '' ): array {
 		$rows      = $this->documents->rowsOf( $ids );
-		$keys      = $this->postings->skuKeysOf( array_keys( $rows ), Fields::SKU );
+		$keys      = $this->postings->skuKeysOf( array_keys( $rows ), Fields::SKU, $key );
 		$refs      = $this->termRefs ? $this->documents->termRefs( $this->productIds( $rows ), TermReader::taxonomies() ) : array();
 		$tokenizer = $this->analyzers->tokenizer();
 		$out       = array();

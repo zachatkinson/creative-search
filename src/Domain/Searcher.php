@@ -249,7 +249,7 @@ final class Searcher {
 		foreach ( $query->phrases() as $indexes ) {
 			$set = array_filter( $set, fn( int $doc ): bool => self::hasPhrase( $widenings, $indexes, $doc ), ARRAY_FILTER_USE_KEY );
 		}
-		$documents = $this->index->documents( array_keys( $set ) );
+		$documents = $this->index->documents( array_keys( $set ), $query->key() );
 		return array_filter(
 			$documents,
 			static fn( Document $d ): bool => $d->visible || ( $options->hiddenBySku && in_array( $query->key(), $d->skuKeys, true ) )

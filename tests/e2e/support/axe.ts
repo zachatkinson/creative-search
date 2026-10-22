@@ -7,11 +7,18 @@ import AxeBuilder from '@axe-core/playwright';
  * @param page    The page.
  * @param name    What is being checked, for the message.
  * @param include The CSS selector of the region.
+ * @param exempt  Rules not run here, each with its reason in docs/DECISIONS.md at the call.
  */
-export async function axe( page: Page, name: string, include = 'body' ) {
+export async function axe(
+	page: Page,
+	name: string,
+	include = 'body',
+	exempt: string[] = []
+) {
 	const results = await new AxeBuilder( { page } )
 		.withTags( [ 'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa' ] )
 		.include( include )
+		.disableRules( exempt )
 		.analyze();
 	const serious = results.violations.filter(
 		( v ) => v.impact === 'serious' || v.impact === 'critical'

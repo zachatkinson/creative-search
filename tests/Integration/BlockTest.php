@@ -74,6 +74,7 @@ final class BlockTest extends IntegrationTestCase {
 		self::assertSame( '6 suggestions', $context['i18n']['counts'][6] );
 		self::assertSame( '1 suggestion', $context['i18n']['counts'][1] );
 		self::assertSame( 'No suggestions', $context['i18n']['counts'][0] );
+		self::assertSame( array( 'See %1$s result for %2$s', 'See all %1$s results for %2$s' ), $context['i18n']['seeAll'], 'one result, then many (D-077)' );
 		self::assertSame( array( 'category', 'tag', 'brand' ), array_keys( $context['i18n']['taxonomies'] ), 'the term types /suggest returns' );
 		self::assertSame( '', $context['answered'] );
 		self::assertStringContainsString( 'class="csearch-label csearch-sr"', do_blocks( '<!-- wp:creative-search/search {"labelVisible":false} /-->' ), 'a visually hidden label' );

@@ -245,6 +245,39 @@ final class HooksTest extends IndexTestCase {
 		self::assertArrayHasKey( 'parts', $this->postingsOf( (int) $this->documents( 'product', $deck )[0]['id'] ), 'a product in a child category carries the parent\'s new name' );
 	}
 
+	public function test_a_visibility_change_queues_the_products_terms_and_a_plain_save_does_not(): void {
+		[ $deck ] = $this->products( array( 0 ) );
+		$cat      = get_term_by( 'slug', 'decks', 'product_cat' );
+		self::assertInstanceOf( \WP_Term::class, $cat );
+		$this->queue()->clear();
+		$product = WooCommerceCatalogue::get( $deck );
+		$product->set_name( 'KAZUMI Skate Deck, Dealer Two' );
+		$product->save();
+		self::assertSame( array(), $this->queue()->pending()['term_taxonomies'], 'visibility unchanged: no term is rewritten' );
+		$this->queue()->clear();
+		$product = WooCommerceCatalogue::get( $deck );
+		$product->set_catalog_visibility( 'search' );
+		$product->save();
+		$queued = $this->queue()->pending()['term_taxonomies'];
+		$this->queue()->clear();
+		self::assertContains( $cat->term_taxonomy_id, $queued['product_cat'] ?? array(), 'its category, whose count follows visibility (D-078)' );
+
+		// A simple product: a variable one's stock follows its variations.
+		[ $grip ] = $this->products( array( 15 ) );
+		$gripCat  = get_term_by( 'slug', 'griptape', 'product_cat' );
+		self::assertInstanceOf( \WP_Term::class, $gripCat );
+		$this->queue()->clear();
+		wc_update_product_stock_status( $grip, 'outofstock' );
+		self::assertSame( array(), $this->queue()->pending()['term_taxonomies'], 'a stock flip leaves the counts while sold-out products show' );
+		$this->queue()->clear();
+		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
+		wc_update_product_stock_status( $grip, 'instock' );
+		$queued = $this->queue()->pending()['term_taxonomies'];
+		$this->queue()->clear();
+		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
+		self::assertContains( $gripCat->term_taxonomy_id, $queued['product_cat'] ?? array(), 'and moves them when the shop hides sold-out products' );
+	}
+
 	public function test_deleting_a_term_queues_its_products_in_batches(): void {
 		$ids = $this->products( array( 0, 1, 2 ) );
 		$tag = get_term_by( 'name', 'popsicle', 'product_tag' );
