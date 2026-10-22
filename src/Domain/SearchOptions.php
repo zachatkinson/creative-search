@@ -28,6 +28,8 @@ final class SearchOptions {
 	 * @param int                $termLimit    At most this many categories, tags and brands.
 	 * @param bool               $retry        Whether a query that matches nothing is retried without its least-matched
 	 *                                         token (off for "search instead for", the shopper's exact words).
+	 * @param int                $kind         What is ranked: the products ({@see Kind::PRODUCT}) or the posts and
+	 *                                         pages ({@see Kind::CONTENT}, D-093).
 	 */
 	public function __construct(
 		public readonly array $weights = array(),
@@ -36,8 +38,18 @@ final class SearchOptions {
 		public readonly array $boostRules = array(),
 		public readonly int $limit = 500,
 		public readonly int $termLimit = 3,
-		public readonly bool $retry = true
+		public readonly bool $retry = true,
+		public readonly int $kind = Kind::PRODUCT
 	) {
+	}
+
+	/**
+	 * The same options for a search of the posts and pages: no categories, tags or brands, no owner's rules.
+	 *
+	 * @param int $limit At most this many.
+	 */
+	public function forContent( int $limit ): self {
+		return new self( $this->weights, false, $this->fallbackLang, array(), $limit, 0, $this->retry, Kind::CONTENT );
 	}
 
 	/**

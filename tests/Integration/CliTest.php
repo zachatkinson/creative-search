@@ -40,14 +40,14 @@ final class CliTest extends IndexTestCase {
 		[ $id ] = $this->products( array( 15 ) );
 		$this->command()->index( array( (string) $id ) );
 		self::assertStringStartsWith( sprintf( 'log: Indexed product %d in ', $id ), WP_CLI::$lines[0] );
-		self::assertSame( 'success: 1 of 1 product indexed.', WP_CLI::$lines[1] );
+		self::assertSame( 'success: 1 of 1 id indexed.', WP_CLI::$lines[1] );
 		self::assertCount( 1, $this->documents( 'product', $id ) );
 
 		try {
 			$this->command()->index( array( (string) $id, '999999' ) );
 			self::fail( 'a product that cannot be indexed exits non-zero' );
 		} catch ( RuntimeException $e ) {
-			self::assertSame( '1 of 2 products indexed.', $e->getMessage() );
+			self::assertSame( '1 of 2 ids indexed.', $e->getMessage() );
 		}
 		self::assertSame( 'log: Product 999999 is not indexable (missing, unpublished or excluded): removed from the index.', WP_CLI::$lines[1] );
 

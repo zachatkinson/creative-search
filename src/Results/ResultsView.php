@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Results;
 
 use CreativeBranding\Search\Domain\Document;
+use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Search\Cache;
 use CreativeBranding\Search\Search\SearchService;
 use CreativeBranding\Search\Settings\Settings;
@@ -24,12 +25,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * The lines the plugin adds to WooCommerce's unchanged results template (spec: The front end → The results
  * page): the count ("23 results for kazumi"), the corrected query ("Showing results for kazumi deck; search
- * instead for kazumi deck 9.5"), and, when nothing matches, the three nearest categories and the owner's
- * fallback products. Every string is escaped where it is built.
+ * instead for kazumi deck 9.5"), the posts and pages the query finds (1.1, above the products unless a product
+ * is named exactly as the query reads), and, when nothing matches, the matching pages, the owner's two links,
+ * each word alone, the three nearest categories and the owner's fallback products. Every string is escaped where
+ * it is built.
  */
 final class ResultsView {
 
 	public const FALLBACK_LIMIT = 4;
+
+	/**
+	 * The posts and pages found, once a request.
+	 *
+	 * @var array<int, array{id: int, type: string, name: string, parent: string, url: string, image: array{src: string, srcset: string, width: int, height: int, alt: string}|null}>|null
+	 */
+	private ?array $content = null;
+
+	/**
+	 * Whether a product is named exactly as the query reads, once a request.
+	 *
+	 * @var bool|null
+	 */
+	private ?bool $pagesBelow = null;
+
+	/**
+	 * Words of a query that found nothing offered alone at most.
+	 */
+	private const ALTERNATIVES = 3;
 
 	/**
 	 * Constructor.
@@ -68,19 +90,163 @@ final class ResultsView {
 				'<a href="' . esc_url( $exact ) . '">' . esc_html( $answer['query'] ) . '</a>'
 			) . '</p>';
 		}
+		if ( $count > 0 && ! $this->pagesBelow() ) {
+			$html .= $this->contentSection();
+		}
 		return $html;
 	}
 
 	/**
-	 * The no-results state: the summary, the nearest categories and the fallback products.
+	 * Forget what this request found (tests render several pages in one process).
+	 */
+	public function reset(): void {
+		$this->content    = null;
+		$this->pagesBelow = null;
+	}
+
+	/**
+	 * The posts and pages after the products, when a product is named exactly as the query reads (a page never
+	 * shows above it); else an empty string, the section having gone above them.
+	 */
+	public function contentAfter(): string {
+		return $this->products->shown() > 0 && $this->pagesBelow() ? $this->contentSection() : '';
+	}
+
+	/**
+	 * Whether the search found no product but found a post or page: then the page leads, and WooCommerce's bare
+	 * "No products were found" is left out (Skatehouse handoff item 7).
+	 */
+	public function contentLeads(): bool {
+		$answer = $this->products->answer();
+		return null !== $answer && '' !== $answer['query'] && 0 === $this->products->shown() && array() !== $this->content();
+	}
+
+	/**
+	 * The posts and pages the query finds on the results page's first page (D-093), fetched once a request.
+	 *
+	 * @return array<int, array{id: int, type: string, name: string, parent: string, url: string, image: array{src: string, srcset: string, width: int, height: int, alt: string}|null}>
+	 */
+	public function content(): array {
+		$answer = $this->products->answer();
+		if ( null === $answer || '' === $answer['query'] || Cast::int( get_query_var( 'paged' ) ) > 1 ) {
+			return array();
+		}
+		$this->content ??= $this->search->content( $answer['query'], $answer['lang'], 'page' );
+		return $this->content;
+	}
+
+	/**
+	 * The heading over the posts and pages, by what is searched.
+	 */
+	public static function contentHeading(): string {
+		$types = ContentReader::enabled();
+		if ( array( 'page' ) === $types ) {
+			return __( 'Pages', 'creative-search' );
+		}
+		return array( 'post' ) === $types ? __( 'Posts', 'creative-search' ) : __( 'Pages and posts', 'creative-search' );
+	}
+
+	/**
+	 * The default wording of a no-results link (D-096).
+	 *
+	 * @param string $link `help` or `guide`.
+	 */
+	public static function defaultLinkText( string $link ): string {
+		return 'help' === $link ? __( 'Can’t find what you need? Contact us', 'creative-search' ) : __( 'Need help choosing? Read our guides', 'creative-search' );
+	}
+
+	/**
+	 * The posts and pages section, or an empty string.
+	 */
+	private function contentSection(): string {
+		$rows = $this->content();
+		if ( array() === $rows ) {
+			return '';
+		}
+		$html = '<section class="csearch-content" aria-labelledby="csearch-content-title"><h2 id="csearch-content-title" class="csearch-content-title">' . esc_html( self::contentHeading() ) . '</h2><ul class="csearch-content-list">';
+		foreach ( $rows as $row ) {
+			$html .= '<li><a href="' . esc_url( $row['url'] ) . '">' . esc_html( $row['name'] ) . '</a>';
+			if ( '' !== $row['parent'] ) {
+				$html .= ' <span class="csearch-content-parent">' . esc_html( $row['parent'] ) . '</span>';
+			}
+			$html .= '</li>';
+		}
+		return $html . '</ul></section>';
+	}
+
+	/**
+	 * Whether a product is named exactly as the query reads, so the pages go after the products.
+	 */
+	private function pagesBelow(): bool {
+		$answer = $this->products->answer();
+		if ( null === $answer || array() === $this->content() ) {
+			return false;
+		}
+		$this->pagesBelow ??= $this->search->namesProduct( $answer['query'], $answer['lang'], $answer['ids'] );
+		return $this->pagesBelow;
+	}
+
+	/**
+	 * The owner's two no-results links (D-096): a help page and a second page, each with its wording.
+	 *
+	 * @param string $query The query that found nothing.
+	 */
+	private function links( string $query ): string {
+		$links = array();
+		foreach ( array( 'help', 'guide' ) as $link ) {
+			$page = Cast::int( Settings::get( $link . '_page' ) );
+			$url  = $page > 0 && 'page' === get_post_type( $page ) && 'publish' === get_post_status( $page ) ? get_permalink( $page ) : false;
+			if ( is_string( $url ) ) {
+				$text    = Cast::str( Settings::get( $link . '_text' ) );
+				$links[] = array(
+					'url'  => $url,
+					'text' => '' !== $text ? $text : self::defaultLinkText( $link ),
+					'kind' => $link,
+				);
+			}
+		}
+		/**
+		 * The links the no-results page offers after the matching pages (D-096): the owner's help page and
+		 * second page by default.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param array<int, array{url: string, text: string, kind: string}> $links The links.
+		 * @param string                                                      $query The query that found nothing.
+		 */
+		$links = apply_filters( 'csearch_no_results_links', $links, $query );
+		$html  = '';
+		foreach ( is_array( $links ) ? $links : array() as $link ) {
+			if ( is_array( $link ) && '' !== Cast::str( $link['url'] ?? '' ) && '' !== Cast::str( $link['text'] ?? '' ) ) {
+				$html .= '<p class="csearch-no-results-link csearch-no-results-' . esc_attr( sanitize_html_class( Cast::str( $link['kind'] ?? '' ) ) ) . '"><a href="' . esc_url( Cast::str( $link['url'] ) ) . '">' . esc_html( Cast::str( $link['text'] ) ) . '</a></p>';
+			}
+		}
+		return $html;
+	}
+
+	/**
+	 * The no-results state (D-058, D-096): the summary, or the line that leads with the matching pages; the
+	 * pages; the owner's two links; each word alone; the nearest categories; the fallback products.
 	 */
 	public function noResults(): string {
 		$answer = $this->products->answer();
 		if ( null === $answer || '' === $answer['query'] || $this->products->shown() > 0 ) {
 			return '';
 		}
-		$html  = '<div class="csearch-no-results">';
-		$html .= $this->summary();
+		$html = '<div class="csearch-no-results">';
+		if ( $this->contentLeads() ) {
+			$html .= '<p class="csearch-results-summary" role="status">' . esc_html(
+				sprintf(
+					/* translators: %s: the search query */
+					__( 'No products match “%s”, but these do:', 'creative-search' ),
+					$answer['query']
+				)
+			) . '</p>' . $this->contentSection();
+		} else {
+			$html .= $this->summary();
+		}
+		$html .= $this->links( $answer['query'] );
+		$html .= $this->alternatives( $answer['query'], $answer['lang'] );
 		$cats  = $this->nearestCategories( $answer['query'], $answer['lang'] );
 		if ( array() !== $cats ) {
 			$html .= '<p class="csearch-no-results-categories">' . esc_html__( 'Try one of these categories:', 'creative-search' ) . '</p><ul class="csearch-no-results-categories-list">';
@@ -104,6 +270,60 @@ final class ResultsView {
 			$html     .= '<h2 class="csearch-no-results-fallback-title">' . esc_html__( 'You might like', 'creative-search' ) . '</h2>' . wp_kses_post( $shortcode->get_content() );
 		}
 		return $html . '</div>';
+	}
+
+	/**
+	 * Each word of a query that found nothing, searched alone, when it finds something (Baymard: offer
+	 * alternative searches on the no-results page; D-096). Up to three words, each a link with its count.
+	 * The searches are the results page's own, cached, and not logged.
+	 *
+	 * @param string $query The query.
+	 * @param string $lang  Its language.
+	 */
+	public function alternatives( string $query, string $lang ): string {
+		$split = preg_split( '/\s+/u', $query );
+		$words = array_values( array_unique( array_filter( false === $split ? array() : $split, static fn( string $w ): bool => mb_strlen( $w ) >= 2 ) ) );
+		if ( count( $words ) < 2 ) {
+			return ''; // One word is the query itself.
+		}
+		$found = array();
+		foreach ( array_slice( $words, 0, self::ALTERNATIVES ) as $word ) {
+			$count = count( $this->search->rankedIds( $word, $lang, '', true )['ids'] );
+			if ( $count > 0 ) {
+				$found[ $word ] = $count;
+			}
+		}
+		/**
+		 * The words offered on the no-results page, each with its result count.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param array<string, int> $found The words and their counts.
+		 * @param string             $query The query that found nothing.
+		 */
+		$found = apply_filters( 'csearch_alternative_queries', $found, $query );
+		if ( ! is_array( $found ) || array() === $found ) {
+			return '';
+		}
+		$html = '<p class="csearch-no-results-alternatives">' . esc_html__( 'Try one word:', 'creative-search' ) . '</p><ul class="csearch-no-results-alternatives-list">';
+		foreach ( $found as $word => $count ) {
+			$url   = add_query_arg(
+				array(
+					's'         => rawurlencode( (string) $word ),
+					'post_type' => 'product',
+				),
+				home_url( '/' )
+			);
+			$html .= '<li><a href="' . esc_url( $url ) . '">' . esc_html(
+				sprintf(
+					/* translators: 1: a word of the shopper's query, 2: how many products it finds alone */
+					_n( '%1$s (%2$s result)', '%1$s (%2$s results)', Cast::int( $count ), 'creative-search' ),
+					(string) $word,
+					number_format_i18n( Cast::int( $count ) )
+				)
+			) . '</a></li>';
+		}
+		return $html . '</ul>';
 	}
 
 	/**

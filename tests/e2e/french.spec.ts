@@ -49,13 +49,10 @@ test( 'the block suggests French products in French words', async ( {
 	await expect( page.locator( '.csearch-live' ) ).toHaveText(
 		/^\d+ suggestions?$/
 	);
-	// Nine rows overflow the panel; the arrow keys bring each into view (APG), so axe's Safari rule on
-	// scrollable regions is exempt for the open panel (D-079).
+	// The panel fits the screen with no scrollbar (D-092, superseding D-079's exemption).
 	await input.press( 'ArrowUp' );
 	await expect( options.last() ).toBeInViewport();
-	await axe( page, 'French panel', '.wp-block-creative-search-search', [
-		'scrollable-region-focusable',
-	] );
+	await axe( page, 'French panel', '.wp-block-creative-search-search' );
 } );
 
 test( 'accents fold: vetements finds Vêtements', async ( { page } ) => {

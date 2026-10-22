@@ -105,6 +105,34 @@ final class GoldenQueriesTest extends TestCase {
 		self::assertSame( array(), $failures, "Golden queries failing:\n" . implode( "\n", $failures ) );
 	}
 
+	/**
+	 * The golden queries of the Skatehouse handoff that the generated catalogue can answer (its sizes; the
+	 * pages are in tests/Integration/ContentTest.php): each spelling of one size finds the same products.
+	 */
+	public function test_every_spelling_of_a_size_finds_the_same_products(): void {
+		$searcher = new Searcher( self::index() );
+		$parser   = self::parser();
+		$skus     = fn( string $q, string $lang = 'en' ): array => array_map( fn( Hit $h ): string => self::$skus[ $h->document->objectId ], $searcher->search( $parser->parse( $q, $lang ), new SearchOptions( limit: 300 ) )->products );
+		$groups   = array(
+			array( 'en', '8.25', '8.25in', '8.25 in', '8.25 inch', '8.25 inches', '8.25"', '8.25″', "8.25''", '8.250' ),
+			array( 'en', '8.5 deck', '8.50 deck', '8.5" deck', '8.5in deck' ),
+			array( 'en', '54mm wheels', '54 mm wheels' ),
+			array( 'en', "philly's", 'phillys', 'philly’s' ),
+			array( 'fr', '8.25', '8,25', '8,25 po', '8,25 pouces' ),
+		);
+		foreach ( $groups as $group ) {
+			$lang  = array_shift( $group );
+			$first = $skus( $group[0], $lang );
+			self::assertNotSame( array(), $first, $group[0] );
+			foreach ( array_slice( $group, 1 ) as $spelling ) {
+				self::assertSame( $first, $skus( $spelling, $lang ), "{$spelling} reads as {$group[0]}" );
+			}
+		}
+		self::assertContains( 'ORB-CLA-00007', $skus( '54 wheels' ), 'a bare 54 finds the 54 mm wheels' );
+		self::assertSame( 'ORB-CLA-00007', $skus( '54 mm wheels' )[0] );
+		self::assertNotContains( 'RSC-SBA-00005', $skus( '8.25 in' ), '8.125 is not 8.25' );
+	}
+
 	public function test_the_in_memory_index_has_the_catalogue_shape(): void {
 		$index = self::index();
 		self::assertSame( $index->documentCount( 'en' ), $index->documentCount( 'fr' ), 'one document per product and term in each language' );

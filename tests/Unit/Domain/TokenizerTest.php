@@ -42,7 +42,7 @@ final class TokenizerTest extends TestCase {
 			'decimal point'         => array( 'Deck 8.25', array( 'deck@0', '8.25@1' ), 'en' ),
 			'inch mark'             => array( '8.25″ deck', array( '8.25@0', 'deck@1' ), 'en' ),
 			'straight inch mark'    => array( '8.25" deck', array( '8.25@0', 'deck@1' ), 'en' ),
-			'unit stays attached'   => array( '54mm 99a', array( '54mm@0', '99a@1' ), 'en' ),
+			'unit stays attached'   => array( '54mm 99a', array( '54mm@0', '54@0', '99a@1' ), 'en' ),
 			'trailing point drops'  => array( 'size 8.', array( 'size@0', '8@1' ), 'en' ),
 			'leading point splits'  => array( '.25 inch', array( '25@0', 'inch@1' ), 'en' ),
 			'sku splits on hyphens' => array( 'KAZ-DEA-00001', array( 'kaz@0', 'dea@1', '00001@2' ), 'en' ),
@@ -66,7 +66,92 @@ final class TokenizerTest extends TestCase {
 			'apostrophe at edges'   => array( "'deck' 'n' roll", array( 'deck@0', 'roll@1' ), 'en' ),
 			'ligature fold'         => array( 'Œuvre', array( 'oeuvre@0' ), 'en' ),
 			'eszett alone is one char' => array( 'ß deck', array( 'deck@0' ), 'en' ),
+			// D-098: sizes read one way, on both sides.
+			'inches written out'    => array( 'Deck 8.25in', array( 'deck@0', '8.25@1' ), 'en' ),
+			'inches spaced'         => array( '8.25 inches wide', array( '8.25@0', 'wide@1' ), 'en' ),
+			'two apostrophes'       => array( "8.25'' deck", array( '8.25@0', 'deck@1' ), 'en' ),
+			'trailing zeros'        => array( '8.50″ 8.00″ 8.125', array( '8.5@0', '8@1', '8.125@2' ), 'en' ),
+			'millimetres spaced'    => array( '1.2 mm grip', array( '1.2mm@0', '1.2@0', 'grip@1' ), 'en' ),
+			'pair of sizes'         => array( 'Grip 33″ x 9″', array( 'grip@0', '33@1', '9@2' ), 'en' ),
+			'pair with a star'      => array( '110*38mm', array( '110@0', '38mm@1', '38@1' ), 'en' ),
+			'a sku keeps its x'     => array( 'KZ825X2', array( 'kz825x2@0' ), 'en' ),
+			'french decimal comma'  => array( 'Planche 8,25 po', array( 'planche@0', '8.25@1' ), 'fr' ),
+			'english keeps a comma' => array( '8,25', array( '8@0', '25@1' ), 'en' ),
 		);
+	}
+
+	/**
+	 * @return array<string, array{string, string, string}>
+	 */
+	public static function units(): array {
+		return array(
+			'in attached'          => array( '8.25in', '8.25″', 'en' ),
+			'in spaced'            => array( '8.25 in', '8.25″', 'en' ),
+			'inch'                 => array( '8.25 inch', '8.25″', 'en' ),
+			'inches'               => array( '8.25inches', '8.25″', 'en' ),
+			'straight quote'       => array( '8.25"', '8.25″', 'en' ),
+			'two apostrophes'      => array( "8.25''", '8.25″', 'en' ),
+			'two curly apostrophes' => array( '8.25’’', '8.25″', 'en' ),
+			'mark spaced'          => array( '8.25 ″', '8.25″', 'en' ),
+			'in a word is a word'  => array( '8 inside', '8 inside', 'en' ),
+			'in after a letter'    => array( 'x8in', 'x8in', 'en' ),
+			'in after a point'     => array( '.8in', '.8in', 'en' ),
+			'po is french'         => array( '8 po', '8 po', 'en' ),
+			'po'                   => array( '8 po', '8″', 'fr' ),
+			'pouce'                => array( '8 pouce', '8″', 'fr' ),
+			'pouces'               => array( '8 pouces', '8″', 'fr' ),
+			'decimal comma'        => array( '8,25', '8.25', 'fr' ),
+			'comma after a letter' => array( 'a8,25', 'a8,25', 'fr' ),
+			'comma after a comma'  => array( '1,2,3', '1,2,3', 'fr' ),
+			'comma list'           => array( '8,25,', '8,25,', 'fr' ),
+			'comma after a point'  => array( '.8,25', '.8,25', 'fr' ),
+			'zeros'                => array( '8.50 9.00 8.125 10.0', '8.5 9 8.125 10', 'en' ),
+			'zeros inside a word'  => array( 'v8.50', 'v8.50', 'en' ),
+			'a version'            => array( '1.2.0', '1.2.0', 'en' ),
+			'zeros before a point' => array( '8.50.', '8.50.', 'en' ),
+			'zeros after a point'  => array( '.8.50', '.8.50', 'en' ),
+			'zeros of a longer number' => array( '8.501', '8.501', 'en' ),
+			'mm spaced'            => array( '54 mm', '54mm', 'en' ),
+			'mm attached'          => array( '54mm', '54mm', 'en' ),
+			'mm in a word'         => array( '54 mmm', '54 mmm', 'en' ),
+			'mm after a letter'    => array( 'a54 mm', 'a54 mm', 'en' ),
+			'mm after a point'     => array( '.54 mm', '.54 mm', 'en' ),
+			'pair'                 => array( '9x33', '9 33', 'en' ),
+			'pair spaced'          => array( '9 × 33', '9 33', 'en' ),
+			'pair star'            => array( '110*38', '110 38', 'en' ),
+			'pair of inches'       => array( '33″ x 9″', '33″ 9″', 'en' ),
+			'pair of decimals'     => array( '8.5x31.5', '8.5 31.5', 'en' ),
+			'x before a letter'    => array( '9xl', '9xl', 'en' ),
+			'x after a letter'     => array( 'a9x33', 'a9x33', 'en' ),
+			'x after a point'      => array( '.9x33', '.9x33', 'en' ),
+			'x alone'              => array( 'x 9', 'x 9', 'en' ),
+			// The rest of the handoff's forms (item 6).
+			'pair reversed'        => array( '33x9', '33 9', 'en' ),
+			'pair reversed spaced' => array( '33 x 9 grip', '33 9 grip', 'en' ),
+			'pair of mm'           => array( '110x38mm', '110 38mm', 'en' ),
+			'pair with a star mm'  => array( '110*38mm', '110 38mm', 'en' ),
+			'fingerboard mm'       => array( '32 mm fingerboard deck', '32mm fingerboard deck', 'en' ),
+			'decimal mm'           => array( '1.2 mm', '1.2mm', 'en' ),
+			'three decimals'       => array( '8.375 deck', '8.375 deck', 'en' ),
+			'three decimals, inch' => array( '8.375in', '8.375″', 'en' ),
+		);
+	}
+
+	#[DataProvider( 'units' )]
+	public function test_sizes_read_one_way( string $text, string $expected, string $lang ): void {
+		self::assertSame( $expected, Tokenizer::units( $text, $lang ) );
+	}
+
+	public function test_units_default_to_english_and_words_read_them(): void {
+		self::assertSame( '8 po', Tokenizer::units( '8 po' ) );
+		self::assertSame( array( '8,25' ), array_slice( Tokenizer::words( '8,25' ), 0, 0 ) + array( '8,25' ) );
+		self::assertSame( array( '8', '25' ), Tokenizer::words( '8,25' ) );
+		self::assertSame( array( '8.25' ), Tokenizer::words( '8,25', 'fr' ) );
+		self::assertSame( array( '8.25″' ), Tokenizer::words( '8.25 IN' ) );
+		self::assertSame( array( '54mm', '54' ), Tokenizer::variants( '54mm' ) );
+		self::assertSame( array( '1.2mm', '1.2' ), Tokenizer::variants( '1.2mm' ) );
+		self::assertSame( array( 'a54mm' ), Tokenizer::variants( 'a54mm' ), 'a SKU is not a size' );
+		self::assertSame( array( '54mmx' ), Tokenizer::variants( '54mmx' ) );
 	}
 
 	#[DataProvider( 'cases' )]
@@ -227,5 +312,10 @@ final class TokenizerTest extends TestCase {
 		$texts = array_map( static fn( Token $x ): string => $x->text, $tokens );
 		$again = array_map( static fn( Token $x ): string => $x->text, $t->tokenize( implode( ' ', $texts ), 'en' ) );
 		self::assertSame( $texts, $again, 'tokenising the tokens gives the tokens' );
+	}
+
+	public function test_a_millimetre_size_in_any_script_adds_its_number(): void {
+		self::assertSame( array( '٥٤mm', '٥٤' ), Tokenizer::variants( '٥٤mm' ) );
+		self::assertSame( array( 'x٥٤mm' ), Tokenizer::variants( 'x٥٤mm' ) );
 	}
 }

@@ -39,6 +39,13 @@ final class ResultsHooks implements Hookable {
 	private bool $emptyShown = false;
 
 	/**
+	 * Whether the posts and pages have been printed after the products on this page.
+	 *
+	 * @var bool
+	 */
+	private bool $contentShown = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param ProductSearch $products The ranked search.
@@ -60,7 +67,11 @@ final class ResultsHooks implements Hookable {
 		add_filter( 'woocommerce_get_filtered_term_product_counts_query', array( $this->products, 'filterCounts' ) );
 		add_filter( 'woocommerce_price_filter_sql', array( $this->products, 'priceRange' ) );
 		add_action( 'woocommerce_before_shop_loop', array( $this, 'printSummary' ), 5 );
+		add_action( 'woocommerce_no_products_found', array( $this, 'leadWithContent' ), 5 );
 		add_action( 'woocommerce_no_products_found', array( $this, 'printNoResults' ), 20 );
+		add_action( 'woocommerce_after_shop_loop', array( $this, 'printContentAfter' ), 5 );
+		add_filter( 'render_block_woocommerce/product-template', array( $this, 'blockContentAfter' ) );
+		add_filter( 'woocommerce_redirect_single_search_result', array( $this, 'singleRedirect' ) );
 		add_filter( 'render_block_woocommerce/product-results-count', array( $this, 'blockSummary' ) );
 		add_filter( 'render_block_woocommerce/product-collection-no-results', array( $this, 'blockNoResults' ) );
 	}
@@ -100,7 +111,60 @@ final class ResultsHooks implements Hookable {
 	 * @return string|mixed
 	 */
 	public function blockNoResults( $content ) {
-		return is_string( $content ) ? $content . $this->noResultsOnce() : $content;
+		if ( ! is_string( $content ) ) {
+			return $content;
+		}
+		// When a page matches, it leads: the block's bare "No products were found" goes.
+		return $this->view->contentLeads() ? $this->noResultsOnce() : $content . $this->noResultsOnce();
+	}
+
+	/**
+	 * Before WooCommerce's own "No products were found": when a post or page matches, that notice goes and the
+	 * no-results state leads with the page (Skatehouse handoff item 7).
+	 */
+	public function leadWithContent(): void {
+		if ( $this->view->contentLeads() ) {
+			remove_action( 'woocommerce_no_products_found', 'wc_no_products_found' );
+		}
+	}
+
+	/**
+	 * The posts and pages after a classic shop loop, when a product is named exactly as the query reads.
+	 */
+	public function printContentAfter(): void {
+		echo $this->contentAfterOnce(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped where it is built, in ResultsView.
+	}
+
+	/**
+	 * The same after a block theme's product template.
+	 *
+	 * @param string|mixed $content The block's HTML.
+	 * @return string|mixed
+	 */
+	public function blockContentAfter( $content ) {
+		return is_string( $content ) ? $content . $this->contentAfterOnce() : $content;
+	}
+
+	/**
+	 * WooCommerce opens the product when a search finds exactly one; not when a post or page was found too.
+	 *
+	 * @param bool|mixed $redirect WooCommerce's choice.
+	 * @return bool|mixed
+	 */
+	public function singleRedirect( $redirect ) {
+		return array() !== $this->view->content() ? false : $redirect;
+	}
+
+	/**
+	 * The posts and pages after the products, the first time they are asked for on a page.
+	 */
+	private function contentAfterOnce(): string {
+		if ( $this->contentShown ) {
+			return '';
+		}
+		$html               = $this->view->contentAfter();
+		$this->contentShown = '' !== $html;
+		return $html;
 	}
 
 	/**
@@ -136,5 +200,8 @@ final class ResultsHooks implements Hookable {
 	public function reset(): void {
 		$this->summaryShown = false;
 		$this->emptyShown   = false;
+		$this->contentShown = false;
+		$this->view->reset();
+		add_action( 'woocommerce_no_products_found', 'wc_no_products_found' );
 	}
 }

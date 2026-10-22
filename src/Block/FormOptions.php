@@ -39,6 +39,9 @@ final class FormOptions {
 		'panelPosition'  => 'panel_position',
 	);
 
+	public const FIELD  = 'field';
+	public const BUTTON = 'button';
+
 	/**
 	 * Constructor.
 	 *
@@ -51,6 +54,8 @@ final class FormOptions {
 	 * @param bool   $recentSearches The shopper's last five searches, in their browser only.
 	 * @param string $panelPosition  auto, below or above.
 	 * @param int    $minChars       Characters before the first request, after `csearch_min_chars`.
+	 * @param string $mode           `field` (the form in place) or `button` (an icon that opens the form in a
+	 *                               dialog, D-099); per form, not a setting.
 	 */
 	public function __construct(
 		public readonly bool $labelVisible,
@@ -61,7 +66,8 @@ final class FormOptions {
 		public readonly bool $showTerms,
 		public readonly bool $recentSearches,
 		public readonly string $panelPosition,
-		public readonly int $minChars
+		public readonly int $minChars,
+		public readonly string $mode = self::FIELD
 	) {
 	}
 
@@ -84,12 +90,15 @@ final class FormOptions {
 				$values[ $key ] = $attributes[ $attribute ];
 			}
 		}
+		if ( isset( $attributes['mode'] ) ) {
+			$values['mode'] = $attributes['mode'];
+		}
 		return self::fromSettingKeys( $values );
 	}
 
 	/**
-	 * From values keyed like the settings (shortcode attributes, a widget instance). Unknown keys are
-	 * ignored, each value is coerced to its type and range, a missing key takes the owner's setting.
+	 * From values keyed like the settings (shortcode attributes, a widget instance), plus `mode`. Unknown keys
+	 * are ignored, each value is coerced to its type and range, a missing key takes the owner's setting.
 	 *
 	 * @param array<string, mixed> $values Overrides.
 	 */
@@ -134,7 +143,8 @@ final class FormOptions {
 			$flag( 'show_terms' ),
 			$flag( 'recent_searches' ),
 			$position,
-			Settings::clamp( Settings::toInt( $minChars, Settings::MIN_CHARS_DEFAULT ), Settings::MIN_CHARS_MIN, Settings::MIN_CHARS_MAX )
+			Settings::clamp( Settings::toInt( $minChars, Settings::MIN_CHARS_DEFAULT ), Settings::MIN_CHARS_MIN, Settings::MIN_CHARS_MAX ),
+			self::BUTTON === Settings::toString( $values['mode'] ?? '' ) ? self::BUTTON : self::FIELD
 		);
 	}
 

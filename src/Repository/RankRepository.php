@@ -65,10 +65,11 @@ final class RankRepository extends Repository {
 
 		$sql[]   = 'WITH q AS (' . implode( ' UNION ALL ', $q ) . '), w AS (' . implode( ' UNION ALL ', $w ) . '),';
 		$sql[]   = $this->prepare(
-			'f AS (SELECT p.document_id AS doc, q.tok, p.field, MAX(COALESCE(w.w, 0) * q.m * (1 + LN(1 + p.tf)) * q.idf) AS best, MIN(p.first_pos) AS pos FROM q INNER JOIN %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = 1 LEFT JOIN w ON w.field = p.field GROUP BY p.document_id, q.tok, p.field),',
+			'f AS (SELECT p.document_id AS doc, q.tok, p.field, MAX(COALESCE(w.w, 0) * q.m * (1 + LN(1 + p.tf)) * q.idf) AS best, MIN(p.first_pos) AS pos FROM q INNER JOIN %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = %d LEFT JOIN w ON w.field = p.field GROUP BY p.document_id, q.tok, p.field),',
 			Tables::postings(),
 			$generation,
-			$plan->lang
+			$plan->lang,
+			$plan->kind
 		);
 		$sql[]   = $this->prepare(
 			"s AS (SELECT t.doc, SUM(t.best) AS base, GROUP_CONCAT(t.tok, ':', t.best ORDER BY t.tok SEPARATOR ',') AS bests FROM (SELECT doc, tok, MAX(best) AS best FROM f GROUP BY doc, tok) t GROUP BY t.doc HAVING COUNT(*) = %d)",
@@ -80,7 +81,8 @@ final class RankRepository extends Repository {
 		}
 
 		$rules  = $this->rulePoints( $plan->boostRules, $taxonomies );
-		$exact  = $this->prepare( '(CASE WHEN d.name_key = %s THEN %d ELSE 0 END) + (CASE WHEN sku.doc IS NULL THEN 0 ELSE %d END)', $plan->key, (int) Scorer::EXACT_NAME, (int) Scorer::EXACT_SKU );
+		$names  = $plan->nameKeys();
+		$exact  = $this->prepare( '(CASE WHEN d.name_key IN (' . self::strings( count( $names ) ) . ') THEN %d ELSE 0 END) + (CASE WHEN sku.doc IS NULL THEN 0 ELSE %d END)', ...array_merge( $names, array( (int) Scorer::EXACT_NAME, (int) Scorer::EXACT_SKU ) ) );
 		$stock  = $this->prepare( '(CASE WHEN d.in_stock = 1 THEN 0 ELSE %d END)', (int) Scorer::SOLD_OUT );
 		$owner  = '(d.boost' . ( array() === $rules ? '' : ' + COALESCE(r.points, 0)' ) . ')';
 		$phrase = $phrased ? 'COALESCE(ph.bonus, 0)' : '0';
@@ -90,11 +92,12 @@ final class RankRepository extends Repository {
 			$sql[] = 'LEFT JOIN ph ON ph.doc = s.doc';
 		}
 		$sql[] = $this->prepare(
-			'LEFT JOIN (SELECT ps.document_id AS doc FROM %i ts INNER JOIN %i ps ON ps.term_id = ts.id AND ps.generation = %d AND ps.lang = %s AND ps.product = 1 WHERE ts.term = %s AND ps.field = %d) sku ON sku.doc = s.doc',
+			'LEFT JOIN (SELECT ps.document_id AS doc FROM %i ts INNER JOIN %i ps ON ps.term_id = ts.id AND ps.generation = %d AND ps.lang = %s AND ps.product = %d WHERE ts.term = %s AND ps.field = %d) sku ON sku.doc = s.doc',
 			Tables::terms(),
 			Tables::postings(),
 			$generation,
 			$plan->lang,
+			$plan->kind,
 			'=' . $plan->key,
 			Fields::SKU
 		);
@@ -109,11 +112,12 @@ final class RankRepository extends Repository {
 		$sql[] = $this->prepare( 'WHERE (d.visible = 1 OR (%d = 1 AND sku.doc IS NOT NULL))', $plan->hiddenBySku ? 1 : 0 );
 		if ( array() !== $plan->excluded ) {
 			$sql[] = $this->prepare(
-				'AND NOT EXISTS (SELECT 1 FROM %i tx INNER JOIN %i px ON px.term_id = tx.id AND px.generation = %d AND px.lang = %s AND px.product = 1 AND px.document_id = d.id WHERE tx.term IN (' . self::strings( count( $plan->excluded ) ) . '))',
+				'AND NOT EXISTS (SELECT 1 FROM %i tx INNER JOIN %i px ON px.term_id = tx.id AND px.generation = %d AND px.lang = %s AND px.product = %d AND px.document_id = d.id WHERE tx.term IN (' . self::strings( count( $plan->excluded ) ) . '))',
 				Tables::terms(),
 				Tables::postings(),
 				$generation,
 				$plan->lang,
+				$plan->kind,
 				...$plan->excluded
 			);
 		}

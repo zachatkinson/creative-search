@@ -34,6 +34,10 @@ final class RankPlan {
 	 * @param bool                                 $hiddenBySku Whether a hidden product answers its exact SKU.
 	 * @param array<string, int>                   $boostRules  The owner's rules: `category:12` to points.
 	 * @param int                                  $limit       At most this many.
+	 * @param int                                  $kind        The documents ranked ({@see Kind}).
+	 * @param string[]                             $names       The name keys that count as exact: the query's
+	 *                                                          key, and that key with the word being typed
+	 *                                                          completed (D-100); empty reads the key alone.
 	 */
 	public function __construct(
 		public readonly string $lang,
@@ -46,8 +50,19 @@ final class RankPlan {
 		public readonly string $key,
 		public readonly bool $hiddenBySku,
 		public readonly array $boostRules,
-		public readonly int $limit
+		public readonly int $limit,
+		public readonly int $kind = Kind::PRODUCT,
+		public readonly array $names = array()
 	) {
+	}
+
+	/**
+	 * The name keys the exact-name bonus answers to.
+	 *
+	 * @return string[]
+	 */
+	public function nameKeys(): array {
+		return array() === $this->names ? array( $this->key ) : $this->names;
 	}
 
 	/**
@@ -67,7 +82,32 @@ final class RankPlan {
 			$texts[ $i ]  = $query->tokens[ $i ]->text;
 			$tokens[ $i ] = $widening->matches;
 		}
-		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit );
+		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ) );
+	}
+
+	/**
+	 * The name keys that count as an exact name (D-100): the query's key and, while its last word is still being
+	 * typed, the key with that word completed by each term it is a prefix of, so "size guide" is the exact name
+	 * of "Size guides" as the shopper types it.
+	 *
+	 * @param Query                                $query  The query.
+	 * @param array<int, array<string, TermMatch>> $tokens Each token's terms, by token index.
+	 * @return string[]
+	 */
+	private static function names( Query $query, array $tokens ): array {
+		$last = array_key_last( $query->tokens );
+		if ( null === $last || ! $query->tokens[ $last ]->prefix ) {
+			return array(); // The key alone (nameKeys()).
+		}
+		$names = array( $query->key() );
+		$texts = array_map( static fn( QueryToken $t ): string => $t->text, $query->tokens );
+		foreach ( $tokens[ $last ] ?? array() as $match ) {
+			if ( TermMatch::PREFIX === $match->kind ) {
+				$texts[ $last ] = $match->term;
+				$names[]        = implode( ' ', $texts );
+			}
+		}
+		return $names;
 	}
 
 	/**

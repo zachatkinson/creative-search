@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Cli;
 
+use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\Indexer;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
@@ -49,12 +50,12 @@ final class IndexCommand {
 	}
 
 	/**
-	 * Index products now.
+	 * Index products, posts and pages now.
 	 *
 	 * ## OPTIONS
 	 *
 	 * <id>...
-	 * : Product ids (a variation indexes its parent).
+	 * : Product ids (a variation indexes its parent), or post and page ids.
 	 *
 	 * [--format=<format>]
 	 * : text or json.
@@ -74,15 +75,24 @@ final class IndexCommand {
 		$results = array();
 		foreach ( $args as $arg ) {
 			$id        = absint( $arg );
+			$content   = null !== ContentReader::typeOf( (string) get_post_type( $id ) );
 			$start     = hrtime( true );
-			$indexed   = $this->indexer->indexProduct( $id );
+			$indexed   = $content ? $this->indexer->indexContent( $id ) : $this->indexer->indexProduct( $id );
 			$ms        = round( ( hrtime( true ) - $start ) / 1e6, 1 );
 			$results[] = array(
 				'id'      => $id,
 				'indexed' => $indexed,
 				'ms'      => $ms,
 			);
-			if ( ! $json ) {
+			if ( ! $json && $content ) {
+				WP_CLI::log(
+					$indexed
+						/* translators: 1: post or page id, 2: milliseconds */
+						? sprintf( __( 'Indexed post or page %1$d in %2$s ms.', 'creative-search' ), $id, number_format_i18n( $ms, 1 ) )
+						/* translators: %d: post or page id */
+						: sprintf( __( 'Post or page %d is not indexable (its type switched off, unpublished or password-protected): removed from the index.', 'creative-search' ), $id )
+				);
+			} elseif ( ! $json ) {
 				WP_CLI::log(
 					$indexed
 						/* translators: 1: product id, 2: milliseconds */
@@ -96,8 +106,8 @@ final class IndexCommand {
 		if ( $json ) {
 			WP_CLI::line( (string) wp_json_encode( $results ) );
 		}
-		/* translators: 1: products indexed, 2: products asked for */
-		$summary = sprintf( _n( '%1$d of %2$d product indexed.', '%1$d of %2$d products indexed.', count( $args ), 'creative-search' ), $done, count( $args ) );
+		/* translators: 1: ids indexed, 2: ids asked for */
+		$summary = sprintf( _n( '%1$d of %2$d id indexed.', '%1$d of %2$d ids indexed.', count( $args ), 'creative-search' ), $done, count( $args ) );
 		if ( $done < count( $args ) ) {
 			WP_CLI::error( $summary );
 		}

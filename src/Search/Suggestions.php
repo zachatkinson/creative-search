@@ -18,11 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * `{ products, terms, total, query, corrected, lang }` for the panel (spec: The search API → /suggest), built
+ * `{ products, terms, content, total, query, corrected, lang }` for the panel (spec: The search API → /suggest), built
  * from the documents table alone: name, URL, image, price and stock are on the row, so no WooCommerce product
  * object is loaded on the search path.
  */
 final class Suggestions {
+
+	/**
+	 * CSS classes a suggestion row carries at most.
+	 */
+	public const CLASSES = 8;
 
 	/**
 	 * Constructor.
@@ -39,7 +44,7 @@ final class Suggestions {
 	 * @param string      $raw   Query as received.
 	 * @param string|null $lang  Language asked for.
 	 * @param int         $limit Products, 1 to 10.
-	 * @return array<mixed> `products`, `terms`, `total`, `query`, `corrected`, `lang`.
+	 * @return array<mixed> `products`, `terms`, `content` (posts and pages, 1.1), `total`, `query`, `corrected`, `lang`.
 	 */
 	public function answer( string $raw, ?string $lang, int $limit ): array {
 		$query = SearchService::clean( $raw );
@@ -48,6 +53,7 @@ final class Suggestions {
 		$empty = array(
 			'products'  => array(),
 			'terms'     => array(),
+			'content'   => array(),
 			'total'     => 0,
 			'query'     => $query,
 			'corrected' => null,
@@ -64,6 +70,7 @@ final class Suggestions {
 			$answer = array(
 				'products'  => $this->products( array_slice( $result->products, 0, $limit ) ),
 				'terms'     => $this->terms( $result->terms ),
+				'content'   => $this->search->content( $query, $lang, 'suggest' ),
 				'total'     => count( $result->products ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
@@ -89,7 +96,7 @@ final class Suggestions {
 			if ( null === $row ) {
 				continue;
 			}
-			$out[] = array(
+			$suggestion = array(
 				'id'         => $hit->document->objectId,
 				'name'       => $hit->document->title,
 				'url'        => Cast::str( $row['url'] ),
@@ -98,6 +105,21 @@ final class Suggestions {
 				'in_stock'   => $hit->document->inStock,
 				'type'       => 'product',
 			);
+			/**
+			 * CSS classes for a product's suggestion row, as Mature Content adds one to blur flagged artwork
+			 * (Skatehouse handoff item 3). Each is sanitised with `sanitize_html_class()`; the answer is cached,
+			 * so a plugin whose answer changes calls `do_action( 'csearch_flush_cache' )`.
+			 *
+			 * @since 1.1.0
+			 *
+			 * @param string[]             $classes   None by default.
+			 * @param int                  $productId The product.
+			 * @param int|null             $imageId   Its image, or null.
+			 * @param array<string, mixed> $row       The suggestion as the panel receives it.
+			 */
+			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $hit->document->objectId, Cast::int( $row['image_id'] ) > 0 ? Cast::int( $row['image_id'] ) : null, $suggestion );
+			$suggestion['classes'] = self::classes( $classes );
+			$out[]                 = $suggestion;
 		}
 		return $out;
 	}
@@ -119,6 +141,23 @@ final class Suggestions {
 				'count'    => $hit->document->totalSales,
 				'url'      => Cast::str( $rows[ $hit->document->id ]['url'] ?? '' ),
 			);
+		}
+		return $out;
+	}
+
+	/**
+	 * A filter's CSS classes, sanitised, without repeats, eight at most.
+	 *
+	 * @param mixed $classes What the filter returned.
+	 * @return string[]
+	 */
+	public static function classes( mixed $classes ): array {
+		$out = array();
+		foreach ( is_array( $classes ) ? $classes : array() as $class ) {
+			$class = is_string( $class ) ? sanitize_html_class( $class ) : '';
+			if ( '' !== $class && ! in_array( $class, $out, true ) && count( $out ) < self::CLASSES ) {
+				$out[] = $class;
+			}
 		}
 		return $out;
 	}

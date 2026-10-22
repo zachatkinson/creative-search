@@ -13,6 +13,8 @@ use CreativeBranding\Search\Index\Indexer;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Domain\Tokenizer;
+use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
 
@@ -105,6 +107,24 @@ final class ReindexTest extends IndexTestCase {
 		self::assertTrue( $this->reindex()->queueFirstBuild() );
 		self::assertFalse( $this->reindex()->queueFirstBuild() );
 		self::assertSame( array( Reindex::START ), array_column( $this->pendingJobs(), 'hook' ) );
+	}
+
+	public function test_an_update_whose_tokenizer_reads_text_differently_owes_one_rebuild(): void {
+		update_option( Options::ANALYSIS_VERSION, Tokenizer::VERSION, true );
+		self::assertFalse( $this->reindex()->checkAnalysis(), 'current: nothing owed' );
+		update_option( Options::ANALYSIS_VERSION, 1, true );
+		self::assertFalse( $this->reindex()->checkAnalysis(), 'never built: the first build uses today\'s rules' );
+		self::assertSame( Tokenizer::VERSION, (int) get_option( Options::ANALYSIS_VERSION ) );
+		self::assertFalse( get_option( Options::REBUILD_OWED, false ) );
+		self::assertSame( array(), $this->pendingJobs() );
+		delete_option( Options::ANALYSIS_VERSION );
+		$this->products( array( 15 ) );
+		$this->reindex()->queueFirstBuild();
+		as_unschedule_all_actions( Reindex::START, array(), Options::QUEUE_GROUP );
+		self::assertTrue( $this->reindex()->checkAnalysis(), 'an index built under the old rules' );
+		self::assertSame( '0', (string) get_option( Options::REBUILD_OWED ) );
+		self::assertSame( array( Reindex::START ), array_column( $this->pendingJobs(), 'hook' ) );
+		self::assertFalse( $this->reindex()->checkAnalysis(), 'once' );
 	}
 
 	public function test_inline_reindex_runs_every_step(): void {

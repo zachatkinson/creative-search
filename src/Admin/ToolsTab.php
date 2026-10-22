@@ -198,7 +198,9 @@ final class ToolsTab {
 		self::flag( 'index_long_description', __( 'Long descriptions', 'creative-search' ), __( 'Search the long description (its first 2,000 characters).', 'creative-search' ), $settings );
 		self::flag( 'index_tags', __( 'Tags', 'creative-search' ), __( 'Search product tags, and suggest tags.', 'creative-search' ), $settings );
 		self::flag( 'index_variation_skus', __( 'Variation SKUs', 'creative-search' ), __( 'Find a variable product by any of its variations’ SKUs.', 'creative-search' ), $settings );
-		echo '</tbody></table><p class="description">' . esc_html__( 'A change here applies to products as they are next indexed; rebuild the index to apply it to all of them.', 'creative-search' ) . '</p>';
+		self::flag( 'index_posts', __( 'Posts', 'creative-search' ), __( 'Search the blog’s posts too, shown apart from the products.', 'creative-search' ), $settings );
+		self::flag( 'index_pages', __( 'Pages', 'creative-search' ), __( 'Search the site’s pages too, shown apart from the products.', 'creative-search' ), $settings );
+		echo '</tbody></table><p class="description">' . esc_html__( 'A change to the product settings applies to products as they are next indexed; rebuild the index to apply it to all of them. Posts and pages are added or removed in the background as soon as you save.', 'creative-search' ) . '</p>';
 
 		echo '<h3>' . esc_html__( 'Stop words', 'creative-search' ) . '</h3><p>' . esc_html__( 'Words a search ignores unless they are all it has, besides the built-in list. One per line or separated by commas.', 'creative-search' ) . '</p><table class="form-table" role="presentation"><tbody>';
 		$builtIn = new StopWords();

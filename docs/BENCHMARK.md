@@ -82,6 +82,19 @@ The index at this size, both languages: 20,104 documents, 1,144,797 postings, 64
 
 On MySQL 8.0 (the `csearch-mysql80` leg, 300 products), where CI had measured 227 ms for `/suggest` cold before D-086: 39.3 ms cold, 0.5 ms warm, `/search` 35.6 ms, 0.32 MB.
 
+## v1.1.0
+
+Same machine. One test (`CatalogueBenchmarkTest`) now loads the catalogue once for both measurements and logs each phase's time: PR #1's 10,000-product CI job spent over an hour loading the catalogue twice, once per test. The API is now measured with pages and posts switched on (a handful per hundred products, worded like a skate shop's), so each cold `/suggest` makes the content pass too (D-093).
+
+| What (300 products) | Result | Budget |
+| --- | --- | --- |
+| Loading the catalogue through WooCommerce | 22.7 s | none (setup) |
+| Full reindex, English | 1.43 s, 4.8 ms a product | 9 s (scaled) |
+| `/suggest` p95, cold, two languages, pages and posts on | 6.5 ms (1.0: 4.4 ms, pages off) | 100 ms |
+| `/suggest` p95, warm | 0.4 ms | 60 ms |
+| `/search` p95 | 6.0 ms | 100 ms |
+| Peak memory p95 | 0.30 MB | 4 MB |
+
 ## v1.0.0: the FiboSearch comparison (D-005, D-081)
 
 Two parts, as D-005 decided: what FiboSearch documents, and a measured run against FiboSearch **free**. No Pro licence was bought and there is no public Pro demo, so nothing here measures Pro.

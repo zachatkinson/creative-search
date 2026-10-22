@@ -9,12 +9,14 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Domain\Searcher;
 use CreativeBranding\Search\Domain\Synonyms;
 use CreativeBranding\Search\Index\AnalyzerFactory;
+use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\Languages;
 use CreativeBranding\Search\Index\TermReader;
 use CreativeBranding\Search\Repository\IndexRepository;
@@ -37,6 +39,18 @@ final class SearchService {
 	public const MAX_QUERY = 200;
 	public const MAX_IDS   = 500;
 	public const MAX_TERMS = 10;
+
+	/**
+	 * Posts and pages at most: in the panel, and on the results page (D-093).
+	 */
+	public const CONTENT_PANEL   = 2;
+	public const CONTENT_RESULTS = 3;
+	public const CONTENT_MAX     = 10;
+
+	/**
+	 * The ranked products looked at for an exact name: the exact-name bonus puts it among the first.
+	 */
+	public const EXACT_SCAN = 10;
 
 	/**
 	 * Constructor.
@@ -90,7 +104,101 @@ final class SearchService {
 	 * @param bool   $explain   Rank in PHP, with every part of each score (D-086): the same order, more memory.
 	 */
 	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false ): SearchResult {
-		$options  = $this->options( $limit, $termLimit, $retry );
+		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry ), $explain );
+	}
+
+	/**
+	 * Run a search of the posts and pages, uncached and unlogged: no boosts, no hidden products, no terms (D-093).
+	 *
+	 * @param string $query   Clean query.
+	 * @param string $lang    Checked language.
+	 * @param int    $limit   Posts and pages at most.
+	 * @param bool   $explain Rank in PHP, with every part of each score.
+	 */
+	public function runContent( string $query, string $lang, int $limit, bool $explain = false ): SearchResult {
+		return $this->searchWith( $query, $lang, $this->options( 1, 0 )->forContent( max( 1, min( self::CONTENT_MAX, $limit ) ) ), $explain );
+	}
+
+	/**
+	 * The posts and pages a query finds, as rows (`id`, `type`, `name`, `parent`: a child page's parent's title,
+	 * `url`, `image`), cached; none, with no query run, while posts and pages are both switched off.
+	 *
+	 * @param string $query   Clean query.
+	 * @param string $lang    Checked language.
+	 * @param string $context `suggest` (the panel) or `page` (the results page).
+	 * @return array<int, array{id: int, type: string, name: string, parent: string, url: string, image: array{src: string, srcset: string, width: int, height: int, alt: string}|null}>
+	 */
+	public function content( string $query, string $lang, string $context ): array {
+		if ( '' === $query || array() === ContentReader::enabled() ) {
+			return array();
+		}
+		$default = 'suggest' === $context ? self::CONTENT_PANEL : self::CONTENT_RESULTS;
+		/**
+		 * How many posts and pages to show beside the products.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param int    $limit   2 in the panel, 3 on the results page; 0 shows none. The panel never shows more
+		 *                        than 2 (its row budget, D-092), so there it can only be lowered.
+		 * @param string $context `suggest` or `page`.
+		 */
+		$limit = max( 0, min( 'suggest' === $context ? self::CONTENT_PANEL : self::CONTENT_MAX, Cast::int( apply_filters( 'csearch_content_limit', $default, $context ) ) ) );
+		if ( 0 === $limit ) {
+			return array();
+		}
+		$key    = Cache::key( $this->index->generation(), 'content', array( $query, $lang, $limit, $this->settingsKey() ) );
+		$cached = $this->cache->get( $key );
+		if ( null === $cached ) {
+			$hits   = $this->runContent( $query, $lang, $limit )->products;
+			$cached = array( 'ids' => array_map( static fn( Hit $hit ): int => $hit->document->id, $hits ) );
+			$this->cache->set( $key, $cached );
+		}
+		$ids   = Cast::ints( $cached['ids'] ?? array() );
+		$rows  = $this->index->rows( $ids );
+		$posts = array_map( static fn( array $row ): int => Cast::int( $row['object_id'] ), $rows );
+		// The posts, then their parents, each in one query: a row's parent title costs nothing more.
+		_prime_post_caches( $posts, false, false );
+		_prime_post_caches( array_map( static fn( int $id ): int => (int) wp_get_post_parent_id( $id ), $posts ), false, false );
+		$out = array();
+		foreach ( $ids as $id ) {
+			$row  = $rows[ $id ] ?? null;
+			$post = null === $row ? null : get_post( Cast::int( $row['object_id'] ) );
+			if ( null === $row || ! $post instanceof \WP_Post ) {
+				continue;
+			}
+			$out[] = array(
+				'id'     => Cast::int( $row['object_id'] ),
+				'type'   => Cast::str( $row['type'] ),
+				'name'   => Cast::str( $row['title'] ),
+				'parent' => ContentReader::parentTitle( $post ),
+				'url'    => Cast::str( $row['url'] ),
+				'image'  => Suggestions::image( Cast::int( $row['image_id'] ) ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Whether one of a query's first ranked products is named exactly as the query reads: then a page never
+	 * shows above it (Skatehouse handoff item 7), and a category query does not leave the search (item 10).
+	 *
+	 * @param string $query Clean query.
+	 * @param string $lang  Checked language.
+	 * @param int[]  $ids   The ranked product ids.
+	 */
+	public function namesProduct( string $query, string $lang, array $ids ): bool {
+		return $this->index->anyNamed( $lang, array_slice( $ids, 0, self::EXACT_SCAN ), mb_substr( $this->analyzers->tokenizer()->key( $query, $lang ), 0, 255, 'UTF-8' ) );
+	}
+
+	/**
+	 * Run a search with some options against the live index.
+	 *
+	 * @param string        $query   Clean query.
+	 * @param string        $lang    Checked language.
+	 * @param SearchOptions $options Options.
+	 * @param bool          $explain Rank in PHP, with every part of each score (D-086): the same order, more memory.
+	 */
+	private function searchWith( string $query, string $lang, SearchOptions $options, bool $explain ): SearchResult {
 		$store    = $this->index->at( $this->index->generation() )->withTermRefs( array() !== $options->boostRules );
 		$store    = $explain ? $store->explaining() : $store;
 		$langs    = array_values( array_unique( array_filter( array( $lang, $options->fallbackLang ) ) ) );
@@ -203,7 +311,7 @@ final class SearchService {
 	 * @return array<int, mixed>
 	 */
 	public function settingsKey(): array {
-		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ) );
+		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ) );
 	}
 
 	/**

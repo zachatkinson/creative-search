@@ -21,6 +21,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class Settings {
 
+	/**
+	 * The longest wording kept for a no-results link (D-096).
+	 */
+	public const LINK_TEXT_MAX = 120;
+
 	public const RETENTION_MIN = 7;
 	public const RETENTION_MAX = 365;
 	public const LIMIT_MIN     = 1;
@@ -65,6 +70,8 @@ final class Settings {
 			'index_long_description'       => 'yes',
 			'index_tags'                   => 'yes',
 			'index_variation_skus'         => 'yes',
+			'index_posts'                  => 'no',
+			'index_pages'                  => 'no',
 			'fields'                       => self::defaultFieldWeights(),
 			// Languages: empty means the site's language only; the csearch_languages filter adds more.
 			'languages'                    => array(),
@@ -73,6 +80,11 @@ final class Settings {
 			'hidden_by_sku'                => 'no',
 			'boost_rules'                  => array(),
 			'fallback_products'            => array(),
+			// The no-results page's two links (D-096): a page the owner picks, and its wording ('' reads the default).
+			'help_page'                    => 0,
+			'help_text'                    => '',
+			'guide_page'                   => 0,
+			'guide_text'                   => '',
 			// The suggestion panel's defaults (a block instance can override each).
 			'suggest_limit'                => self::LIMIT_DEFAULT,
 			'suggest_terms'                => self::TERMS_DEFAULT,
@@ -201,7 +213,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}
@@ -218,6 +230,14 @@ final class Settings {
 		}
 		if ( isset( $input['fallback_products'] ) && is_array( $input['fallback_products'] ) ) {
 			$out['fallback_products'] = self::sanitizeIds( $input['fallback_products'] );
+		}
+		foreach ( array( 'help', 'guide' ) as $link ) {
+			if ( isset( $input[ $link . '_page' ] ) ) {
+				$out[ $link . '_page' ] = max( 0, self::toInt( $input[ $link . '_page' ], 0 ) );
+			}
+			if ( isset( $input[ $link . '_text' ] ) ) {
+				$out[ $link . '_text' ] = mb_substr( trim( sanitize_text_field( self::toString( $input[ $link . '_text' ] ) ) ), 0, self::LINK_TEXT_MAX, 'UTF-8' );
+			}
 		}
 		if ( isset( $input['suggest_limit'] ) ) {
 			$out['suggest_limit'] = self::clamp( self::toInt( $input['suggest_limit'], self::LIMIT_DEFAULT ), self::LIMIT_MIN, self::LIMIT_MAX );

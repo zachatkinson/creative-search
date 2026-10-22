@@ -26,7 +26,7 @@ final class Languages {
 	/**
 	 * The languages, resolved once per request.
 	 *
-	 * @var array<string, array{product: ?callable, term: ?callable}>|null
+	 * @var array<string, array{product: ?callable, term: ?callable, content: ?callable}>|null
 	 */
 	private ?array $languages = null;
 
@@ -51,7 +51,7 @@ final class Languages {
 	/**
 	 * Codes with their readers.
 	 *
-	 * @return array<string, array{product: ?callable, term: ?callable}>
+	 * @return array<string, array{product: ?callable, term: ?callable, content: ?callable}>
 	 */
 	public function all(): array {
 		if ( null !== $this->languages ) {
@@ -73,10 +73,12 @@ final class Languages {
 		 *
 		 * @since 0.4.0
 		 *
-		 * @param array<string, array{product?: callable, term?: callable}> $languages Code to readers. `product`
-		 *     receives the WC_Product, the field texts read from the product itself (Domain\Fields ids to text) and
-		 *     the code, and returns the field texts in that language; `term` receives the WP_Term, its name and the
-		 *     code, and returns the name in that language. Either may be left out to read the product as is.
+		 * @param array<string, array{product?: callable, term?: callable, content?: callable}> $languages Code to
+		 *     readers. `product` receives the WC_Product, the field texts read from the product itself (Domain\Fields
+		 *     ids to text) and the code, and returns the field texts in that language; `term` receives the WP_Term,
+		 *     its name and the code, and returns the name in that language; `content` (since 1.1.0) receives the
+		 *     WP_Post, its field texts and the code, and returns the field texts in that language. Any may be left
+		 *     out to read the object as is.
 		 */
 		$filtered = apply_filters( 'csearch_languages', $defaults );
 		$out      = array();
@@ -88,12 +90,14 @@ final class Languages {
 			$out[ StopWords::code( $code ) ] = array(
 				'product' => isset( $readers['product'] ) && is_callable( $readers['product'] ) ? $readers['product'] : null,
 				'term'    => isset( $readers['term'] ) && is_callable( $readers['term'] ) ? $readers['term'] : null,
+				'content' => isset( $readers['content'] ) && is_callable( $readers['content'] ) ? $readers['content'] : null,
 			);
 		}
 		if ( array() === $out ) {
 			$out[ self::siteCode() ] = array(
 				'product' => null,
 				'term'    => null,
+				'content' => null,
 			);
 		}
 		$this->languages = $out;

@@ -14,6 +14,7 @@ use CreativeBranding\Search\Rest\ClickRoute;
 use CreativeBranding\Search\Rest\SearchRoute;
 use CreativeBranding\Search\Rest\StatusRoute;
 use CreativeBranding\Search\Rest\SuggestRoute;
+use CreativeBranding\Search\Search\Cache;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -40,6 +41,10 @@ final class RestHooks implements Hookable {
 	 */
 	public function register(): void {
 		add_action( 'rest_api_init', array( $this, 'routes' ) );
+		// Any plugin that changes what a suggestion shows drops the cached answers (Skatehouse handoff item 3).
+		add_action( 'csearch_flush_cache', array( Cache::class, 'bump' ), 10, 0 );
+		// Mature Content for WooCommerce, when a product's artwork flag changes (its row classes with it).
+		add_action( 'mcw_flags_changed', array( Cache::class, 'bump' ), 10, 0 );
 	}
 
 	/**

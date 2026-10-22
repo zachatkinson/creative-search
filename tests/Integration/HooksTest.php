@@ -196,6 +196,8 @@ final class HooksTest extends IndexTestCase {
 				'terms'           => array( 'product_cat' => array( $cat->term_id ) ),
 				'term_taxonomies' => array(),
 				'term_products'   => array( 'product_cat' => array( $cat->term_id ) ),
+				'content'         => array(),
+				'content_types'   => array(),
 			)
 		);
 		self::assertCount( 1, $this->documents( 'product', $a ) );

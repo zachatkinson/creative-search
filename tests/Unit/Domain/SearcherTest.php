@@ -13,6 +13,7 @@ use CreativeBranding\Search\Domain\Analyzer;
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\Query;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\QueryToken;
@@ -468,5 +469,97 @@ final class SearcherTest extends TestCase {
 		self::assertSame( '8.25', $score->tokens[1]['term'] );
 		self::assertGreaterThan( 0, $score->tokens[1]['df'] );
 		self::assertGreaterThan( 0.0, $score->total() );
+	}
+
+	/**
+	 * Add a post or page document (1.1): its title, its parent's title and its text.
+	 *
+	 * @param string $type   Document::POST or Document::PAGE.
+	 * @param string $title  Title.
+	 * @param string $parent The parent page's title.
+	 * @param string $text   Its text.
+	 */
+	private function page( string $type, string $title, string $parent = '', string $text = '' ): void {
+		$id = ++$this->nextId;
+		$this->index->add(
+			new Document( $id, $type, 500 + $id, 'en', $title, $this->analyzer->tokenizer()->key( $title, 'en' ) ),
+			$this->analyzer->analyze(
+				array(
+					Fields::NAME     => $title,
+					Fields::CATEGORY => $parent,
+					Fields::LONG     => $text,
+				),
+				'en'
+			)
+		);
+	}
+
+	private function pages(): void {
+		$this->page( Document::PAGE, 'Shipping and returns', '', 'Free shipping over $100. Returns within 30 days.' );
+		$this->page( Document::PAGE, 'Size guides' );
+		$this->page( Document::PAGE, 'Wheel guide', 'Size guides', 'Which wheel diameter for street or park.' );
+		$this->page( Document::PAGE, 'Deck width guide', 'Size guides', 'Pick a deck width by shoe size.' );
+		$this->page( Document::POST, 'Dealer deck drop', '', 'The KAZUMI Dealer is back.' );
+	}
+
+	private function content( string $raw, int $limit = 3 ): SearchResult {
+		return $this->search( $raw, 'en', ( new SearchOptions() )->forContent( $limit ) );
+	}
+
+	public function test_the_posts_and_pages_are_searched_on_their_own(): void {
+		$this->pages();
+		self::assertSame( array( 'Shipping and returns' ), self::titles( $this->content( 'returns' ) ), 'by its text and title' );
+		self::assertSame( array( 'Size guides', 'Wheel guide', 'Deck width guide' ), self::titles( $this->content( 'size guide' ) ), 'the parent first, then its children by their parent' );
+		self::assertSame( array( 'Wheel guide' ), self::titles( $this->content( 'wheel guide' ) ) );
+		self::assertSame( array(), self::terms( $this->content( 'kazumi' ) ), 'no categories, tags or brands' );
+		self::assertSame( array( 'Dealer deck drop' ), self::titles( $this->content( 'kazumi dealer' ) ), 'no product either' );
+		self::assertSame( array( 'Size guides', 'Wheel guide' ), self::titles( $this->content( 'size guide', 2 ) ), 'the limit' );
+		self::assertSame( array( 'Shipping and returns' ), self::titles( $this->content( 'ship' ) ), 'a prefix of a page\'s word' );
+	}
+
+	public function test_a_product_search_never_returns_a_post_or_page(): void {
+		$this->pages();
+		self::assertSame( array(), self::titles( $this->search( 'returns' ) ) );
+		self::assertNotContains( 'Dealer deck drop', self::titles( $this->search( 'dealer deck' ) ) );
+	}
+
+	public function test_turning_the_pages_on_changes_no_product_s_rank(): void {
+		$queries = array( 'deck', 'kazumi dealer', 'wheel', 'size', 'guide', 'dec', 'ship', 'kazumi dealr' );
+		$before  = array();
+		foreach ( $queries as $q ) {
+			$before[ $q ] = array_map( static fn( Hit $h ): array => array( $h->document->title, round( $h->score->total(), 6 ) ), $this->search( $q )->products );
+		}
+		$this->pages();
+		foreach ( $queries as $q ) {
+			$after = array_map( static fn( Hit $h ): array => array( $h->document->title, round( $h->score->total(), 6 ) ), $this->search( $q )->products );
+			self::assertSame( $before[ $q ], $after, $q );
+		}
+	}
+
+	public function test_a_content_search_drops_its_least_matched_word_among_the_pages(): void {
+		$this->pages();
+		$r = $this->content( 'returns policy' );
+		self::assertSame( array( 'Shipping and returns' ), self::titles( $r ) );
+		self::assertSame( 'returns', $r->corrected );
+	}
+
+	public function test_a_typo_of_a_word_only_the_pages_carry_finds_nothing(): void {
+		$this->pages();
+		self::assertSame( array(), self::titles( $this->content( 'retruns' ) ), 'typo correction reaches the catalogue\'s words only (D-093)' );
+		self::assertSame( array( 'Dealer deck drop' ), self::titles( $this->content( 'dealr' ) ), 'a word the products carry too is corrected' );
+	}
+
+	public function test_content_options(): void {
+		$base    = new SearchOptions( array( 'name' => 50 ), true, 'fr', array( 'brand:kazumi' => 5 ), 400, 3, false );
+		$content = $base->forContent( 4 );
+		self::assertSame( Kind::CONTENT, $content->kind );
+		self::assertSame( 4, $content->limit );
+		self::assertSame( 0, $content->termLimit );
+		self::assertFalse( $content->hiddenBySku );
+		self::assertSame( array(), $content->boostRules, 'the owner\'s boosts are for products' );
+		self::assertSame( array( 'name' => 50 ), $content->weights );
+		self::assertSame( 'fr', $content->fallbackLang );
+		self::assertFalse( $content->retry );
+		self::assertSame( Kind::PRODUCT, $base->kind );
 	}
 }

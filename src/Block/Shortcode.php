@@ -17,7 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * `[creative_search]` renders the same form as the block, for themes without a block header. Attributes
- * use the settings' keys: `[creative_search limit="8" show_prices="no" label_visible="no"]`.
+ * use the settings' keys: `[creative_search limit="8" show_prices="no" label_visible="no"]`, and `mode="button"` for
+ * the icon that opens the search in a dialog (D-099).
  */
 final class Shortcode implements Hookable {
 

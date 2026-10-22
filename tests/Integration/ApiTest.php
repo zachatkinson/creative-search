@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Index\Indexer;
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Search\Suggestions;
 use CreativeBranding\Search\Repository\LogRepository;
 use CreativeBranding\Search\Search\SearchLog;
 use CreativeBranding\Search\Settings\Settings;
@@ -280,5 +281,23 @@ final class ApiTest extends IndexTestCase {
 		$after = array_column( $this->call( 'GET', '/suggest', array( 'q' => 'skate deck' ) )->get_data()['products'], 'id' );
 		self::assertNotSame( $before, $after );
 		self::assertContains( $after[0], array( $this->ids[1], $this->ids[2] ), 'a Philly\'s deck rises to the top' );
+	}
+
+	public function test_a_plugin_adds_classes_to_a_product_row_and_drops_the_cached_answers(): void {
+		$flag = static fn( array $classes, int $productId ): array => array( 'mcw-mature', 'bad class!', 'mcw-mature', 42 );
+		add_filter( 'csearch_suggestion_classes', $flag, 10, 2 );
+		$data = $this->call( 'GET', '/suggest', array( 'q' => 'kazumi dealer' ) )->get_data();
+		self::assertSame( array( 'mcw-mature', 'badclass' ), $data['products'][0]['classes'], 'sanitised, without repeats or non-strings' );
+		remove_filter( 'csearch_suggestion_classes', $flag, 10 );
+		self::assertSame( array( 'mcw-mature', 'badclass' ), $this->call( 'GET', '/suggest', array( 'q' => 'kazumi dealer' ) )->get_data()['products'][0]['classes'], 'cached' );
+		do_action( 'mcw_flags_changed' );
+		self::assertSame( array(), $this->call( 'GET', '/suggest', array( 'q' => 'kazumi dealer' ) )->get_data()['products'][0]['classes'], 'Mature Content\'s change drops the answer' );
+		add_filter( 'csearch_suggestion_classes', $flag, 10, 2 );
+		do_action( 'csearch_flush_cache' );
+		self::assertSame( 'mcw-mature', $this->call( 'GET', '/suggest', array( 'q' => 'kazumi dealer' ) )->get_data()['products'][0]['classes'][0], 'and so does the public action' );
+		remove_filter( 'csearch_suggestion_classes', $flag, 10 );
+		self::assertCount( Suggestions::CLASSES, Suggestions::classes( array_map( static fn( int $i ): string => 'c' . $i, range( 1, 12 ) ) ) );
+		self::assertSame( array(), Suggestions::classes( 'mcw-mature' ) );
+		self::assertSame( array(), $data['content'], 'no pages while they are off' );
 	}
 }

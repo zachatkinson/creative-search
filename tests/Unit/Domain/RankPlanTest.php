@@ -50,4 +50,20 @@ final class RankPlanTest extends TestCase {
 		self::assertSame( array( 'kazumi', '825', 'deck' ), $plan->terms(), 'each term once, numbers as strings, in order' );
 		self::assertSame( log( 100 / 4 ), $plan->idf( 3 ) );
 	}
+
+	public function test_while_the_last_word_is_typed_its_completions_name_the_product_too(): void {
+		$guides  = new TermMatch( 'guides', TermMatch::PREFIX, 2 );
+		$guide   = new TermMatch( 'guide', TermMatch::PREFIX, 5 );
+		$stem    = new TermMatch( 'guid', TermMatch::STEM, 1 );
+		$size    = new TermMatch( 'size', TermMatch::EXACT, 9 );
+		$widened = array(
+			new TokenWidening( array( 'size' => $size ), array(), array() ),
+			new TokenWidening( array( 'guides' => $guides, 'guid' => $stem, 'guide' => $guide ), array(), array() ),
+		);
+		$typing  = new Query( 'size guid', 'en', array( new QueryToken( 'size', 'size' ), new QueryToken( 'guid', 'guid', prefix: true ) ) );
+		self::assertSame( array( 'size guid', 'size guides', 'size guide' ), RankPlan::of( $typing, $widened, 'en', 9, array(), new SearchOptions() )->nameKeys(), 'the key itself first, then each completion' );
+		$done = new Query( 'size guid ', 'en', array( new QueryToken( 'size', 'size' ), new QueryToken( 'guid', 'guid' ) ) );
+		self::assertSame( array( 'size guid' ), RankPlan::of( $done, $widened, 'en', 9, array(), new SearchOptions() )->nameKeys(), 'a finished word is not completed' );
+		self::assertSame( array( '' ), RankPlan::of( new Query( '', 'en', array() ), array(), 'en', 9, array(), new SearchOptions() )->nameKeys() );
+	}
 }

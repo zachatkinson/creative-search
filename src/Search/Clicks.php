@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class Clicks {
 
-	public const TYPES  = array( 'product', 'category', 'tag', 'brand' );
+	public const TYPES  = array( 'product', 'category', 'tag', 'brand', 'post', 'page' );
 	public const WINDOW = 600;
 
 	/**

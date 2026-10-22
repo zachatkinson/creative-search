@@ -13,6 +13,7 @@ use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\IndexStore;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\RankPlan;
 use CreativeBranding\Search\Domain\Ranker;
 use CreativeBranding\Search\Domain\Score;
@@ -84,22 +85,29 @@ final class IndexRepository implements IndexStore {
 	}
 
 	/**
-	 * The number of documents in a language in the live generation.
+	 * The number of documents in a language in the live generation: the catalogue's, or the posts and pages'.
 	 *
 	 * @param string $lang Language code.
+	 * @param int    $kind The search's kind.
 	 */
-	public function documentCount( string $lang ): int {
-		return $this->documents->count( $this->generation(), $lang );
+	public function documentCount( string $lang, int $kind = Kind::PRODUCT ): int {
+		return $this->documents->countOf( $this->generation(), $lang, Kind::CONTENT === $kind );
 	}
 
 	/**
-	 * The terms starting with a prefix, most frequent first.
+	 * The terms starting with a prefix, most frequent first: the dictionary's for the catalogue, the posts and
+	 * pages' own counted from their postings for a content search (D-093).
 	 *
 	 * @param string $prefix Folded prefix.
 	 * @param int    $limit  At most.
+	 * @param int    $kind   The search's kind.
+	 * @param string $lang   Language code, for a content search.
 	 * @return array<string, int>
 	 */
-	public function termsWithPrefix( string $prefix, int $limit ): array {
+	public function termsWithPrefix( string $prefix, int $limit, int $kind = Kind::PRODUCT, string $lang = '' ): array {
+		if ( Kind::CONTENT === $kind ) {
+			return Upgrader::needed() ? array() : $this->postings->contentPrefix( $prefix, $limit, $this->generation(), $lang );
+		}
 		return $this->dictionary->withPrefix( $prefix, $limit );
 	}
 
@@ -119,13 +127,15 @@ final class IndexRepository implements IndexStore {
 	 *
 	 * @param string[] $terms    Folded terms.
 	 * @param string   $lang     Language code.
-	 * @param bool     $products Product documents, or the others.
+	 * @param int      $kind     The documents' kind.
 	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>>
 	 */
-	public function postings( array $terms, string $lang, bool $products ): array {
-		return Upgrader::needed()
-			? $this->schemaOne->forTerms( $terms, $this->generation(), $lang, $products )
-			: $this->postings->forTerms( $terms, $this->generation(), $lang, $products );
+	public function postings( array $terms, string $lang, int $kind ): array {
+		if ( Upgrader::needed() ) {
+			// Schema 1 had no posts or pages (D-090, D-093).
+			return Kind::CONTENT === $kind ? array() : $this->schemaOne->forTerms( $terms, $this->generation(), $lang, Kind::PRODUCT === $kind );
+		}
+		return $this->postings->forTerms( $terms, $this->generation(), $lang, $kind );
 	}
 
 	/**
@@ -170,9 +180,14 @@ final class IndexRepository implements IndexStore {
 	 *
 	 * @param string[] $terms Folded terms.
 	 * @param string   $lang  Language code.
+	 * @param int      $kind  The search's kind: the catalogue's stored counts, or the posts and pages' counted
+	 *                        from their postings (D-093).
 	 * @return array<string, int>
 	 */
-	public function frequencies( array $terms, string $lang ): array {
+	public function frequencies( array $terms, string $lang, int $kind = Kind::PRODUCT ): array {
+		if ( Kind::CONTENT === $kind ) {
+			return Upgrader::needed() ? array() : $this->postings->contentFrequencies( $terms, $this->generation(), $lang );
+		}
 		return Upgrader::needed()
 			? $this->schemaOne->frequencies( $terms, $this->generation(), $lang )
 			: $this->stats->frequencies( $terms, $this->generation(), $lang );
@@ -183,11 +198,13 @@ final class IndexRepository implements IndexStore {
 	 *
 	 * @param string[] $terms Folded terms.
 	 * @param string   $lang  Language code.
+	 * @param int      $kind  Products or content.
 	 */
-	public function productCount( array $terms, string $lang ): int {
-		return Upgrader::needed()
-			? $this->schemaOne->productCount( $terms, $this->generation(), $lang )
-			: $this->postings->productCount( $terms, $this->generation(), $lang );
+	public function productCount( array $terms, string $lang, int $kind = Kind::PRODUCT ): int {
+		if ( Upgrader::needed() ) {
+			return Kind::CONTENT === $kind ? 0 : $this->schemaOne->productCount( $terms, $this->generation(), $lang );
+		}
+		return $this->postings->productCount( $terms, $this->generation(), $lang, $kind );
 	}
 
 	/**
@@ -200,7 +217,7 @@ final class IndexRepository implements IndexStore {
 		if ( $this->explaining || Upgrader::needed() ) { // While the schema upgrade waits, the statement's columns may not be there yet (D-090).
 			return ( new Ranker() )->rank(
 				$plan,
-				$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, true ),
+				$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, $plan->kind ),
 				fn( array $ids, string $key ): array => $this->documents( $ids, $key )
 			);
 		}
@@ -279,6 +296,17 @@ final class IndexRepository implements IndexStore {
 	 */
 	public function generation(): int {
 		return $this->pinned ?? $this->state->live();
+	}
+
+	/**
+	 * Whether any of some products, in the live generation, is named exactly as a query reads (its name key).
+	 *
+	 * @param string $lang       Language code.
+	 * @param int[]  $productIds Product ids (the first of a ranked list: the exact name ranks high).
+	 * @param string $key        The query's name key.
+	 */
+	public function anyNamed( string $lang, array $productIds, string $key ): bool {
+		return $this->documents->anyNamed( $this->generation(), $lang, $productIds, $key );
 	}
 
 	/**

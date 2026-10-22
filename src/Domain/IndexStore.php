@@ -22,20 +22,25 @@ defined( 'ABSPATH' ) || exit;
 interface IndexStore {
 
 	/**
-	 * The number of documents in a language: N in the score.
+	 * The number of documents in a language: N in the score. The catalogue's (products, categories, tags and
+	 * brands) for a product or term search; the posts and pages' for a content search (D-093).
 	 *
 	 * @param string $lang Language code.
+	 * @param int    $kind The search's kind ({@see Kind}).
 	 */
-	public function documentCount( string $lang ): int;
+	public function documentCount( string $lang, int $kind = Kind::PRODUCT ): int;
 
 	/**
-	 * The terms starting with a prefix, most frequent first.
+	 * The terms starting with a prefix, most frequent first: the catalogue's, or for a content search the
+	 * terms the posts and pages of a language carry (D-093).
 	 *
 	 * @param string $prefix Folded prefix.
 	 * @param int    $limit  At most this many.
+	 * @param int    $kind   The search's kind ({@see Kind}).
+	 * @param string $lang   Language code, for a content search.
 	 * @return array<string, int> Term to df.
 	 */
-	public function termsWithPrefix( string $prefix, int $limit ): array;
+	public function termsWithPrefix( string $prefix, int $limit, int $kind = Kind::PRODUCT, string $lang = '' ): array;
 
 	/**
 	 * The terms sharing at least so many of the given trigrams, most shared first.
@@ -47,16 +52,16 @@ interface IndexStore {
 	public function termsSharingTrigrams( array $trigrams, int $minimumShared ): array;
 
 	/**
-	 * The postings of some terms in the documents of one language: in the products, or in the categories, tags
-	 * and brands (whose name field alone is scored).
+	 * The postings of some terms in the documents of one language and kind: the products, the categories, tags
+	 * and brands (whose name field alone is scored), or the posts and pages.
 	 *
-	 * @param string[] $terms    Folded terms; may be empty, which answers an empty array.
-	 * @param string   $lang     Language code.
-	 * @param bool     $products True for product documents, false for the others.
+	 * @param string[] $terms Folded terms; may be empty, which answers an empty array.
+	 * @param string   $lang  Language code.
+	 * @param int      $kind  The documents' kind ({@see Kind}).
 	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>> Term to document id to field id to
 	 *                                                                      [tf, first position].
 	 */
-	public function postings( array $terms, string $lang, bool $products ): array;
+	public function postings( array $terms, string $lang, int $kind ): array;
 
 	/**
 	 * Documents by id.
@@ -69,25 +74,28 @@ interface IndexStore {
 	public function documents( array $ids, string $key = '' ): array;
 
 	/**
-	 * The document frequency of some terms in one language: how many documents (products, categories, tags and
-	 * brands) carry each.
+	 * The document frequency of some terms in one language: how many documents carry each, counted over the
+	 * same set as {@see documentCount()}: the catalogue's, or the posts and pages'.
 	 *
 	 * @param string[] $terms Folded terms; may be empty.
 	 * @param string   $lang  Language code.
+	 * @param int      $kind  The search's kind ({@see Kind}).
 	 * @return array<string, int> Term to df; a term no document carries is absent.
 	 */
-	public function frequencies( array $terms, string $lang ): array;
+	public function frequencies( array $terms, string $lang, int $kind = Kind::PRODUCT ): array;
 
 	/**
-	 * How many products of one language carry any of some terms (the retry drops the token that reached fewest).
+	 * How many documents of one language and kind carry any of some terms (the retry drops the token that
+	 * reached fewest).
 	 *
 	 * @param string[] $terms Folded terms; may be empty.
 	 * @param string   $lang  Language code.
+	 * @param int      $kind Products or content ({@see Kind}).
 	 */
-	public function productCount( array $terms, string $lang ): int;
+	public function productCount( array $terms, string $lang, int $kind = Kind::PRODUCT ): int;
 
 	/**
-	 * The products of a plan, scored and in rank order, at most its limit (D-086).
+	 * The documents of a plan's kind, scored and in rank order, at most its limit (D-086).
 	 *
 	 * @param RankPlan $plan The plan.
 	 * @return Hit[]

@@ -31,7 +31,9 @@
 		"CastString": {
 			"ignore": [
 				// A numeric string can share no trigram with a token that has letters, and a token without letters is never fuzzed.
-				"CreativeBranding\\Search\\Domain\\Searcher::typoCandidates"
+				"CreativeBranding\\Search\\Domain\\Searcher::typoCandidates",
+				// The text is mb_strtolower()'s, so valid UTF-8, and the patterns are fixed: preg_replace() never returns null here.
+				"CreativeBranding\\Search\\Domain\\Tokenizer::units"
 			]
 		},
 		"GreaterThan": {

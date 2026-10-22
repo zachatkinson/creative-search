@@ -140,6 +140,8 @@ A deck width written `8.25"` or `8.25″` is one word to the tokenizer: the rege
 
 **Why:** Skatehouse's names carry `8.25"` and `8.5"` everywhere and shoppers type them both ways, with and without the mark; `8.25"` and `8.25` must be the same term, and a quote after a digit must not open a phrase. The spec's tokenizer section lists `8.25″` among its one-token examples; this reads "one token" as "not split at the mark" and stores the number without it, which is a reading for Zach to confirm, since storing the mark would make `8.25` match `8.25″` only as a prefix. The one case that loses is a quoted phrase ending in a number (`"deck 8.25"`), which the parser reads as the unquoted words; the shopper still finds the deck.
 
+**Settled 2026-10-22 (Skatehouse handoff, item 6):** the reading is confirmed: a number is stored without its inch mark, so `8.25` and `8.25″` are one term. 1.1 extends the rule (D-098): `8.25in`, `8.25 in`, `8.25 inch`, `8.25 inches`, `8.25"`, `8.25''` and `8.25″` all read as `8.25` (`in` is a unit only right after a number); trailing zeros go (`8.50` is `8.5`, `8.00` is `8`); with French on, `8,25` and `8,25 po` read as `8.25`. Numbers and units stay out of fuzzing and stemming.
+
 ### D-025 · Apostrophes: the joined form and the two sides, at one position · 2026-10-21
 
 `l'orbite` indexes as `lorbite`, `l` is dropped as one character, and `orbite` is kept; all forms of one word share one position. A word with an apostrophe whose joined form is a stop word (`don't` → `dont`) is dropped whole. In a query the variants of one token are ORed within the position, so `l'orbite` finds a product indexed from `orbite` and vice versa. Curly apostrophes are straightened first.
@@ -289,7 +291,7 @@ The filter receives and returns an array of language code to readers: `product` 
 
 ### D-047 · Index timings measured at 300 and 2,000 products here, 10,000 on CI · 2026-10-21
 
-`tests/Integration/IndexBenchmarkTest.php` (group `benchmark`, `composer test:integration:benchmark`) loads `CSEARCH_BENCH_PRODUCTS` catalogue products (default 300) into WooCommerce with their variations and times a full inline reindex against a budget scaled linearly from the spec's (5 minutes for 10,000 is 30 ms a product). The one-product budget (50 ms) is an assertion in the regular suite. Loading 10,000 products with 40,000 variations through WooCommerce's CRUD takes longer than the reindex it measures, so the full-size run belongs on the CI runner the spec names.
+`tests/Integration/IndexBenchmarkTest.php` (since 1.1 part of `CatalogueBenchmarkTest.php`, which loads the catalogue once for this and the API budgets; group `benchmark`, `composer test:integration:benchmark`) loads `CSEARCH_BENCH_PRODUCTS` catalogue products (default 300) into WooCommerce with their variations and times a full inline reindex against a budget scaled linearly from the spec's (5 minutes for 10,000 is 30 ms a product). The one-product budget (50 ms) is an assertion in the regular suite. Loading 10,000 products with 40,000 variations through WooCommerce's CRUD takes longer than the reindex it measures, so the full-size run belongs on the CI runner the spec names.
 
 **Why:** The spec's 10,000-product figure is for the CI runner; on this Mac the run is bounded by fixture loading, not by the indexer. The milestone review gives the measured rate and the extrapolation.
 
@@ -328,6 +330,8 @@ Answers are kept with `wp_cache_set()` under a key of the live generation, a sal
 **Why:** The spec keeps rate-limit counters out of the database by name, and a transient fallback for the answer cache would write one row per distinct query. A shop that needs the rate limit has, or should have, a persistent object cache; the status screen in milestone 7 says which.
 
 **Spec deviation, flagged for Zach:** the spec's Compatibility line says "with and without a persistent object cache (transients fall back)". Without one, answers are not shared between requests and the rate limit does not hold. The rate limit's client key trusts a WooCommerce session cookie only when its HMAC verifies (a forged cookie per request would otherwise buy a new bucket each time), and `csearch_client_ip` lets a site behind a proxy supply the shopper's address.
+
+**Settled 2026-10-22 (Skatehouse handoff):** the open question is closed. Redis Object Cache is installed and connected on the Skatehouse demo (its comment closes every page, checked 22 October), so the answer is the persistent object cache, as Zach said; the spec's transient fallback does not come back. The demo has no page cache yet; one is on Skatehouse's go-live list, and the block's server render stays free of nonces and anything per user or time-limited so a page cached for days still searches (handoff item 4).
 
 ### D-052 · A click finds its log row by query, not by id · 2026-10-21
 
@@ -376,6 +380,8 @@ The plugin ranks the main query of a product search (`post_type=product`, WooCom
 The corrected line's link adds `csearch_exact=1`, which runs the shopper's words with `SearchOptions::$retry` off (new in the Domain, default on, tested to 100 % mutation). The no-results state's "three nearest categories" are the category documents the query's words point to (the same term suggestions the panel shows); when the words point nowhere, the three largest categories, without WooCommerce's "Uncategorized". The owner's fallback products are rendered with WooCommerce's own `[products]` shortcode class, four at most.
 
 **Why:** The spec names both features without saying how "search instead" avoids correcting itself or what "nearest" means.
+
+**Changed for 1.1 (Skatehouse handoff, item 8; D-096):** the no-results state no longer starts with the nearest categories. Above them, in order: the posts and pages that match, a help line linking to a page the owner picks, and a second link to another page the owner picks (both settings, with translated generic defaults; Skatehouse's wording goes in its settings). The nearest categories and the fallback products follow as before. A search that finds no product but finds a page leads with the page and never shows the bare no-results state.
 
 ### D-059 · Storefront 4.6.2 and Kadence 1.5.2 in wp-env; a shared browser fixture · 2026-10-21
 
@@ -502,6 +508,8 @@ A category, tag or brand document's product count is WooCommerce's `product_coun
 
 ### D-079 · axe's `scrollable-region-focusable` is exempt on the open panel · 2026-10-21
 
+**Superseded by D-092 (1.1):** the panel no longer scrolls, and the exemption is gone.
+
 When nine rows (six products, two terms and "See all") are taller than the panel's `min(70vh, 36rem)`, the panel scrolls. axe then reports `scrollable-region-focusable` (serious), because nothing inside the panel takes focus. In the APG list-autocomplete pattern, focus stays in the input and the options are reached with `aria-activedescendant`, and the script scrolls the active option into view on every arrow key. A keyboard user therefore reaches every row, which is the need the rule protects. The French browser test proves it: Up from the field brings the last row into view. That one rule is turned off for that one check, through the shared axe helper's `exempt` list. It applies in every other state and region. The same run found and fixed a bug: Up with no row chosen went to the second-to-last row, not the last.
 
 **Why:** making the panel focusable to satisfy the rule would add a tab stop that the pattern says must not exist. Hiding rows to avoid scrolling would drop suggestions.
@@ -622,6 +630,7 @@ The review of D-086 and D-087 found what happens between deploying 1.0.0 over 0.
 
 ### Zach's answers on the flagged decisions · 2026-10-22
 
+- **1.1, the postings' `product` column (2026-10-22):** approved: posts and pages are marked 2 (0 terms, 1 products), with their term counts kept apart from the products', so turning them on changes no product's rank. No DDL and no migration (D-093).
 - **The competitor scan and the Baymard audit (2026-10-22):** Zach wants every gap both found, the ones needing a schema change included (the variation's own photo when a search names it). Planned as 1.1 (posts and pages, plus the small autocomplete and results-page fixes) and 1.2 (the rest), each reviewed and tagged on its own. Posts and pages stay off by default (Claude's recommendation; Zach did not change it). "Why this matched" is the slim version Zach chose: one small line under a result's title, shown only when the match came from something the card does not show (SKU, an attribute value, the description), e.g. "Matches SKU KZ-825"; last in 1.2.
 - **D-001 to D-004:** confirmed (Zach was told that anything not mentioned stands).
 - **D-034:** kept: the retry runs only when the AND finds nothing.
@@ -636,3 +645,71 @@ The review of D-086 and D-087 found what happens between deploying 1.0.0 over 0.
 ### Zach on 1.1 · 2026-10-22
 
 Posts and pages in the results (the spec's 1.1) come after the 1.0 tag, the same day. Zach: posts and pages are both off by default, each with a toggle in the admin. Where they show (the suggestion panel, the results page) is settled when 1.1 is built.
+
+### Zach on the Skatehouse handoff · 2026-10-22
+
+docs/research/SKATEHOUSE-HANDOFF-2026-10.md is folded into the plans: items 1 to 4 (the search dialog, the query kept in the field, classes on a suggestion for Mature Content, safe under a page cache) and 5 to 8 (arrow keys write the field, units and number forms, pages, the no-results state) in 1.1; items 9 to 11 (a size becomes a removable filter, a category query opens the category, tests on a copy of Skatehouse) in 1.2, on their own so the shop's go-live waits on nothing else; the rest of docs/research (the variation's own photo, "Matches SKU", the remaining Baymard and competitor items) in 1.3. Zach left the split to Claude ("whatever is best for you"). Zach allowed SPEC.md's keyboard paragraph to be updated for D-091 (handoff item 5); it was. No schema change is planned for any of it: the pages use the approved kind 2, the attribute terms of item 9 live in an option, the exclusion box in post meta.
+
+### D-091 · The arrow keys write the chosen suggestion into the field · 2026-10-22
+
+Down and Up move the choice as before (APG list autocomplete, focus kept in the field, `aria-activedescendant` on it) and now also write the chosen row's name into the field; above the first row or past the last, the field shows what the shopper typed again, and "See all" shows the typed text too. Escape puts the typed text back and closes. Writing the field never fetches: the panel keeps answering the typed text until the shopper types again, and Enter after editing the copied text searches the edit. Hovering highlights a row and never writes the field. SPEC.md's keyboard paragraph was updated with Zach's leave.
+
+**Why:** Baymard's autocomplete guideline and the Skatehouse handoff (item 5): a shopper who arrows to "KAZUMI Skate Deck" sees in the field what Enter will act on, and can refine it. The APG pattern allows either; Skatehouse's test plan asks for this one.
+
+### D-092 · The panel never scrolls: a row budget, then fit to the screen · 2026-10-22
+
+Supersedes D-079. The panel has no height limit and no scrollbar. Its rows are budgeted: on a desktop, at most 10 suggestions, the owner's product limit first, the terms (3 at most) giving way, and up to 2 posts or pages taken from the products' share, never added to the 10; on a phone (600 px or less, or a coarse pointer), 4 products and 2 terms. After each render `fit()` drops the last suggestion, one per frame, until the panel is inside the visible viewport; "See all" always stays, and the live region's count follows. It measures only once the rendered rows match the context (the Interactivity API renders after the context changes), waits up to 10 frames for that, and re-measures when the panel's size changes (a `ResizeObserver`: a web font arriving made the first measure 1.5 px short in the browser test). A dropped row that was chosen sends the choice back to the field, and a kept one keeps its choice under its new id, so `aria-activedescendant` never names a row that is gone (axe's `aria-valid-attr-value` caught it in the French run).
+
+**Why:** Baymard: 4 to 8 suggestions on a phone, at most 10 on a desktop, and no scrollbar in the panel. D-079's exemption is gone: the French browser test runs axe on the open panel with every rule, and the 1.1 tests check that the panel fits at 1280×720 and 390×664.
+
+### D-093 · Posts and pages: their own kind, their own counts, their own group · 2026-10-22
+
+Reshaped by the Skatehouse handoff (item 7). Settings `index_posts` and `index_pages`, both off by default (Zach). Their postings are kind 2 (`Domain\Kind`: 0 terms, 1 products, 2 posts and pages), a value in the existing column, approved by Zach with no DDL. Their term counts are counted from their own postings and never added to the stored product counts, and N is counted over them alone, so turning them on changes no product's rank. A content search is a second pass over kind 2 with no boosts, no hidden-by-SKU rule and no exactness key; its prefix candidates come from the content postings. A typo is corrected only toward words the catalogue's dictionary holds (the trigram table is the catalogue's; `MemoryIndex` now asks for df > 0, as the SQL does), so a word only a page uses is matched exactly or as a prefix.
+
+What is indexed: a published post or page of a type switched on, without a password, not excluded with the editor's "Exclude from search" box (`_csearch_exclude`), and not the front page or WooCommerce's shop, cart, checkout or account pages. The title is the name, the excerpt the short description, the content the long one (2,000 characters), and a page's parent's title the category, only while the parent is published with no password (a private parent's title is never indexed or shown). Saving a page queues its children, and a page that becomes or stops being the front page or a WooCommerce page is read again. Filters `csearch_index_content` and `csearch_content_document`; `csearch_languages` takes a `content` reader. Switching a type on queues its posts (100 a job); switching it off deletes its documents in batches.
+
+Where they show: in the panel, after the products and terms, 2 at most, the first under a visible group heading ("Pages", "Posts" or "Pages and posts", by what is on). The heading is `aria-hidden`, because a listbox holds options only; each row's accessible name says "Page" or "Post" instead. On the results page, 3 at most (`csearch_content_limit` can raise it to 10, and only lower the panel's 2), above the products, or after them when a product's name matches the query exactly. When no product matches and a page does, the page leads ("No products match “size guide”, but these do:"). WooCommerce's jump to a single result is kept off while a page matches. Clicks on them are logged as `post` and `page`.
+
+**Why:** the spec's 1.1, and Skatehouse's size guides and shipping page, which shoppers search for in the product search.
+
+### D-094 · The query stays in the field; the panel says when a word was left out · 2026-10-22
+
+On a search page the block's field holds the query it answers (`get_search_query( false )`, escaped once by the markup), with the clear button shown and the panel closed, in both modes. When `/suggest` answers with a word left out (D-034's retry), the panel's status line and the live region say "Showing results for …".
+
+**Why:** Baymard: keep the query in the field on the results page so the shopper can refine it, and say when the search changed what was typed. The handoff's item 2.
+
+### D-095 · A suggestion marks what it adds, not what was typed · 2026-10-22
+
+Each word of a suggestion keeps the part the shopper typed plain and marks the rest in bold (`<mark>` styled by weight, not colour, so it holds in forced colours); a word matched by a typo or a synonym is marked whole; with nothing typed, nothing is marked. Comparison is on folded text (accents and case), so "vetements" marks "Vêtements" correctly. The parts are built as text nodes and `mark` elements, never markup.
+
+**Why:** Baymard's autocomplete guideline: highlight the suggested completion, not the typed text.
+
+### D-096 · No results: pages, two links, single words, categories, fallbacks · 2026-10-22
+
+Changes D-058 (handoff item 8). The no-results state reads, in order: the matching posts and pages (leading, as D-093 says), the owner's help link and second link, the single words of the query that each find something ("Try one word:", up to 3, `csearch_alternative_queries`), the nearest categories, the fallback products. The links are settings: `help_page` and `guide_page` (page pickers, a published page or none) and `help_text` and `guide_text` (120 characters, plain text); empty wording reads "Can’t find what you need? Contact us" and "Need help choosing? Read our guides", translated. Filter `csearch_no_results_links`. These replace the uncommitted `help_url`: a page the owner picks cannot be a broken or unsafe link, and it moves with the site.
+
+**Why:** Baymard: a no-results page should never be a dead end. Skatehouse's wording goes in its settings, not in the plugin.
+
+### D-097 · The page dims behind the open panel · 2026-10-22
+
+While the panel is open, a fixed backdrop (25 % black) covers the page below the form; a pointer on it closes the panel. It is `aria-hidden`, hidden in forced colours, and fades only without reduced motion. Filter `csearch_dim_page` turns it off for a theme whose header stacking puts it in the wrong place. Button mode has the dialog's own `::backdrop` instead.
+
+**Why:** Baymard: give the open panel visual depth so it reads as on top of the page.
+
+### D-098 · Sizes are read one way however they are written · 2026-10-22
+
+Extends D-024 (handoff item 6). `Tokenizer::units()` runs on the index side and the query side before words are cut: `8.25in`, `8.25 in`, `8.25 inch`, `8.25 inches`, `8.25"`, `8.25''` and `8.25″` all become `8.25″`, whose mark the tokenizer drops; trailing zeros go (`8.50` is `8.5`); `54 mm` is `54mm`, indexed with `54` beside it at one position (D-025's rule), so a bare `54` finds it; `x`, `×` and `*` between two numbers split them (`9x33`, `33″ x 9″`, `110*38mm`); with French, `8,25` is `8.25` and `po`, `pouce`, `pouces` are inches. A number a letter runs into (`kz825x2`, a SKU) is left alone, and a query ending in an inch mark is not a prefix. Numbers stay out of fuzzing and stemming. Because the index changes, `Tokenizer::VERSION` is 2 and `csearch_analysis_version` records what the index was built under: an update that finds an older value owes one full rebuild through D-090's path (no DDL); a fresh install records the current value, and a shop never built needs none.
+
+**Why:** Skatehouse's names and shoppers write sizes every one of these ways.
+
+### D-099 · Button mode: the same form in a modal dialog · 2026-10-22
+
+The block's `mode` attribute (`field` or `button`) and the shortcode's `mode="button"` render an icon button (accessible name "Search", `aria-haspopup="dialog"`) and the same form inside a `<dialog>`. The button opens it with `showModal()`, so the page behind is inert natively, and focuses the field within the click, so a phone raises its keyboard without a second tap. Escape closes the panel first and the dialog second; the close button and a click on the backdrop close it; opening pushes a history entry so Back closes it instead of leaving the page, and a suggestion or search chosen from it replaces that entry. Focus returns to the button. Full screen at 600 px or less, with the panel under the field. With no script (`@media (scripting: none)`) the form shows in place and searches.
+
+**Why:** handoff item 1: Skatehouse's header has room for an icon only.
+
+### D-100 · The exact-name bonus counts the name being typed · 2026-10-22
+
+While the last word is still being typed (a prefix), the exactness bonus also counts each completion of it the search used: "size guide" is the exact name of "Size guides" as the shopper types it. `RankPlan::nameKeys()` holds the query's key and those completions; `Scorer` and the ranking statement (`d.name_key IN (…)`) compare against all of them. A finished word (followed by a space) is not completed. The golden set is unchanged.
+
+**Why:** found writing the pages' tests: "size guide" ranked a product named "Size guides" below one that only mentioned guides, because the exact name was only exact once the word was finished.

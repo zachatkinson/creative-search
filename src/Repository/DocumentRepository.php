@@ -64,6 +64,34 @@ final class DocumentRepository extends Repository {
 	}
 
 	/**
+	 * Some document ids of one type, in every generation (a type switched off loses its documents in batches).
+	 *
+	 * @param string $type  Document type.
+	 * @param int    $limit At most.
+	 * @return int[]
+	 */
+	public function idsOfType( string $type, int $limit ): array {
+		$rows = $this->rows( $this->prepare( 'SELECT id FROM %i WHERE type = %s ORDER BY id LIMIT %d', Tables::documents(), $type, $limit ) );
+		return array_map( static fn( array $row ): int => (int) $row['id'], $rows );
+	}
+
+	/**
+	 * Whether any of some products, in one generation and language, has a name whose key is exactly this one
+	 * (by the unique key on generation, type, object id and language).
+	 *
+	 * @param int    $generation Generation.
+	 * @param string $lang       Language code.
+	 * @param int[]  $productIds Product ids.
+	 * @param string $key        A folded name key.
+	 */
+	public function anyNamed( int $generation, string $lang, array $productIds, string $key ): bool {
+		if ( array() === $productIds || '' === $key ) {
+			return false;
+		}
+		return null !== $this->value( $this->prepare( 'SELECT 1 FROM %i WHERE generation = %d AND type = %s AND lang = %s AND object_id IN (' . self::ints( $productIds ) . ') AND name_key = %s LIMIT 1', Tables::documents(), $generation, Document::PRODUCT, $lang, $key ) );
+	}
+
+	/**
 	 * Delete some documents.
 	 *
 	 * @param int[] $ids Document ids.
@@ -85,6 +113,27 @@ final class DocumentRepository extends Repository {
 	 */
 	public function setStock( int $productId, int $generation, bool $inStock ): int {
 		return $this->run( $this->prepare( 'UPDATE %i SET in_stock = %d WHERE generation = %d AND type = %s AND object_id = %d', Tables::documents(), (int) $inStock, $generation, Document::PRODUCT, $productId ) );
+	}
+
+	/**
+	 * How many documents of one language a generation holds, the catalogue's or the posts and pages': N in the
+	 * score, over the same set as the term counts (D-093).
+	 *
+	 * @param int    $generation Generation.
+	 * @param string $lang       Language code.
+	 * @param bool   $content    The posts and pages, or the products, categories, tags and brands.
+	 */
+	public function countOf( int $generation, string $lang, bool $content ): int {
+		return (int) $this->value(
+			$this->prepare(
+				'SELECT COUNT(*) FROM %i WHERE generation = %d AND lang = %s AND type ' . ( $content ? 'IN' : 'NOT IN' ) . ' (%s, %s)',
+				Tables::documents(),
+				$generation,
+				$lang,
+				Document::POST,
+				Document::PAGE
+			)
+		);
 	}
 
 	/**

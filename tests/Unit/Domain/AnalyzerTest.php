@@ -77,7 +77,7 @@ final class AnalyzerTest extends TestCase {
 	public function test_numbers_and_sku_shapes_are_not_stemmed(): void {
 		$a = new Analyzer();
 		$p = $a->analyze( array( Fields::ATTRIBUTE => array( '8.25', '54mm', '101a', 'wheels' ) ), 'en' );
-		self::assertSame( array( '8.25', '54mm', '101a', 'wheels', 'wheel' ), array_keys( $p ) );
+		self::assertSame( array( '8.25', '54mm', 54, '101a', 'wheels', 'wheel' ), array_keys( $p ) );
 		self::assertSame( '', $a->stem( new Token( '8.25', 0 ), 'en' ) );
 		self::assertSame( '', $a->stem( new Token( '54mm', 0 ), 'en' ) );
 		self::assertSame( 'wheel', $a->stem( new Token( 'wheels', 0 ), 'en' ) );

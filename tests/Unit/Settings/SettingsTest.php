@@ -40,10 +40,33 @@ final class SettingsTest extends TestCase {
 		self::assertSame( array(), $d['stats'] );
 		self::assertSame( 'no', $d['theme_form_takeover'] );
 		self::assertSame( '', $d['placeholder'] );
+		self::assertSame( 0, $d['help_page'], 'no help link until the owner picks a page (D-096)' );
+		self::assertSame( 0, $d['guide_page'] );
+		self::assertSame( '', $d['help_text'], 'empty reads the translated default' );
+		self::assertSame( '', $d['guide_text'] );
+		self::assertSame( 'no', $d['index_posts'], 'posts and pages off by default (D-093)' );
+		self::assertSame( 'no', $d['index_pages'] );
 		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'show_prices', 'show_stock', 'show_terms', 'label_visible' ) as $on ) {
 			self::assertSame( 'yes', $d[ $on ], $on );
 		}
-		self::assertCount( 22, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertCount( 28, $d, 'every key is documented in docs/SETTINGS.md' );
+	}
+
+	public function test_the_no_results_links_keep_a_page_id_and_plain_wording(): void {
+		$out = Settings::sanitize(
+			array(
+				'help_page'  => '42',
+				'help_text'  => '  Questions? <b>Ask us</b>  ',
+				'guide_page' => -3,
+				'guide_text' => str_repeat( 'é', Settings::LINK_TEXT_MAX + 5 ),
+			)
+		);
+		self::assertSame( 42, $out['help_page'] );
+		self::assertSame( 'Questions? Ask us', $out['help_text'], 'plain text, trimmed' );
+		self::assertSame( 0, $out['guide_page'], 'never negative' );
+		self::assertSame( Settings::LINK_TEXT_MAX, mb_strlen( $out['guide_text'] ), 'capped in characters' );
+		self::assertSame( 0, Settings::sanitize( array( 'help_page' => 'contact' ) )['help_page'] );
+		self::assertSame( array( 'index_posts' => 'yes' ), array_intersect_key( Settings::sanitize( array( 'index_posts' => '1' ) ), array( 'index_posts' => 1 ) ) );
 	}
 
 	public function test_default_field_weights_are_the_spec_table(): void {

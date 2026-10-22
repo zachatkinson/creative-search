@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Repository;
 
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Support\Tables;
 
@@ -33,11 +34,11 @@ final class PostingRepository extends Repository {
 	 * @param int                                              $documentId Document id.
 	 * @param int                                              $generation Generation.
 	 * @param string                                           $lang       The document's language.
-	 * @param bool                                             $product    Whether the document is a product.
+	 * @param int                                              $kind       The document's kind (`Domain\Kind`): the `product` column.
 	 * @param array<string, array<int, array{0: int, 1: int}>> $postings   Term to field to [tf, first position].
 	 * @param array<string, int>                               $termIds    Term to id.
 	 */
-	public function write( int $documentId, int $generation, string $lang, bool $product, array $postings, array $termIds ): void {
+	public function write( int $documentId, int $generation, string $lang, int $kind, array $postings, array $termIds ): void {
 		$rows = array();
 		foreach ( $postings as $term => $byField ) {
 			$termId = $termIds[ (string) $term ] ?? null;
@@ -45,7 +46,7 @@ final class PostingRepository extends Repository {
 				continue;
 			}
 			foreach ( $byField as $field => [ $tf, $position ] ) {
-				$rows[] = array( $termId, $documentId, $field, $generation, $lang, $product ? 1 : 0, min( $tf, 65535 ), min( $position, 65535 ) );
+				$rows[] = array( $termId, $documentId, $field, $generation, $lang, $kind, min( $tf, 65535 ), min( $position, 65535 ) );
 			}
 		}
 		foreach ( array_chunk( $rows, self::CHUNK ) as $chunk ) {
@@ -57,6 +58,7 @@ final class PostingRepository extends Repository {
 
 	/**
 	 * The terms of some documents, each with how many of those documents carry it, per generation and language.
+	 * The posts and pages are left out: their counts are not stored (D-093).
 	 *
 	 * @param int[] $documentIds Document ids.
 	 * @return array<int, array{term_id: int, generation: int, lang: string, n: int}>
@@ -65,7 +67,7 @@ final class PostingRepository extends Repository {
 		if ( array() === $documentIds ) {
 			return array();
 		}
-		$rows = $this->rows( $this->prepare( 'SELECT term_id, generation, lang, COUNT(DISTINCT document_id) AS n FROM %i WHERE document_id IN (' . self::ints( $documentIds ) . ') GROUP BY term_id, generation, lang', Tables::postings() ) );
+		$rows = $this->rows( $this->prepare( 'SELECT term_id, generation, lang, COUNT(DISTINCT document_id) AS n FROM %i WHERE document_id IN (' . self::ints( $documentIds ) . ') AND product <> %d GROUP BY term_id, generation, lang', Tables::postings(), Kind::CONTENT ) );
 		$out  = array();
 		foreach ( $rows as $row ) {
 			$out[] = array(
@@ -91,15 +93,15 @@ final class PostingRepository extends Repository {
 	}
 
 	/**
-	 * The postings of some terms in one generation and language, for product documents or for the others.
+	 * The postings of some terms in one generation, language and kind of document.
 	 *
 	 * @param string[] $terms      Terms.
 	 * @param int      $generation Generation.
 	 * @param string   $lang       Language code.
-	 * @param bool     $products   Product documents, or category, tag and brand documents.
+	 * @param int      $kind       Products, categories, tags and brands, or posts and pages (`Domain\Kind`).
 	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>> Term to document id to field to [tf, first position].
 	 */
-	public function forTerms( array $terms, int $generation, string $lang, bool $products ): array {
+	public function forTerms( array $terms, int $generation, string $lang, int $kind ): array {
 		if ( array() === $terms ) {
 			return array();
 		}
@@ -110,7 +112,7 @@ final class PostingRepository extends Repository {
 				"SELECT t.term, p.document_id, p.field, p.tf, p.first_pos FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE t.term IN ({$list}) ORDER BY p.document_id, p.field",
 				Tables::terms(),
 				Tables::postings(),
-				...array_merge( array( $generation, $lang, $products ? 1 : 0 ), array_values( $terms ) )
+				...array_merge( array( $generation, $lang, $kind ), array_values( $terms ) )
 			)
 		);
 		$out = array();
@@ -121,24 +123,84 @@ final class PostingRepository extends Repository {
 	}
 
 	/**
-	 * How many products of one language carry any of some terms, in a generation.
+	 * How many documents of one language and kind carry any of some terms, in a generation.
 	 *
 	 * @param string[] $terms      Folded terms.
 	 * @param int      $generation Generation.
 	 * @param string   $lang       Language code.
+	 * @param int      $kind       Products or content.
 	 */
-	public function productCount( array $terms, int $generation, string $lang ): int {
+	public function productCount( array $terms, int $generation, string $lang, int $kind = Kind::PRODUCT ): int {
 		if ( array() === $terms ) {
 			return 0;
 		}
 		return (int) $this->value(
 			$this->prepare(
-				'SELECT COUNT(DISTINCT p.document_id) FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = 1 WHERE t.term IN (' . self::strings( count( $terms ) ) . ')',
+				'SELECT COUNT(DISTINCT p.document_id) FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE t.term IN (' . self::strings( count( $terms ) ) . ')',
 				Tables::terms(),
 				Tables::postings(),
-				...array_merge( array( $generation, $lang ), array_values( $terms ) )
+				...array_merge( array( $generation, $lang, $kind ), array_values( $terms ) )
 			)
 		);
+	}
+
+	/**
+	 * The terms starting with a prefix that the posts and pages of one language carry, most carried first
+	 * (D-093): a range of the terms' unique key, then of the postings' primary key per term.
+	 *
+	 * @param string $prefix     Folded prefix.
+	 * @param int    $limit      At most.
+	 * @param int    $generation Generation.
+	 * @param string $lang       Language code.
+	 * @return array<string, int> Term to df.
+	 */
+	public function contentPrefix( string $prefix, int $limit, int $generation, string $lang ): array {
+		global $wpdb;
+		$rows = $this->rows(
+			$this->prepare(
+				'SELECT t.term, COUNT(DISTINCT p.document_id) AS df FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE t.term LIKE %s GROUP BY t.term ORDER BY df DESC, t.term ASC LIMIT %d',
+				Tables::terms(),
+				Tables::postings(),
+				$generation,
+				$lang,
+				Kind::CONTENT,
+				$wpdb->esc_like( $prefix ) . '%',
+				$limit
+			)
+		);
+		$out  = array();
+		foreach ( $rows as $row ) {
+			$out[ (string) $row['term'] ] = (int) $row['df'];
+		}
+		return $out;
+	}
+
+	/**
+	 * How many posts and pages of one language carry each of some terms, counted from their postings: their
+	 * counts are not stored, so the catalogue's stay as they are (D-093). A range of the primary key per term.
+	 *
+	 * @param string[] $terms      Folded terms.
+	 * @param int      $generation Generation.
+	 * @param string   $lang       Language code.
+	 * @return array<string, int> Term to df; a term none carries is absent.
+	 */
+	public function contentFrequencies( array $terms, int $generation, string $lang ): array {
+		if ( array() === $terms ) {
+			return array();
+		}
+		$rows = $this->rows(
+			$this->prepare(
+				'SELECT t.term, COUNT(DISTINCT p.document_id) AS df FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE t.term IN (' . self::strings( count( $terms ) ) . ') GROUP BY t.term',
+				Tables::terms(),
+				Tables::postings(),
+				...array_merge( array( $generation, $lang, Kind::CONTENT ), array_values( $terms ) )
+			)
+		);
+		$out  = array();
+		foreach ( $rows as $row ) {
+			$out[ (string) $row['term'] ] = (int) $row['df'];
+		}
+		return $out;
 	}
 
 	/**

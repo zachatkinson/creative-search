@@ -11,7 +11,9 @@ namespace CreativeBranding\Search\Index;
 
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Install\Upgrader;
+use CreativeBranding\Search\Repository\ContentIdRepository;
 use CreativeBranding\Search\Repository\DocumentRepository;
 use CreativeBranding\Search\Repository\PostingRepository;
 use CreativeBranding\Search\Repository\ProductIdRepository;
@@ -20,6 +22,7 @@ use CreativeBranding\Search\Repository\TermRepository;
 use CreativeBranding\Search\Repository\TrigramRepository;
 use RuntimeException;
 use WC_Product;
+use WP_Post;
 use WP_Term;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -52,6 +55,8 @@ final class Indexer {
 	 * @param TrigramRepository   $trigrams  Trigrams.
 	 * @param ProductIdRepository $productIds Product ids by term.
 	 * @param StatRepository      $stats     Term counts per generation and language.
+	 * @param ContentReader       $content   Reads posts and pages.
+	 * @param ContentIdRepository $contentIds Post and page ids.
 	 */
 	public function __construct(
 		private ProductReader $products,
@@ -63,7 +68,9 @@ final class Indexer {
 		private PostingRepository $postings,
 		private TrigramRepository $trigrams,
 		private ProductIdRepository $productIds,
-		private StatRepository $stats
+		private StatRepository $stats,
+		private ContentReader $content,
+		private ContentIdRepository $contentIds
 	) {
 	}
 
@@ -96,6 +103,80 @@ final class Indexer {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Index one post or page into every generation that is live or being built; one switched off, unpublished
+	 * or refused leaves the index (D-093).
+	 *
+	 * @param int      $postId     Post id.
+	 * @param int|null $generation One generation only.
+	 * @return bool Whether the post is in the index afterwards.
+	 */
+	public function indexContent( int $postId, ?int $generation = null ): bool {
+		$this->ready();
+		$post        = get_post( $postId );
+		$type        = $post instanceof WP_Post ? ContentReader::typeOf( $post->post_type ) : null;
+		$generations = null === $generation ? $this->generations() : array( $generation );
+		if ( null === $type ) {
+			foreach ( $generations as $target ) {
+				$this->remove( Document::POST, $postId, $target );
+				$this->remove( Document::PAGE, $postId, $target );
+			}
+			return false;
+		}
+		foreach ( $generations as $target ) {
+			$this->remove( $type, $postId, $target );
+		}
+		if ( ! $post instanceof WP_Post || ! $this->content->shouldIndex( $post ) ) {
+			return false;
+		}
+		$texts = $this->content->read( $post );
+		foreach ( $generations as $target ) {
+			foreach ( $texts as $text ) {
+				$this->write( $type, $postId, $target, $text );
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * The next published posts and pages of the types switched on, by id after the last one walked.
+	 *
+	 * @param int      $after     The last id walked (0 to start).
+	 * @param int      $limit     At most.
+	 * @param string[] $postTypes The post types; every type switched on when null.
+	 * @return int[]
+	 */
+	public function contentAfter( int $after, int $limit, ?array $postTypes = null ): array {
+		return $this->contentIds->publishedAfter( $postTypes ?? ContentReader::enabled(), $after, $limit );
+	}
+
+	/**
+	 * One batch of a post type switched on or off: the next published posts indexed, or up to so many of its
+	 * documents removed.
+	 *
+	 * @param string $postType Post type.
+	 * @param int    $after    The last id walked (0 to start; ignored when removing).
+	 * @param int    $limit    At most.
+	 * @return int|null Where the next batch starts, or null when the type is done.
+	 */
+	public function syncContentType( string $postType, int $after, int $limit ): ?int {
+		$this->ready();
+		$type = ContentReader::typeOf( $postType );
+		if ( null === $type ) {
+			return null;
+		}
+		if ( in_array( $postType, ContentReader::enabled(), true ) ) {
+			$ids = $this->contentAfter( $after, $limit, array( $postType ) );
+			foreach ( $ids as $postId ) {
+				$this->indexContent( $postId );
+			}
+			return array() !== $ids && count( $ids ) === $limit ? max( $ids ) : null;
+		}
+		$ids = $this->documents->idsOfType( $type, $limit );
+		$this->removeDocuments( $ids );
+		return count( $ids ) === $limit ? 0 : null;
 	}
 
 	/**
@@ -331,8 +412,12 @@ final class Indexer {
 		$terms    = array_keys( $postings );
 		$existing = $this->dictionary->idsOf( $terms );
 		$ids      = $this->dictionary->ensure( $terms );
+		$kind     = Kind::ofType( $type );
 		$this->trigrams->write( array_diff_key( $ids, $existing ) );
-		$this->postings->write( $documentId, $generation, $text->lang, Document::PRODUCT === $type, $postings, $ids );
+		$this->postings->write( $documentId, $generation, $text->lang, $kind, $postings, $ids );
+		if ( Kind::CONTENT === $kind ) {
+			return; // The posts and pages' counts are read from their postings, so the catalogue's stay as they are (D-093).
+		}
 		$this->dictionary->increment( array_values( $ids ) );
 		$this->stats->increment( array_values( $ids ), $generation, $text->lang );
 	}

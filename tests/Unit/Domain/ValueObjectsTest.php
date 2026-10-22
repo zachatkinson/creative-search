@@ -12,6 +12,7 @@ namespace CreativeBranding\Search\Tests\Unit\Domain;
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\Score;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
@@ -163,5 +164,12 @@ final class ValueObjectsTest extends TestCase {
 		self::assertSame( 'école', $t->source() );
 		self::assertSame( 3, $t->position );
 		self::assertSame( 'deck', ( new Token( 'deck', 0 ) )->source() );
+	}
+
+	public function test_a_document_type_has_a_kind(): void {
+		self::assertSame( Kind::PRODUCT, Kind::ofType( Document::PRODUCT ) );
+		self::assertSame( Kind::CONTENT, Kind::ofType( Document::POST ) );
+		self::assertSame( Kind::CONTENT, Kind::ofType( Document::PAGE ) );
+		self::assertSame( Kind::TERM, Kind::ofType( 'category' ) );
 	}
 }

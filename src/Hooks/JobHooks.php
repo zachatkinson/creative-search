@@ -45,7 +45,9 @@ final class JobHooks implements Hookable {
 		add_action( IndexQueue::INDEX_TERMS, array( $this, 'indexTerms' ), 10, 2 );
 		add_action( IndexQueue::TERM_PRODUCTS, array( $this, 'termProducts' ), 10, 3 );
 		add_action( IndexQueue::INDEX_PRODUCTS, array( $this, 'indexProducts' ), 10, 1 );
-		foreach ( array( Reindex::START, Reindex::BATCH_ACTION, Reindex::TERMS_ACTION, Reindex::CLEANUP ) as $hook ) {
+		add_action( IndexQueue::INDEX_CONTENT, array( $this, 'indexContent' ), 10, 1 );
+		add_action( IndexQueue::CONTENT_TYPE, array( $this, 'contentType' ), 10, 2 );
+		foreach ( array( Reindex::START, Reindex::BATCH_ACTION, Reindex::CONTENT, Reindex::TERMS_ACTION, Reindex::CLEANUP ) as $hook ) {
 			add_action(
 				$hook,
 				function ( ...$args ) use ( $hook ): void {
@@ -125,6 +127,28 @@ final class JobHooks implements Hookable {
 	}
 
 	/**
+	 * Index or remove one post or page.
+	 *
+	 * @param int|mixed $postId Post id.
+	 */
+	public function indexContent( $postId ): void {
+		$this->indexer->indexContent( Cast::int( $postId ) );
+	}
+
+	/**
+	 * One batch of a post type switched on or off, then queue the next.
+	 *
+	 * @param string|mixed $postType Post type.
+	 * @param int|mixed    $after    The last post id done.
+	 */
+	public function contentType( $postType, $after = 0 ): void {
+		$next = $this->indexer->syncContentType( Cast::str( $postType ), Cast::int( $after ), IndexQueue::BATCH );
+		if ( null !== $next ) {
+			IndexQueue::schedule( IndexQueue::CONTENT_TYPE, array( Cast::str( $postType ), $next ) );
+		}
+	}
+
+	/**
 	 * On an admin request: the schema upgrade behind a lock, and the first build when activation could not queue it.
 	 */
 	public function adminInit(): void {
@@ -148,5 +172,6 @@ final class JobHooks implements Hookable {
 		if ( Upgrader::needed() ) {
 			IndexQueue::schedule( IndexQueue::UPGRADE );
 		}
+		$this->reindex->checkAnalysis();
 	}
 }

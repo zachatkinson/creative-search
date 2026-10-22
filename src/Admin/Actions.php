@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Admin;
 
 use CreativeBranding\Search\Index\AnalyzerFactory;
+use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\Languages;
 use CreativeBranding\Search\Index\Reindex;
@@ -56,7 +57,7 @@ final class Actions {
 	/**
 	 * Settings the Tools tab saves: yes/no flags, then numbers and text.
 	 */
-	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover' );
+	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover' );
 	public const TOOLS_VALUES = array( 'retention_days', 'suggest_limit', 'suggest_terms', 'min_chars', 'placeholder', 'panel_position' );
 
 	/**
@@ -270,6 +271,10 @@ final class Actions {
 				'boost_rules'       => array_values( array_filter( $rules ) ),
 				'fallback_products' => self::fallback( $input ),
 				'hidden_by_sku'     => Settings::yesNo( $input['hidden_by_sku'] ?? 'no' ),
+				'help_page'         => $input['help_page'] ?? Settings::get( 'help_page' ),
+				'help_text'         => $input['help_text'] ?? Settings::get( 'help_text' ),
+				'guide_page'        => $input['guide_page'] ?? Settings::get( 'guide_page' ),
+				'guide_text'        => $input['guide_text'] ?? Settings::get( 'guide_text' ),
 			)
 		);
 		$included = 0;
@@ -323,6 +328,11 @@ final class Actions {
 		$rebuild = false;
 		foreach ( self::INDEX_FLAGS as $flag ) {
 			$rebuild = $rebuild || $before[ $flag ] !== $after[ $flag ];
+		}
+		foreach ( ContentReader::TYPES as $postType => [ , $flag ] ) {
+			if ( $before[ $flag ] !== $after[ $flag ] ) {
+				$this->queue->contentType( $postType ); // Indexed or removed in jobs; no rebuild needed (D-093).
+			}
 		}
 		Notices::flash(
 			'success',

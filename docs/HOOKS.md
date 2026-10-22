@@ -265,6 +265,126 @@ Internal endpoints, not for plugins to call; each checks `manage_woocommerce` an
 
 No new hook. `csearch_languages` now starts from the language set under Settings → General rather than the request's locale (D-076), and the plugin's translations load through WordPress's just-in-time loading from its `Domain Path`, so the plugin hooks nothing for them.
 
+## 1.1: the Skatehouse handoff and the Baymard fixes (1.1.0)
+
+### `csearch_index_content` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_index_content', bool $allowed, WP_Post $post ): bool`
+- **What it does:** whether a post or page is indexed (D-093). False by default for a type switched off (`index_posts`, `index_pages`), an unpublished post, one with a password, one the editor's "Exclude from search" box ticks (`_csearch_exclude`), the front page and WooCommerce's shop, cart, checkout and account pages.
+- **Where it runs:** `Index\ContentReader::shouldIndex()`, in the index job for that post and in each reindex batch.
+- **Example:**
+
+```php
+add_filter( 'csearch_index_content', static fn( bool $allowed, WP_Post $post ): bool => $allowed && ! has_category( 'internal', $post ), 10, 2 );
+```
+
+### `csearch_content_document` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_content_document', array $document, WP_Post $post, string $lang ): array`
+- **What it does:** the document about to be written for a post or page in one language: `title`, `fields` (`Domain\Fields` ids to text: the title as NAME, the excerpt as SHORT, the content as LONG, the parent page's title as CATEGORY), `url`, `image_id`, `lang`, and the product keys, which a post leaves empty.
+- **Where it runs:** `Index\ContentReader::read()`, in the index job for that post and in each reindex batch, after the language's `content` reader (`csearch_languages`).
+- **Example:**
+
+```php
+add_filter(
+	'csearch_content_document',
+	static function ( array $document, WP_Post $post ): array {
+		$document['fields'][ \CreativeBranding\Search\Domain\Fields::TAG ] = implode( ' ', wp_get_post_tags( $post->ID, array( 'fields' => 'names' ) ) );
+		return $document;
+	},
+	10,
+	2
+);
+```
+
+`csearch_languages` takes a third reader for them, `content`: it receives the `WP_Post`, the field texts read from it and the language code, and returns the field texts in that language.
+
+### `csearch_content_limit` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_content_limit', int $limit, string $context ): int`
+- **What it does:** how many posts and pages show beside the products: 3 on the results page (`page`), which it can raise to 10, and 2 in the panel (`suggest`), which it can only lower, since the panel's row budget holds at most 2 (D-092); 0 shows none.
+- **Where it runs:** `Search\SearchService::content()`, on a `/suggest` request and on the results page.
+- **Example:**
+
+```php
+add_filter( 'csearch_content_limit', static fn( int $limit, string $context ): int => 'page' === $context ? 5 : $limit, 10, 2 );
+```
+
+### `csearch_suggestion_classes` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_suggestion_classes', array $classes, int $productId, ?int $imageId, array $row ): array`
+- **What it does:** CSS classes for a product's suggestion row (Skatehouse handoff item 3: Mature Content blurs flagged artwork with one). Each is passed through `sanitize_html_class()`, repeats and non-strings are dropped, and at most 8 are kept. The answer is cached: a plugin whose answer changes calls `do_action( 'csearch_flush_cache' )`.
+- **Where it runs:** `Search\Suggestions`, on a `/suggest` request that is not answered from the cache.
+- **Example:**
+
+```php
+add_filter( 'csearch_suggestion_classes', static fn( array $classes, int $productId ): array => my_is_flagged( $productId ) ? array_merge( $classes, array( 'mcw-mature' ) ) : $classes, 10, 2 );
+```
+
+### `csearch_flush_cache` (action)
+
+- **Since:** 1.1.0
+- **Signature:** `do_action( 'csearch_flush_cache' )`
+- **What it does:** drops every cached answer (the cache group's version is raised, so nothing is deleted one by one). The plugin listens to `mcw_flags_changed` (Mature Content) the same way.
+- **Where it runs:** `Hooks\RestHooks`, whenever another plugin fires it.
+- **Example:**
+
+```php
+add_action( 'my_flags_saved', static fn() => do_action( 'csearch_flush_cache' ) );
+```
+
+### `csearch_no_results_links` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_no_results_links', array $links, string $query ): array`
+- **What it does:** the links the no-results page offers (D-096), each `url`, `text` and `kind` (`help`, `guide`, or a plugin's own word, used in the class name): the owner's help page and second page by default (`help_page`, `guide_page`).
+- **Where it runs:** `Results\ResultsView::noResults()`, on a results page that found no product.
+- **Example:**
+
+```php
+add_filter( 'csearch_no_results_links', static fn( array $links ): array => array_merge( $links, array( array( 'url' => 'tel:+18005550199', 'text' => __( 'Call us', 'my-theme' ), 'kind' => 'phone' ) ) ) );
+```
+
+### `csearch_alternative_queries` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_alternative_queries', array $found, string $query ): array`
+- **What it does:** the single words of a query that found nothing which each find something, word to result count, offered as "Try one word:" links (D-096). Return an empty array to show none.
+- **Where it runs:** `Results\ResultsView::noResults()`, on a results page that found no product for a query of two words or more.
+- **Example:**
+
+```php
+add_filter( 'csearch_alternative_queries', static fn( array $found ): array => array_slice( $found, 0, 2, true ) );
+```
+
+### `csearch_dim_page` (filter)
+
+- **Since:** 1.1.0
+- **Signature:** `apply_filters( 'csearch_dim_page', bool $dim ): bool`
+- **What it does:** whether the page dims behind the open suggestions (D-097); true by default. Return false for a theme whose header makes the backdrop sit in the wrong place. Button mode (D-099) has the dialog's own backdrop and ignores it.
+- **Where it runs:** `Block\SearchForm::render()`, once per form on the page.
+- **Example:**
+
+```php
+add_filter( 'csearch_dim_page', '__return_false' );
+```
+
+### Jobs
+
+`csearch_job_index_content` (one post or page), `csearch_job_content_type` (a type switched on or off on the Tools tab: its posts indexed, or its documents deleted, 100 a job) and `csearch_reindex_content` (a full reindex's posts and pages, between the product batches and the terms).
+
+### The block, the shortcode
+
+The block's `mode` attribute and the shortcode's `mode="button"` show the form as an icon that opens it in a modal dialog (D-099). The block's markup holds nothing per visitor and no nonce, so a page cache may keep it for any length of time (Skatehouse handoff item 4).
+
+### Admin
+
+A "Search" box in the post and page editors ("Exclude from search", nonce `csearch_content_exclude`, saved on `save_post` for a user who can edit the post).
+
 ## Format for later entries
 
 ### `csearch_example` (filter)

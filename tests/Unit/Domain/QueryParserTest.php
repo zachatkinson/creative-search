@@ -77,6 +77,16 @@ final class QueryParserTest extends TestCase {
 			'spaces only'               => array( '   ', array(), array() ),
 			'punctuation only'          => array( '--- ...', array(), array() ),
 			'french stop words'         => array( 'chandail à capuchon', array( 'chandail', 'capuchon P' ), array(), 'fr' ),
+			// D-098: a unit after a space joins its number before the query is cut into chunks.
+			'inches spaced'             => array( '8.25 in', array( '8.25' ), array() ),
+			'inch spelled'              => array( '8.25 inch deck', array( '8.25', 'deck P' ), array() ),
+			'trailing zero'             => array( '8.50 deck', array( '8.5', 'deck P' ), array() ),
+			'millimetres spaced'        => array( '54 mm wheels', array( '54mm |54', 'wheels P' ), array() ),
+			'millimetres attached'      => array( '54mm wheels', array( '54mm |54', 'wheels P' ), array() ),
+			'pair spaced'               => array( '33 X 9 grip', array( '33', '9', 'grip P' ), array() ),
+			'pair attached'             => array( '9x33 grip', array( '9', '33', 'grip P' ), array() ),
+			'minus a size'              => array( 'wheels -54 mm', array( 'wheels' ), array( '54mm N |54' ) ),
+			'french inches'             => array( 'planche 8,25 po', array( 'planche', '8.25' ), array(), 'fr' ),
 		);
 	}
 

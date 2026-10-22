@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Tests\Support;
 
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\IndexStore;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\RankPlan;
 use CreativeBranding\Search\Domain\Ranker;
 use CreativeBranding\Search\Domain\Trigrams;
@@ -78,7 +79,9 @@ final class MemoryIndex implements IndexStore {
 	 */
 	public function add( Document $document, array $postings ): void {
 		$this->documents[ $document->id ] = $document;
-		$this->counts[ $document->lang ]  = ( $this->counts[ $document->lang ] ?? 0 ) + 1;
+		$content                          = $document->isContent();
+		$count                            = $content ? 'content:' . $document->lang : $document->lang;
+		$this->counts[ $count ]           = ( $this->counts[ $count ] ?? 0 ) + 1;
 		foreach ( $postings as $term => $byField ) {
 			$term = (string) $term;
 			if ( ! isset( $this->df[ $term ] ) ) {
@@ -87,7 +90,10 @@ final class MemoryIndex implements IndexStore {
 					$this->trigrams[ $trigram ][ $term ] = true;
 				}
 			}
-			++$this->df[ $term ];
+			// The dictionary counts the catalogue only, as the SQL store's does (D-093).
+			if ( ! $content ) {
+				++$this->df[ $term ];
+			}
 			$this->postings[ $term ][ $document->id ] = $byField;
 		}
 	}
@@ -115,8 +121,8 @@ final class MemoryIndex implements IndexStore {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function documentCount( string $lang ): int {
-		return $this->counts[ $lang ] ?? 0;
+	public function documentCount( string $lang, int $kind = Kind::PRODUCT ): int {
+		return $this->counts[ Kind::CONTENT === $kind ? 'content:' . $lang : $lang ] ?? 0;
 	}
 
 	/**
@@ -138,10 +144,16 @@ final class MemoryIndex implements IndexStore {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function termsWithPrefix( string $prefix, int $limit ): array {
+	public function termsWithPrefix( string $prefix, int $limit, int $kind = Kind::PRODUCT, string $lang = '' ): array {
 		$out = array();
 		foreach ( $this->df as $term => $df ) {
-			if ( str_starts_with( (string) $term, $prefix ) ) {
+			if ( ! str_starts_with( (string) $term, $prefix ) ) {
+				continue;
+			}
+			if ( Kind::CONTENT === $kind ) {
+				$df = count( $this->postings( array( (string) $term ), $lang, Kind::CONTENT )[ $term ] ?? array() );
+			}
+			if ( $df > 0 ) { // As the SQL store: a term no document of the kind counts is not offered.
 				$out[ $term ] = $df;
 			}
 		}
@@ -159,7 +171,8 @@ final class MemoryIndex implements IndexStore {
 				$shared[ $term ] = ( $shared[ $term ] ?? 0 ) + 1;
 			}
 		}
-		$shared = array_filter( $shared, static fn( int $n ): bool => $n >= $minimumShared );
+		// As the SQL store: a term no product, category, tag or brand carries (df 0) is no typo candidate (D-093).
+		$shared = array_filter( $shared, fn( int $n, string|int $term ): bool => $n >= $minimumShared && ( $this->df[ $term ] ?? 0 ) > 0, ARRAY_FILTER_USE_BOTH );
 		arsort( $shared ); // Most shared first; ties keep insertion order, as a SQL store might return them.
 		return $shared;
 	}
@@ -167,12 +180,12 @@ final class MemoryIndex implements IndexStore {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function postings( array $terms, string $lang, bool $products ): array {
+	public function postings( array $terms, string $lang, int $kind ): array {
 		$out = array();
 		foreach ( $terms as $term ) {
 			foreach ( $this->postings[ $term ] ?? array() as $doc => $byField ) {
 				$document = $this->documents[ $doc ];
-				if ( $document->lang === $lang && $document->isProduct() === $products ) {
+				if ( $document->lang === $lang && Kind::of( $document ) === $kind ) {
 					$out[ $term ][ $doc ] = $byField;
 				}
 			}
@@ -197,10 +210,10 @@ final class MemoryIndex implements IndexStore {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function frequencies( array $terms, string $lang ): array {
+	public function frequencies( array $terms, string $lang, int $kind = Kind::PRODUCT ): array {
 		$out = array();
-		foreach ( array( true, false ) as $products ) {
-			foreach ( $this->postings( $terms, $lang, $products ) as $term => $byDoc ) {
+		foreach ( Kind::CONTENT === $kind ? array( Kind::CONTENT ) : array( Kind::PRODUCT, Kind::TERM ) as $counted ) {
+			foreach ( $this->postings( $terms, $lang, $counted ) as $term => $byDoc ) {
 				$out[ $term ] = ( $out[ $term ] ?? 0 ) + count( $byDoc );
 			}
 		}
@@ -210,9 +223,9 @@ final class MemoryIndex implements IndexStore {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function productCount( array $terms, string $lang ): int {
+	public function productCount( array $terms, string $lang, int $kind = Kind::PRODUCT ): int {
 		$set = array();
-		foreach ( $this->postings( $terms, $lang, true ) as $byDoc ) {
+		foreach ( $this->postings( $terms, $lang, $kind ) as $byDoc ) {
 			$set += $byDoc;
 		}
 		return count( $set );
@@ -225,7 +238,7 @@ final class MemoryIndex implements IndexStore {
 		$this->plans[] = $plan;
 		return ( new Ranker() )->rank(
 			$plan,
-			$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, true ),
+			$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, $plan->kind ),
 			fn( array $ids, string $key ): array => $this->documents( $ids, $key )
 		);
 	}

@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Admin;
 
 use CreativeBranding\Search\Index\TermReader;
 use CreativeBranding\Search\Repository\ProductIdRepository;
+use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use WP_Term;
@@ -114,6 +115,8 @@ final class BoostsTab {
 		}
 		echo '<p><label for="csearch-fallback-add">' . esc_html__( 'Add products by SKU or ID', 'creative-search' ) . '</label><br><input type="text" id="csearch-fallback-add" name="fallback_add" class="regular-text" aria-describedby="csearch-fallback-help"></p>';
 		echo '<p class="description" id="csearch-fallback-help">' . esc_html__( 'Separate several with commas. Up to four are shown on the results page when a search finds nothing.', 'creative-search' ) . '</p></td></tr>';
+		self::linkRow( 'help', __( 'Help link', 'creative-search' ), ResultsView::defaultLinkText( 'help' ), __( 'Your contact or help page. Shown first on the results page when a search finds nothing; none chosen shows none.', 'creative-search' ) );
+		self::linkRow( 'guide', __( 'Second link', 'creative-search' ), ResultsView::defaultLinkText( 'guide' ), __( 'Another page worth offering when a search finds nothing, such as your size guides; none chosen shows none.', 'creative-search' ) );
 		echo '<tr><th scope="row">' . esc_html__( 'Hidden products', 'creative-search' ) . '</th><td><input type="hidden" name="hidden_by_sku" value="no"><label for="csearch-hidden-sku"><input type="checkbox" id="csearch-hidden-sku" name="hidden_by_sku" value="yes"' . checked( 'yes', Settings::get( 'hidden_by_sku' ), false ) . '> ' . esc_html__( 'Show a hidden product when a search is exactly its SKU', 'creative-search' ) . '</label></td></tr></tbody></table>';
 
 		echo '<h2>' . esc_html__( 'Excluded products', 'creative-search' ) . '</h2>';
@@ -157,5 +160,28 @@ final class BoostsTab {
 			'product_brand' => __( 'Brand', 'creative-search' ),
 		);
 		return $names[ $taxonomy ] ?? $taxonomy;
+	}
+
+	/**
+	 * A no-results link's row: the page and its wording (D-096).
+	 *
+	 * @param string $link        `help` or `guide`.
+	 * @param string $label       The row's label.
+	 * @param string $placeholder The default wording.
+	 * @param string $help        What it is for.
+	 */
+	private static function linkRow( string $link, string $label, string $placeholder, string $help ): void {
+		$id = 'csearch-' . $link;
+		echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td><p><label for="' . esc_attr( $id . '-page' ) . '">' . esc_html__( 'Page', 'creative-search' ) . '</label><br>';
+		wp_dropdown_pages(
+			array(
+				'name'              => esc_attr( $link . '_page' ),
+				'id'                => esc_attr( $id . '-page' ),
+				'selected'          => absint( Cast::int( Settings::get( $link . '_page' ) ) ),
+				'show_option_none'  => esc_html__( '— None —', 'creative-search' ),
+				'option_none_value' => '0',
+			)
+		);
+		echo '</p><p><label for="' . esc_attr( $id . '-text' ) . '">' . esc_html__( 'Wording', 'creative-search' ) . '</label><br><input type="text" id="' . esc_attr( $id . '-text' ) . '" name="' . esc_attr( $link . '_text' ) . '" class="regular-text" maxlength="' . esc_attr( (string) Settings::LINK_TEXT_MAX ) . '" value="' . esc_attr( Cast::str( Settings::get( $link . '_text' ) ) ) . '" placeholder="' . esc_attr( $placeholder ) . '" aria-describedby="' . esc_attr( $id . '-help' ) . '"></p><p class="description" id="' . esc_attr( $id . '-help' ) . '">' . esc_html( $help ) . ' ' . esc_html__( 'Leave the wording empty to use the default shown.', 'creative-search' ) . '</p></td></tr>';
 	}
 }

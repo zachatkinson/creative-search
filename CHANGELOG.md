@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-22
+
+Posts and pages in the search (the spec's 1.1), items 1 to 8 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md), and the Baymard autocomplete fixes.
+
+### Added
+- Posts and pages, each switched on separately on the Tools tab (off by default). They are searched apart from the products, so switching them on changes no product's rank. In the panel they come after the products, two at most, under a "Pages", "Posts" or "Pages and posts" heading. On the results page up to three show above the products, or after them when a product's name matches exactly, and a page leads when no product matches. The shop, cart, checkout and account pages, the front page, private and password-protected posts, and any post whose editor's new "Exclude from search" box is ticked are never indexed (D-093).
+- Button mode for the block and the shortcode (`mode="button"`): a search icon that opens the same form in a modal dialog, full screen on a phone. Escape, the close button, a click outside and the browser's Back close it, and focus returns to the icon (D-099).
+- The no-results page's links: a help page and a second page the owner picks on the Boosts and exclusions tab, each with its own wording (translated defaults), then "Try one word:" with the words of the query that each find something (D-096).
+- Hooks: `csearch_index_content`, `csearch_content_document`, `csearch_content_limit`, `csearch_suggestion_classes` (classes on a product's suggestion row, for Mature Content's blur), `csearch_flush_cache` (and the plugin listens to `mcw_flags_changed`), `csearch_no_results_links`, `csearch_alternative_queries`, `csearch_dim_page`; a `content` reader in `csearch_languages`. See docs/HOOKS.md.
+- `content` in the `/suggest` and `/search` answers, and `classes` on each suggested product.
+
+### Changed
+- The arrow keys write the chosen suggestion into the field, and the field returns to what was typed above the first row and past the last (D-091). SPEC.md's keyboard paragraph was updated with Zach's leave.
+- The panel never scrolls: at most 10 suggestions on a desktop and 4 products and 2 terms on a phone, then trimmed until it fits the screen (D-092, superseding D-079's axe exemption).
+- Each suggestion marks in bold the part it adds to what was typed (D-095), and the page dims behind the open panel (D-097, `csearch_dim_page` turns it off).
+- On a search page the field keeps the query, and the panel says when a word was left out (D-094).
+- Sizes are read one way however they are written: `8.25in`, `8.25 inch`, `8.25''` and `8.25″` are `8.25`; `8.50` is `8.5`; `54 mm` is `54mm` and finds `54`; `9x33` and `110*38mm` split; in French, `8,25` and `8,25 po`. Updating owes one full rebuild of the index, run in the background (D-098).
+- A name being typed counts as exact once its last word completes it: "size guide" ranks "Size guides" first (D-100).
+- The block's render holds nothing per visitor and no nonce, so a page cache can keep it (Skatehouse handoff item 4; an integration test holds it).
+
+### Fixed
+- The panel could be measured before its rows rendered or its font loaded, and end below the screen; and trimming it could leave the field pointing at a removed row (D-092).
+
 ## [1.0.0] - 2026-10-22
 
 Milestone 8, Languages and 1.0. The shop works in French end to end, the plugin speaks Canadian French, and the documentation is complete.

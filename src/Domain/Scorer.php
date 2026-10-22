@@ -77,7 +77,7 @@ final class Scorer {
 		return new Score(
 			$tokens,
 			self::phraseBonus( $fields, count( $widenings ) ),
-			( $plan->key === $document->nameKey ? self::EXACT_NAME : 0.0 ) + ( in_array( $plan->key, $document->skuKeys, true ) ? self::EXACT_SKU : 0.0 ),
+			( in_array( $document->nameKey, $plan->nameKeys(), true ) ? self::EXACT_NAME : 0.0 ) + ( in_array( $plan->key, $document->skuKeys, true ) ? self::EXACT_SKU : 0.0 ),
 			$document->inStock ? 0.0 : self::SOLD_OUT,
 			(float) $owner
 		);

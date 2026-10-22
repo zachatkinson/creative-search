@@ -44,6 +44,10 @@ final class Schemas {
 							'price_html' => array( 'type' => 'string' ),
 							'in_stock'   => array( 'type' => 'boolean' ),
 							'type'       => array( 'type' => 'string' ),
+							'classes'    => array(
+								'type'  => 'array',
+								'items' => array( 'type' => 'string' ),
+							),
 						),
 					),
 				),
@@ -63,10 +67,39 @@ final class Schemas {
 						),
 					),
 				),
+				'content'   => self::content(),
 				'total'     => array( 'type' => 'integer' ),
 				'query'     => array( 'type' => 'string' ),
 				'corrected' => array( 'type' => array( 'string', 'null' ) ),
 				'lang'      => array( 'type' => 'string' ),
+			),
+		);
+	}
+
+	/**
+	 * The posts and pages beside the products (1.1): empty while both are switched off.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function content(): array {
+		return array(
+			'type'  => 'array',
+			'items' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'id'     => array( 'type' => 'integer' ),
+					'type'   => array(
+						'type' => 'string',
+						'enum' => array( 'post', 'page' ),
+					),
+					'name'   => array( 'type' => 'string' ),
+					'parent' => array( 'type' => 'string' ),
+					'url'    => array(
+						'type'   => 'string',
+						'format' => 'uri',
+					),
+					'image'  => array( 'type' => array( 'object', 'null' ) ),
+				),
 			),
 		);
 	}
@@ -89,6 +122,7 @@ final class Schemas {
 				'total'     => array( 'type' => 'integer' ),
 				'page'      => array( 'type' => 'integer' ),
 				'pages'     => array( 'type' => 'integer' ),
+				'content'   => self::content(),
 				'corrected' => array( 'type' => array( 'string', 'null' ) ),
 				'query'     => array( 'type' => 'string' ),
 				'lang'      => array( 'type' => 'string' ),

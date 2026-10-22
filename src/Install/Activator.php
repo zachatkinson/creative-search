@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Install;
 
+use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Index\Reindex;
 use CreativeBranding\Search\Plugin;
 use CreativeBranding\Search\Settings\Settings;
@@ -62,6 +63,8 @@ final class Activator {
 		}
 		if ( false === get_option( Options::SETTINGS, false ) ) {
 			add_option( Options::SETTINGS, Settings::defaults(), '', true );
+			// A first install builds under today's rules: no rebuild is owed for them.
+			add_option( Options::ANALYSIS_VERSION, Tokenizer::VERSION, '', true );
 		}
 		Settings::flush();
 		Plugin::container()->get( Reindex::class )->queueFirstBuild();

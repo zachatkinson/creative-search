@@ -130,17 +130,18 @@ final class Analytics {
 	 * @return array<int, array{type: string, id: int, clicks: int, name: string, url: string}>
 	 */
 	public function topClicked( int $days ): array {
-		$out  = array();
-		$rows = $this->log->topClicked( self::since( $days ), 10 );
-		_prime_post_caches( array_column( array_filter( $rows, static fn( array $r ): bool => 'product' === $r['type'] ), 'id' ) );
-		$terms = array_column( array_filter( $rows, static fn( array $r ): bool => 'product' !== $r['type'] ), 'id' );
+		$out   = array();
+		$rows  = $this->log->topClicked( self::since( $days ), 10 );
+		$posts = static fn( array $r ): bool => in_array( $r['type'], array( 'product', 'post', 'page' ), true );
+		_prime_post_caches( array_column( array_filter( $rows, $posts ), 'id' ) );
+		$terms = array_column( array_filter( $rows, static fn( array $r ): bool => ! $posts( $r ) ), 'id' );
 		if ( array() !== $terms ) {
 			_prime_term_caches( $terms );
 		}
 		foreach ( $rows as $row ) {
 			$name = '';
 			$url  = '';
-			if ( 'product' === $row['type'] ) {
+			if ( $posts( $row ) ) {
 				$name = get_the_title( $row['id'] );
 				$link = get_permalink( $row['id'] );
 				$url  = is_string( $link ) ? $link : '';

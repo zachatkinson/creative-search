@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Hooks;
 
 use CreativeBranding\Search\Admin\Actions;
 use CreativeBranding\Search\Admin\AdminPage;
+use CreativeBranding\Search\Admin\ContentPanel;
 use CreativeBranding\Search\Admin\ProductPanel;
 use CreativeBranding\Search\Hookable;
 
@@ -30,8 +31,9 @@ final class AdminHooks implements Hookable {
 	 * @param AdminPage    $page    The screen.
 	 * @param Actions      $actions The forms' handlers.
 	 * @param ProductPanel $panel   The product editor's panel.
+	 * @param ContentPanel $content The post and page editor's box.
 	 */
-	public function __construct( private AdminPage $page, private Actions $actions, private ProductPanel $panel ) {
+	public function __construct( private AdminPage $page, private Actions $actions, private ProductPanel $panel, private ContentPanel $content ) {
 	}
 
 	/**
@@ -44,6 +46,8 @@ final class AdminHooks implements Hookable {
 		foreach ( array_keys( Actions::handlers() ) as $action ) {
 			add_action( 'admin_post_' . $action, fn() => $this->actions->handle( $action ) );
 		}
+		add_action( 'add_meta_boxes', array( $this->content, 'add' ) );
+		add_action( 'save_post', array( $this->content, 'save' ), 10, 2 );
 		add_filter( 'woocommerce_product_data_tabs', array( $this->panel, 'tab' ) );
 		add_action( 'woocommerce_product_data_panels', array( $this->panel, 'panel' ) );
 		add_action( 'woocommerce_admin_process_product_object', array( $this->panel, 'save' ) );

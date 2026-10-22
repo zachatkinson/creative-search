@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Hooks;
 
 use CreativeBranding\Search\Hookable;
+use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\TermReader;
 use WC_Product;
@@ -55,6 +56,10 @@ final class IndexHooks implements Hookable {
 		add_action( 'untrashed_post', array( $this, 'postChanged' ), 10, 1 );
 		add_action( 'before_delete_post', array( $this, 'postDeleted' ), 10, 2 );
 		add_action( 'transition_post_status', array( $this, 'statusChanged' ), 10, 3 );
+		add_action( 'wp_after_insert_post', array( $this, 'contentSaved' ), 10, 2 );
+		foreach ( array( 'page_on_front', 'woocommerce_shop_page_id', 'woocommerce_cart_page_id', 'woocommerce_checkout_page_id', 'woocommerce_myaccount_page_id' ) as $option ) {
+			add_action( 'update_option_' . $option, array( $this, 'pageRoleChanged' ), 10, 2 );
+		}
 		add_action( 'edited_term', array( $this, 'termEdited' ), 10, 3 );
 		add_action( 'created_term', array( $this, 'termCreated' ), 10, 3 );
 		add_action( 'delete_term', array( $this, 'termDeleted' ), 10, 5 );
@@ -196,6 +201,8 @@ final class IndexHooks implements Hookable {
 			$this->queue->product( Cast::int( $postId ) );
 		} elseif ( 'product_variation' === $type ) {
 			$this->variationRemoved( $postId );
+		} elseif ( is_string( $type ) ) {
+			$this->content( $type, Cast::int( $postId ) );
 		}
 	}
 
@@ -212,6 +219,65 @@ final class IndexHooks implements Hookable {
 		} elseif ( 'product_variation' === $type ) {
 			$parent = $post instanceof WP_Post ? $post->post_parent : 0;
 			$this->queue->product( $parent > 0 ? $parent : Cast::int( $postId ) );
+		} elseif ( is_string( $type ) ) {
+			$this->content( $type, Cast::int( $postId ) );
+		}
+	}
+
+	/**
+	 * A post or page was created or saved, whatever its status (the job reads it and indexes or removes it).
+	 *
+	 * @param int|mixed $postId Post id.
+	 * @param mixed     $post   The post.
+	 */
+	public function contentSaved( $postId, $post = null ): void {
+		if ( ! $post instanceof WP_Post || ! in_array( $post->post_type, ContentReader::enabled(), true ) ) {
+			return;
+		}
+		$this->content( $post->post_type, $post->ID );
+		// Its children are found by its title, and only while it is public (ContentReader::parentTitle()).
+		$children = ( new \WP_Query(
+			array(
+				'post_type'              => $post->post_type,
+				'post_parent'            => $post->ID,
+				'post_status'            => 'any',
+				'fields'                 => 'ids',
+				'posts_per_page'         => IndexQueue::BATCH,
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			)
+		) )->posts;
+		foreach ( Cast::ints( $children ) as $child ) {
+			$this->content( $post->post_type, $child );
+		}
+	}
+
+	/**
+	 * A page became, or stopped being, the front page or one of WooCommerce's pages, which are never indexed:
+	 * both pages are read again.
+	 *
+	 * @param mixed $previous The previous page id.
+	 * @param mixed $current  The new page id.
+	 */
+	public function pageRoleChanged( $previous, $current ): void {
+		foreach ( array( Cast::int( $previous ), Cast::int( $current ) ) as $id ) {
+			$post = $id > 0 ? get_post( $id ) : null;
+			if ( $post instanceof WP_Post ) {
+				$this->content( $post->post_type, $post->ID );
+			}
+		}
+	}
+
+	/**
+	 * Queue a post or page when its type is switched on (D-093); a type switched off has no documents left.
+	 *
+	 * @param string $postType Post type.
+	 * @param int    $postId   Post id.
+	 */
+	private function content( string $postType, int $postId ): void {
+		if ( in_array( $postType, ContentReader::enabled(), true ) ) {
+			$this->queue->content( $postId );
 		}
 	}
 
@@ -289,16 +355,22 @@ final class IndexHooks implements Hookable {
 	}
 
 	/**
-	 * The owner's boost or exclude flag changed on a product.
+	 * The owner's boost or exclude flag changed on a product, post or page.
 	 *
 	 * @param mixed     $metaId  Meta id.
 	 * @param int|mixed $postId  Post id.
 	 * @param mixed     $metaKey Meta key.
 	 */
 	public function metaChanged( $metaId, $postId, $metaKey ): void {
-		if ( in_array( $metaKey, \CreativeBranding\Search\Support\Options::metaKeys(), true ) ) {
-			$this->queue->product( Cast::int( $postId ) );
+		if ( ! in_array( $metaKey, \CreativeBranding\Search\Support\Options::metaKeys(), true ) ) {
+			return;
 		}
+		$type = get_post_type( Cast::int( $postId ) );
+		if ( is_string( $type ) && null !== ContentReader::typeOf( $type ) ) {
+			$this->content( $type, Cast::int( $postId ) );
+			return;
+		}
+		$this->queue->product( Cast::int( $postId ) );
 	}
 
 	/**

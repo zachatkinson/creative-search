@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Domain\Fields;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Index\Indexer;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Repository\PostingRepository;
@@ -45,9 +46,9 @@ final class PostingRepositoryTest extends IndexTestCase {
 				$want[ (string) $row['term'] ][ (int) $row['document_id'] ][ (int) $row['field'] ] = array( (int) $row['tf'], (int) $row['first_pos'] );
 			}
 			self::assertNotSame( array(), $want );
-			$got = $postings->forTerms( $asked, $generation, 'en', $products );
+			$got = $postings->forTerms( $asked, $generation, 'en', $products ? Kind::PRODUCT : Kind::TERM );
 			self::assertSame( self::sorted( $want ), self::sorted( $got ), $products ? 'product postings' : 'category, tag and brand postings' );
-			self::assertSame( array(), $postings->forTerms( $asked, $generation, 'fr', $products ), 'nothing in a language not indexed' );
+			self::assertSame( array(), $postings->forTerms( $asked, $generation, 'fr', $products ? Kind::PRODUCT : Kind::TERM ), 'nothing in a language not indexed' );
 		}
 
 		foreach ( array( array( 'deck' ), array( 'deck', 'wheels', 'tee' ), array( 'zzznotaterm' ) ) as $some ) {

@@ -10,6 +10,9 @@ export function installDom() {
 		elements,
 		beacons: [],
 		assigned: [],
+		replaced: [],
+		focused: null,
+		backs: 0,
 		fetch: null,
 	};
 	class FakeElement {
@@ -17,11 +20,31 @@ export function installDom() {
 			this.id = id;
 			this.value = '';
 			this.form = { requestSubmit: () => ( dom.submitted = true ) };
+			this.open = false;
+			this.dataset = {};
+			const classes = new Set();
+			this.classList = {
+				add: ( ...names ) => names.forEach( ( n ) => classes.add( n ) ),
+				remove: ( ...names ) =>
+					names.forEach( ( n ) => classes.delete( n ) ),
+				contains: ( name ) => classes.has( name ),
+				get size() {
+					return classes.size;
+				},
+			};
+		}
+		showModal() {
+			this.open = true;
+		}
+		close() {
+			this.open = false;
 		}
 		contains( other ) {
 			return other === this || other?.parent === this;
 		}
-		focus() {}
+		focus() {
+			dom.focused = this.id;
+		}
 		scrollIntoView() {}
 		getBoundingClientRect() {
 			return { bottom: 100 };
@@ -64,7 +87,21 @@ export function installDom() {
 		navigator: {
 			sendBeacon: ( url, body ) => dom.beacons.push( { url, body } ) > 0,
 		},
-		location: { assign: ( url ) => dom.assigned.push( url ) },
+		location: {
+			href: 'http://shop.test/',
+			assign: ( url ) => dom.assigned.push( url ),
+			replace: ( url ) => dom.replaced.push( url ),
+		},
+		history: {
+			state: null,
+			pushState( state ) {
+				this.state = state;
+			},
+			back() {
+				this.state = null;
+				dom.backs++;
+			},
+		},
 	};
 	return dom;
 }

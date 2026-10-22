@@ -75,6 +75,11 @@ final class Options {
 	public const REBUILD_OWED = 'csearch_rebuild_owed';
 
 	/**
+	 * The `Domain\Tokenizer::VERSION` the index was built with: an older one owes a full rebuild (D-098).
+	 */
+	public const ANALYSIS_VERSION = 'csearch_analysis_version';
+
+	/**
 	 * Object-cache group for answers and rate-limit counters.
 	 */
 	public const CACHE_GROUP = 'csearch';
@@ -90,7 +95,7 @@ final class Options {
 	 * @return string[]
 	 */
 	public static function names(): array {
-		return array( self::SETTINGS, self::DB_VERSION, self::INDEX_STATE, self::UPGRADE_LOCK, self::REINDEX_CANCEL, self::REBUILD_OWED );
+		return array( self::SETTINGS, self::DB_VERSION, self::INDEX_STATE, self::UPGRADE_LOCK, self::REINDEX_CANCEL, self::REBUILD_OWED, self::ANALYSIS_VERSION );
 	}
 
 	/**

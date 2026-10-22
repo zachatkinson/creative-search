@@ -22,12 +22,14 @@ final class Document {
 	public const CATEGORY = 'category';
 	public const TAG      = 'tag';
 	public const BRAND    = 'brand';
+	public const POST     = 'post';
+	public const PAGE     = 'page';
 
 	/**
 	 * Constructor.
 	 *
 	 * @param int      $id         Document id.
-	 * @param string   $type       product, category, tag or brand.
+	 * @param string   $type       product, category, tag, brand, post or page.
 	 * @param int      $objectId   The product or term id.
 	 * @param string   $lang       Language code.
 	 * @param string   $title      The name as written, for the suggestion.
@@ -62,5 +64,12 @@ final class Document {
 	 */
 	public function isProduct(): bool {
 		return self::PRODUCT === $this->type;
+	}
+
+	/**
+	 * Whether this is a post or a page (1.1): searched on its own, never among the products or the terms.
+	 */
+	public function isContent(): bool {
+		return self::POST === $this->type || self::PAGE === $this->type;
 	}
 }

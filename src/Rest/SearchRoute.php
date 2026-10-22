@@ -101,6 +101,7 @@ final class SearchRoute implements Route {
 					'total'     => $total,
 					'page'      => $page,
 					'pages'     => (int) ceil( $total / $perPage ),
+					'content'   => 1 === $page ? $this->search->content( $ranked['query'], $ranked['lang'], 'page' ) : array(),
 					'corrected' => $ranked['corrected'],
 					'query'     => $ranked['query'],
 					'lang'      => $ranked['lang'],

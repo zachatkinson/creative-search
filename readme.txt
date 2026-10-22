@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -52,10 +52,21 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.1.0 =
+Sizes are now read one way however they are written, so the index is rebuilt once in the background after the update. Searches keep working meanwhile.
+
 = 1.0.0 =
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.1.0 =
+* Posts and pages can be searched (off by default; Tools tab), shown after the products in the suggestions and above them on the results page, with an "Exclude from search" box in the editor.
+* Button mode: a search icon that opens the search in a dialog, full screen on a phone.
+* The no-results page links to a help page and a second page of your choice, and offers the words of the query that find something.
+* The arrow keys copy the suggestion into the field; suggestions mark what they add; the page dims behind them; the panel never scrolls.
+* Sizes are read one way however they are written (8.25in, 8.25", 8.25 inch; 54 mm; 9x33).
+* New hooks for themes and plugins (docs/HOOKS.md in the repository).
 
 = 1.0.0 =
 * Languages: French end to end, with the plugin translated into Canadian French; a French search falls back to the site language (Settings → General) when it finds nothing.

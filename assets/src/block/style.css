@@ -13,6 +13,7 @@
 	--csearch-row: 44px;
 	--csearch-thumb: 48px;
 	--csearch-shadow: 0 8px 24px color-mix(in srgb, var(--csearch-fg) 18%, transparent);
+	--csearch-backdrop: rgb(0 0 0 / 25%);
 
 	position: relative;
 	color: var(--csearch-fg);
@@ -103,9 +104,7 @@
 	inset-inline: 0;
 	inset-block-start: 100%;
 	z-index: 50;
-	max-block-size: min(70vh, 36rem);
 	margin-block-start: calc(var(--csearch-gap) / 2);
-	overflow-y: auto;
 	color: var(--csearch-fg);
 	background: var(--csearch-bg);
 	border: 1px solid var(--csearch-border);
@@ -224,5 +223,153 @@
 
 	.wp-block-creative-search-search {
 		--csearch-row: 48px;
+	}
+}
+
+/* The part a suggestion adds to what was typed (D-095): weight, not colour, so it holds in forced colours. */
+.csearch-name mark {
+	font-weight: 700;
+	color: inherit;
+	background: transparent;
+}
+
+.csearch-corrected {
+	font-style: italic;
+}
+
+/* The page dims behind the open panel (D-097); the form sits above it. */
+.csearch-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 40;
+	background: var(--csearch-backdrop);
+}
+
+.csearch-backdrop[hidden] {
+	display: none;
+}
+
+.is-dimmed > .csearch-form {
+	z-index: 41;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+
+	.csearch-backdrop {
+		animation: csearch-fade 120ms ease-out;
+	}
+}
+
+@media (forced-colors: active) {
+
+	.csearch-backdrop {
+		display: none;
+	}
+}
+
+/* The group heading over the first post or page (Skatehouse handoff item 7). */
+.csearch-option.has-heading {
+	flex-wrap: wrap;
+	border-block-start: 1px solid var(--csearch-border);
+}
+
+.csearch-group {
+	flex-basis: 100%;
+	font-size: 0.75em;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--csearch-muted);
+}
+
+.csearch-group[hidden] {
+	display: none;
+}
+
+/* Button mode (D-099): an icon that opens the form in a modal dialog. */
+.csearch-open,
+.csearch-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: var(--csearch-row);
+	min-block-size: var(--csearch-row);
+	margin: 0;
+	padding: 0;
+	color: inherit;
+	cursor: pointer;
+	background: transparent;
+	border: 0;
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-open:focus-visible,
+.csearch-close:focus-visible {
+	outline: 2px solid currentcolor;
+	outline-offset: 2px;
+}
+
+.csearch-dialog {
+	inline-size: min(40rem, calc(100vw - 2rem));
+	max-block-size: calc(100dvh - 2rem);
+	margin-block: 10vh auto;
+	padding: var(--csearch-gap);
+	color: var(--csearch-fg);
+	background: var(--csearch-bg);
+	border: 1px solid var(--csearch-border);
+	border-radius: var(--csearch-radius);
+	box-shadow: var(--csearch-shadow);
+	overflow: visible;
+}
+
+.csearch-dialog::backdrop {
+	background: var(--csearch-backdrop);
+}
+
+.csearch-dialog[open] {
+	display: flex;
+	flex-direction: column;
+	gap: var(--csearch-gap);
+}
+
+.csearch-dialog .csearch-close {
+	align-self: flex-end;
+}
+
+/* On a phone the dialog fills the screen, the panel under the field. */
+@media (width <= 600px) {
+
+	.csearch-dialog {
+		inline-size: 100vw;
+		max-inline-size: none;
+		block-size: 100dvh;
+		max-block-size: none;
+		margin: 0;
+		border: 0;
+		border-radius: 0;
+	}
+
+	.csearch-dialog .csearch-panel {
+		position: static;
+		box-shadow: none;
+	}
+}
+
+/* With no script the button cannot open anything: the form shows in place, so the search still works. */
+@media (scripting: none) {
+
+	.csearch-open,
+	.csearch-close {
+		display: none;
+	}
+
+	.csearch-dialog {
+		position: static;
+		display: block;
+		inline-size: auto;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		box-shadow: none;
 	}
 }

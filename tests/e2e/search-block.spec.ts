@@ -53,13 +53,24 @@ test( 'the APG keyboard script', async ( { page } ) => {
 	await expect( options.first() ).toHaveAttribute( 'aria-selected', 'true' );
 	await expect( input ).toBeFocused();
 
+	// The chosen suggestion is written into the field (D-091).
+	await expect( input ).toHaveValue( 'KAZUMI Skate Deck, Dealer' );
+
+	// Above the first row, back to what was typed; Up again, the last row (APG).
+	await input.press( 'ArrowUp' );
+	await expect( input ).not.toHaveAttribute( 'aria-activedescendant', /.+/ );
+	await expect( input ).toHaveValue( 'kazumi' );
 	await input.press( 'ArrowUp' );
 	const last = await options.last().getAttribute( 'id' );
 	await expect( input ).toHaveAttribute(
 		'aria-activedescendant',
 		last ?? ''
 	);
+	await expect( input ).toHaveValue( 'kazumi' );
 
+	// Past the last row, back to what was typed; Down again, the first.
+	await input.press( 'ArrowDown' );
+	await expect( input ).not.toHaveAttribute( 'aria-activedescendant', /.+/ );
 	await input.press( 'ArrowDown' );
 	await expect( input ).toHaveAttribute(
 		'aria-activedescendant',

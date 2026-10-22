@@ -105,4 +105,49 @@ final class BlockTest extends IntegrationTestCase {
 		$html = do_blocks( '<!-- wp:creative-search/search {"placeholder":""><script>alert(1)</script>"} /-->' );
 		self::assertStringNotContainsString( '<script>alert(1)', $html );
 	}
+
+	public function test_on_a_search_page_the_field_keeps_the_query_escaped(): void {
+		$this->go_to( add_query_arg( array( 's' => 'deck "><script>alert(1)</script>', 'post_type' => 'product' ), home_url( '/' ) ) );
+		$html = do_blocks( '<!-- wp:creative-search/search /-->' );
+		self::assertStringNotContainsString( '<script>alert(1)', $html );
+		self::assertStringContainsString( 'value="deck &quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"', $html, 'the query in the field (Baymard; handoff item 2)' );
+		self::assertMatchesRegularExpression( '/<button type="button" class="csearch-clear" data-wp-bind/', $html, 'the clear button shown' );
+		$context = self::context( $html );
+		self::assertSame( 'deck "><script>alert(1)</script>', $context['query'] );
+		self::assertSame( $context['query'], $context['typed'] );
+		self::assertFalse( $context['panel'], 'the panel stays closed' );
+		$this->go_to( home_url( '/' ) );
+		$html = do_blocks( '<!-- wp:creative-search/search /-->' );
+		self::assertStringContainsString( 'value=""', $html );
+		self::assertStringContainsString( 'class="csearch-clear" hidden', $html );
+	}
+
+	public function test_button_mode_opens_the_same_form_in_a_dialog(): void {
+		$html = do_blocks( '<!-- wp:creative-search/search {"mode":"button"} /-->' );
+		self::assertMatchesRegularExpression( '/<button type="button" id="csearch-[^"]+-open" class="csearch-open" aria-haspopup="dialog" aria-controls="csearch-[^"]+-dialog" data-wp-on--click="actions.openDialog">/', $html );
+		self::assertStringContainsString( '<span class="csearch-sr">Search</span></button>', $html, 'the button\'s name' );
+		self::assertMatchesRegularExpression( '/<dialog id="csearch-[^"]+-dialog" class="csearch-dialog" aria-label="Search"/', $html );
+		self::assertStringContainsString( 'data-wp-on-window--popstate="actions.dialogBack"', $html, 'Back closes it' );
+		self::assertStringContainsString( 'Close search', $html );
+		self::assertLessThan( strpos( $html, '</dialog>' ), strpos( $html, '<form role="search"' ), 'the form is inside the dialog' );
+		self::assertStringContainsString( 'name="s"', $html, 'the same form, so it searches with no script' );
+		self::assertStringNotContainsString( 'csearch-backdrop', $html, 'the dialog has its own backdrop' );
+		self::assertTrue( self::context( $html )['dialog'] );
+		self::assertFalse( self::context( do_blocks( '<!-- wp:creative-search/search /-->' ) )['dialog'] );
+		self::assertStringContainsString( 'csearch-dialog', do_shortcode( '[creative_search mode="button"]' ), 'the shortcode too' );
+		self::assertStringNotContainsString( 'csearch-dialog', do_blocks( '<!-- wp:creative-search/search {"mode":"other"} /-->' ) );
+	}
+
+	public function test_the_render_is_the_same_for_every_visitor_and_holds_no_nonce(): void {
+		// A page cached for days must still search (Skatehouse handoff item 4): nothing per user, nothing that expires.
+		foreach ( array( '<!-- wp:creative-search/search /-->', '<!-- wp:creative-search/search {"mode":"button"} /-->' ) as $block ) {
+			wp_set_current_user( 0 );
+			$guest = preg_replace( '/csearch-\d+/', 'csearch-N', do_blocks( $block ) );
+			wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+			$admin = preg_replace( '/csearch-\d+/', 'csearch-N', do_blocks( $block ) );
+			wp_set_current_user( 0 );
+			self::assertSame( $guest, $admin, $block );
+			self::assertDoesNotMatchRegularExpression( '/nonce|_wpnonce|X-WP-Nonce/i', (string) $guest );
+		}
+	}
 }

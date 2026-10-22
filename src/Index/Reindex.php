@@ -9,9 +9,11 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Index;
 
+use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Install\Upgrader;
 use CreativeBranding\Search\Repository\DocumentRepository;
 use CreativeBranding\Search\Repository\ProductIdRepository;
+use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Options;
 use RuntimeException;
 use Throwable;
@@ -23,7 +25,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Builds generation N+1 beside N (spec: Indexing → Full reindex): products 100 at a time in id order (keyset:
- * each job carries the last id it walked, D-054), one job per batch; then the categories, tags and brands; then
+ * each job carries the last id it walked, D-054), one job per batch; then the posts and pages switched on (1.1),
+ * the same way; then the categories, tags and brands; then
  * the switch; then the old generation deleted in batches. Every step returns the next job, so the same code
  * runs as Action Scheduler jobs and inline under `wp csearch reindex --inline`. Progress lives in
  * {@see IndexState}; the old index serves throughout; a reindex already running is not started twice.
@@ -34,6 +37,7 @@ final class Reindex {
 
 	public const START         = 'csearch_reindex';
 	public const BATCH_ACTION  = 'csearch_reindex_batch';
+	public const CONTENT       = 'csearch_reindex_content';
 	public const TERMS_ACTION  = 'csearch_reindex_terms';
 	public const CLEANUP       = 'csearch_reindex_cleanup';
 	public const BATCH         = 100;
@@ -84,6 +88,24 @@ final class Reindex {
 			return false;
 		}
 		return $this->queue();
+	}
+
+	/**
+	 * After an update whose tokenizer reads text differently (Tokenizer::VERSION, D-098), owe one full rebuild,
+	 * through the same path a schema upgrade's rebuild takes (D-090). One autoloaded option read when current.
+	 *
+	 * @return bool Whether a rebuild was owed now.
+	 */
+	public function checkAnalysis(): bool {
+		if ( Cast::int( get_option( Options::ANALYSIS_VERSION, 0 ) ) >= Tokenizer::VERSION || ! IndexQueue::available() ) {
+			return false;
+		}
+		update_option( Options::ANALYSIS_VERSION, Tokenizer::VERSION, true );
+		if ( ! (bool) $this->state->all()[ IndexState::FIRST_QUEUED ] ) {
+			return false; // Never built: the first build uses today's rules.
+		}
+		$this->owe();
+		return true;
 	}
 
 	/**
@@ -146,9 +168,41 @@ final class Reindex {
 		$last = array() === $ids ? $after : max( $ids );
 		$this->state->progress( count( $ids ), $written, $last, $errors );
 		if ( count( $ids ) < self::BATCH ) {
-			return array( self::TERMS_ACTION, array( $generation, 0 ) );
+			return array( self::CONTENT, array( $generation, 0 ) );
 		}
 		return array( self::BATCH_ACTION, array( $generation, $last ) );
+	}
+
+	/**
+	 * One batch of the posts and pages switched on (D-093); the categories, tags and brands after the last.
+	 *
+	 * @param int $generation The generation being built.
+	 * @param int $after      The last post id walked (0 to start).
+	 * @return Job|null The next job.
+	 */
+	public function content( int $generation, int $after ): ?array {
+		if ( $generation !== $this->state->building() ) {
+			return null;
+		}
+		if ( $this->state->isCancelled() ) {
+			return $this->abandon();
+		}
+		$ids    = $this->indexer->contentAfter( $after, self::BATCH );
+		$errors = array();
+		foreach ( $ids as $postId ) {
+			try {
+				$this->indexer->indexContent( $postId, $generation );
+			} catch ( Throwable $e ) {
+				$errors[] = sprintf( 'post #%d: %s', $postId, $e->getMessage() );
+			}
+		}
+		if ( array() !== $errors ) {
+			$this->state->progress( 0, 0, 0, $errors );
+		}
+		if ( count( $ids ) < self::BATCH ) {
+			return array( self::TERMS_ACTION, array( $generation, 0 ) );
+		}
+		return array( self::CONTENT, array( $generation, max( $ids ) ) );
 	}
 
 	/**
@@ -259,6 +313,8 @@ final class Reindex {
 				return $this->start();
 			case self::BATCH_ACTION:
 				return $this->batch( $args[0] ?? 0, $args[1] ?? 0 );
+			case self::CONTENT:
+				return $this->content( $args[0] ?? 0, $args[1] ?? 0 );
 			case self::TERMS_ACTION:
 				return $this->terms( $args[0] ?? 0, $args[1] ?? 0 );
 			case self::CLEANUP:
@@ -334,7 +390,7 @@ final class Reindex {
 	 * Whether any job of a reindex chain is waiting or running.
 	 */
 	private static function chainAlive(): bool {
-		foreach ( array( self::BATCH_ACTION, self::TERMS_ACTION ) as $hook ) {
+		foreach ( array( self::BATCH_ACTION, self::CONTENT, self::TERMS_ACTION ) as $hook ) {
 			if ( IndexQueue::isScheduled( $hook ) ) {
 				return true;
 			}

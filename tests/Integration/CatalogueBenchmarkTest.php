@@ -1,6 +1,6 @@
 <?php
 /**
- * The golden set through the API, and the API's budgets.
+ * The index and API budgets, on one catalogue.
  *
  * @package CreativeBranding\Search\Tests
  */
@@ -11,9 +11,12 @@ namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Index\AnalyzerFactory;
+use CreativeBranding\Search\Index\IndexQueue;
+use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
 use CreativeBranding\Search\Repository\SynonymRepository;
 use CreativeBranding\Search\Settings\Settings;
+use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Fixtures\GoldenQueries;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
@@ -21,34 +24,88 @@ use CreativeBranding\Search\Tests\Support\WooCommerceCatalogue;
 use WP_REST_Request;
 
 /**
- * Milestone 4's "the golden set through the API" and its budgets (spec: Security, performance → Performance):
- * `/suggest` p95 within 60 ms warm and 100 ms cold, `/search` within 100 ms, 4 MB above the baseline. The
- * catalogue (300 products by default, `CSEARCH_BENCH_PRODUCTS` to change) is written into WooCommerce in two
- * languages, the way skatehouse-core will answer `csearch_languages`, with the golden set's synonyms. Times are
- * measured around `rest_do_request()`: the route's own work, without WordPress's bootstrap.
+ * The spec's budgets, on one catalogue loaded once (`CSEARCH_BENCH_PRODUCTS`, default 300, the shop's size):
+ * loading 10,000 products through WooCommerce's CRUD takes far longer than anything it measures, so the two
+ * measurements share it rather than each loading its own.
+ *
+ * 1. A full reindex in English within 5 minutes for 10,000 products, scaled linearly (30 ms a product, so 9 s
+ *    for 300). The one-product budget (50 ms) is an assertion in the regular suite.
+ * 2. Milestone 4's golden set through the API, with the catalogue in two languages the way skatehouse-core
+ *    answers `csearch_languages` and the golden set's synonyms (spec: Security, performance → Performance):
+ *    `/suggest` p95 within 60 ms warm and 100 ms cold, `/search` within 100 ms, 4 MB above the baseline. Times
+ *    are measured around `rest_do_request()`: the route's own work, without WordPress's bootstrap.
+ *
+ * Each phase writes its time to STDERR as it ends, so a slow run shows where the time went.
  *
  * @group benchmark
  */
-final class ApiBenchmarkTest extends IndexTestCase {
+final class CatalogueBenchmarkTest extends IndexTestCase {
 
-	public function test_the_golden_set_through_the_api_within_budget(): void {
-		$count = max( 24, (int) ( getenv( 'CSEARCH_BENCH_PRODUCTS' ) ?: 300 ) );
-		add_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
-		$this->service( AnalyzerFactory::class )->flush();
+	/**
+	 * When the test began, for the phase lines.
+	 *
+	 * @var int
+	 */
+	private int $began = 0;
+
+	public function test_the_index_and_api_budgets_on_one_catalogue(): void {
+		$count       = max( 24, (int) ( getenv( 'CSEARCH_BENCH_PRODUCTS' ) ?: 300 ) );
+		$this->began = hrtime( true );
+
+		$start = hrtime( true );
 		$specs = ( new Catalogue() )->generate( $count );
 		$ids   = $this->catalogue->load( $specs );
-		$skus  = array();
+		$this->service( IndexQueue::class )->clear();
+		$this->phase( sprintf( 'loaded %d products through WooCommerce', $count ), $start );
+
+		// 1. The full reindex, in English.
+		$start = hrtime( true );
+		self::assertTrue( $this->service( Reindex::class )->runInline() );
+		$seconds = ( hrtime( true ) - $start ) / 1e9;
+		$budget  = 300.0 * $count / 10000;
+		$state   = $this->service( IndexState::class )->all();
+		$this->phase(
+			sprintf(
+				'reindex %.2f s (budget %.1f s), %.1f ms a product; %d documents, %d postings, %d terms; %d errors',
+				$seconds,
+				$budget,
+				1000 * $seconds / $count,
+				$this->rowCount( Tables::documents() ),
+				$this->rowCount( Tables::postings() ),
+				$this->rowCount( Tables::terms() ),
+				count( (array) $state[ IndexState::ERRORS ] )
+			),
+			$start
+		);
+		self::assertSame( array(), $state[ IndexState::ERRORS ] );
+		self::assertSame( $count, $state[ IndexState::DONE ] );
+		self::assertLessThan( $budget, $seconds );
+
+		// 2. The golden set through the API, in two languages.
+		$start = hrtime( true );
+		add_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
+		$this->service( AnalyzerFactory::class )->flush();
+		$skus = array();
 		foreach ( $specs as $spec ) {
 			$skus[ $ids[ (int) $spec['id'] ] ] = (string) $spec['sku'];
 		}
-		$this->service( \CreativeBranding\Search\Index\IndexQueue::class )->clear();
 		foreach ( GoldenQueries::load()['synonyms'] as $row ) {
 			$this->service( SynonymRepository::class )->add( new Synonym( $row['lang'], $row['word'], $row['means'], $row['both_ways'] ) );
 		}
+		// Pages and posts on, as Skatehouse runs: each answer then makes a second pass over them (D-093).
+		$this->content( max( 10, intdiv( $count, 100 ) ) );
+		Settings::update(
+			array(
+				'index_pages' => 'yes',
+				'index_posts' => 'yes',
+			)
+		);
 		self::assertTrue( $this->service( Reindex::class )->runInline() );
 		$this->analyzeAside( self::$analyzed );
 		do_action( 'rest_api_init' );
+		$this->phase( 'reindexed in English and French, with the synonyms, pages and posts', $start );
 
+		$queried  = hrtime( true );
 		$failures = array();
 		$cold     = array();
 		$warm     = array();
@@ -105,18 +162,22 @@ final class ApiBenchmarkTest extends IndexTestCase {
 			}
 		}
 		remove_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
-
-		fwrite(
-			STDERR,
+		Settings::update(
+			array(
+				'index_pages' => 'no',
+				'index_posts' => 'no',
+			)
+		);
+		$this->phase(
 			sprintf(
-				"\n[benchmark] %d products, %d queries: /suggest p95 cold %.1f ms (budget 100), warm %.1f ms (budget 60); /search p95 %.1f ms (budget 100); peak memory p95 %.2f MB (budget 4)\n",
-				$count,
+				'%d queries: /suggest p95 cold %.1f ms (budget 100), warm %.1f ms (budget 60); /search p95 %.1f ms (budget 100); peak memory p95 %.2f MB (budget 4)',
 				count( $cold ),
 				self::p95( $cold ),
 				self::p95( $warm ),
 				self::p95( $search ),
 				self::p95( $memory )
-			)
+			),
+			$queried
 		);
 		if ( $count <= 300 ) {
 			// The golden set is scored at the shop's size; at 10,000 the stock penalty moves six heroes (D-032).
@@ -126,6 +187,52 @@ final class ApiBenchmarkTest extends IndexTestCase {
 		self::assertLessThan( 60.0, self::p95( $warm ) );
 		self::assertLessThan( 100.0, self::p95( $search ) );
 		self::assertLessThan( 4.0, self::p95( $memory ) );
+	}
+
+	/**
+	 * Pages under a few parents and as many posts, worded like a skate shop's, so the content pass has terms
+	 * that overlap the catalogue's (deck, wheels, size).
+	 *
+	 * @param int $count Pages, and posts.
+	 */
+	private function content( int $count ): void {
+		$words   = array( 'deck', 'wheels', 'size', 'guide', 'shipping', 'returns', 'griptape', 'bearings', 'trucks', 'kazumi' );
+		$parents = array();
+		foreach ( array( 'Size guides', 'Help', 'About' ) as $title ) {
+			$parents[] = self::factory()->post->create(
+				array(
+					'post_type'   => 'page',
+					'post_title'  => $title,
+					'post_status' => 'publish',
+				)
+			);
+		}
+		for ( $i = 0; $i < $count; $i++ ) {
+			$text = $words[ $i % 10 ] . ' ' . $words[ ( $i * 3 + 1 ) % 10 ] . ' ' . $words[ ( $i * 7 + 2 ) % 10 ];
+			foreach ( array( 'page', 'post' ) as $type ) {
+				self::factory()->post->create(
+					array(
+						'post_type'    => $type,
+						'post_title'   => ucfirst( $text ) . ' ' . $i,
+						'post_content' => str_repeat( $text . '. ', 40 ),
+						'post_status'  => 'publish',
+						'post_parent'  => 'page' === $type ? $parents[ $i % 3 ] : 0,
+					)
+				);
+			}
+		}
+		$this->service( IndexQueue::class )->clear();
+	}
+
+	/**
+	 * Write one phase's line: what it did, how long it took, and the time since the test began.
+	 *
+	 * @param string $what  What the phase did.
+	 * @param int    $start When it began (hrtime).
+	 */
+	private function phase( string $what, int $start ): void {
+		$now = hrtime( true );
+		fwrite( STDERR, sprintf( "\n[benchmark] %s (%.1f s; %.1f s in all)\n", $what, ( $now - $start ) / 1e9, ( $now - $this->began ) / 1e9 ) );
 	}
 
 	/**

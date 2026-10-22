@@ -32,6 +32,35 @@ function Edit( { attributes, setAttributes } ) {
 		<div { ...useBlockProps() }>
 			<InspectorControls>
 				<PanelBody title={ __( 'Search bar', 'creative-search' ) }>
+					<SelectControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __( 'Show as', 'creative-search' ) }
+						help={ __(
+							'A button opens the search in a dialog, with the cursor already in the field.',
+							'creative-search'
+						) }
+						value={ attributes.mode || 'field' }
+						options={ [
+							{
+								value: 'field',
+								label: __(
+									'A search field',
+									'creative-search'
+								),
+							},
+							{
+								value: 'button',
+								label: __(
+									'A search button (icon)',
+									'creative-search'
+								),
+							},
+						] }
+						onChange={ ( value ) =>
+							setAttributes( { mode: value } )
+						}
+					/>
 					{ toggle(
 						'labelVisible',
 						__( 'Show the label', 'creative-search' )

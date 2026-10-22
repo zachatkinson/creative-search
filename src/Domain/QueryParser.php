@@ -40,10 +40,12 @@ final class QueryParser {
 	 * @param string $lang Language code.
 	 */
 	public function parse( string $raw, string $lang ): Query {
-		$text     = trim( mb_substr( trim( $raw ), 0, Query::MAX_CHARS, 'UTF-8' ) );
-		$lang     = StopWords::code( $lang );
-		$prepared = self::prepare( $text );
-		$endsOpen = 1 !== preg_match( '/\s$/u', $raw ) && mb_strlen( trim( $raw ), 'UTF-8' ) <= Query::MAX_CHARS;
+		$text = trim( mb_substr( trim( $raw ), 0, Query::MAX_CHARS, 'UTF-8' ) );
+		$lang = StopWords::code( $lang );
+		// Sizes first: a unit may follow its number after a space, which the chunks below would split (D-098).
+		$prepared = Tokenizer::units( mb_strtolower( self::prepare( $text ), 'UTF-8' ), $lang );
+		// A size whose unit was typed (`8.25 in`, `8.25″`) is finished: it is no prefix.
+		$endsOpen = 1 !== preg_match( '/\s$/u', $raw ) && mb_strlen( trim( $raw ), 'UTF-8' ) <= Query::MAX_CHARS && ! str_ends_with( $prepared, '″' );
 
 		$tokens   = array();
 		$excluded = array();

@@ -31,7 +31,7 @@ final class OptionsTest extends TestCase {
 	}
 
 	public function test_the_spec_names_are_present(): void {
-		self::assertSame( array( 'csearch_settings', 'csearch_db_version', 'csearch_index_state', 'csearch_upgrade_lock', 'csearch_reindex_cancel', 'csearch_rebuild_owed' ), Options::names() );
+		self::assertSame( array( 'csearch_settings', 'csearch_db_version', 'csearch_index_state', 'csearch_upgrade_lock', 'csearch_reindex_cancel', 'csearch_rebuild_owed', 'csearch_analysis_version' ), Options::names() );
 		self::assertSame( array( '_csearch_boost', '_csearch_exclude' ), Options::metaKeys() );
 	}
 }

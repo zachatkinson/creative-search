@@ -2,9 +2,9 @@
 
 Everything the owner can set, with its default and its range. All of it lives in one autoloaded option, `csearch_settings`, read through `Settings\Settings` and sanitised by `Settings::sanitize()` whichever screen or command writes it. Unknown keys are dropped; a missing key takes its default; every value is coerced to its type and range (so a corrupt option never breaks a request).
 
-Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on every request, written only once the tables match it, D-090), `csearch_rebuild_owed` (set to 0 when a schema upgrade needs a full rebuild, then to the generation of the reindex begun to settle it; cleared when that generation goes live, so a cancelled or abandoned rebuild is queued again, D-090), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, a list of lower-case words, set on the Tools tab). Product meta: `_csearch_boost` (−10 to 10, absent for 0) and `_csearch_exclude` (`yes` or absent), set in the product editor's Search tab and carried by the product CSV (D-070). User meta: `csearch_dismissed_notices` (the warnings a user dismissed, until each clears; D-071). Transients: `csearch_notice_{user id}` (an action's answer, for one minute).
+Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on every request, written only once the tables match it, D-090), `csearch_rebuild_owed` (set to 0 when a schema upgrade needs a full rebuild, then to the generation of the reindex begun to settle it; cleared when that generation goes live, so a cancelled or abandoned rebuild is queued again, D-090), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, a list of lower-case words, set on the Tools tab), `csearch_analysis_version` (the tokenizer's rules the index was built under; an update that changes them owes one full rebuild, D-098). Product meta: `_csearch_boost` (−10 to 10, absent for 0) and `_csearch_exclude` (`yes` or absent), set in the product editor's Search tab and carried by the product CSV (D-070). Post and page meta: `_csearch_exclude` (`yes` or absent), set in the editor's Search box (D-093). User meta: `csearch_dismissed_notices` (the warnings a user dismissed, until each clears; D-071). Transients: `csearch_notice_{user id}` (an action's answer, for one minute).
 
-**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` and the suggestion panel's defaults; the Boosts and exclusions tab sets `boost_rules`, `fallback_products` and `hidden_by_sku`. `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
+**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` and the suggestion panel's defaults; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`) and `hidden_by_sku`. `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
 
 ## What to index
 
@@ -13,6 +13,8 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | `index_long_description` | `yes` | yes/no | Index the long description (2,000 characters at most). |
 | `index_tags` | `yes` | yes/no | Index product tags, and make tag documents. |
 | `index_variation_skus` | `yes` | yes/no | Index every variation's SKU on the parent document. |
+| `index_posts` | `no` | yes/no | Index published posts, searched apart from the products and shown after them (D-093). Changing it queues the posts' indexing or the removal of their documents. |
+| `index_pages` | `no` | yes/no | Index published pages the same way, except the front page and WooCommerce's shop, cart, checkout and account pages. |
 | `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
 
 ## Languages
@@ -29,6 +31,10 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | `hidden_by_sku` | `no` | yes/no | A hidden product (catalogue visibility hidden) appears for an exact SKU match. Off until the owner answers the hidden-products question (docs/DECISIONS.md D-018). |
 | `boost_rules` | `[]` | `{taxonomy, term_id, boost -10..10}` | A number added to every product in a category, brand or tag. |
 | `fallback_products` | `[]` | product ids | Shown on the results page when nothing matches. |
+| `help_page` | `0` | a page id, 0 for none | The no-results page's first link (D-096): a published page, such as the contact page. Filter: `csearch_no_results_links`. |
+| `help_text` | `''` | plain text, at most 120 characters | Its wording; empty reads "Can’t find what you need? Contact us". |
+| `guide_page` | `0` | a page id, 0 for none | The no-results page's second link, such as a size or buying guide. |
+| `guide_text` | `''` | plain text, at most 120 characters | Its wording; empty reads "Need help choosing? Read our guides". |
 
 ## The suggestion panel's defaults
 
@@ -47,6 +53,8 @@ A block instance can override each of these; they are the defaults for new block
 | `panel_position` | `auto` | auto, below, above | `auto` opens below, and above on a phone when the keyboard would cover it. |
 | `recent_searches` | `no` | yes/no | The shopper's last 5 searches, in their browser only. Off by default for privacy (D-004). |
 | `theme_form_takeover` | `no` | yes/no | Replace a classic theme's `get_search_form()` with the block's form. |
+
+A block or shortcode also takes `mode` (`field`, the default, or `button`: an icon that opens the same form in a modal dialog, full screen on a phone; D-099). It is set per instance, with no site-wide setting.
 
 ## Analytics
 

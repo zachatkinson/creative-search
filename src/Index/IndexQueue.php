@@ -33,6 +33,8 @@ final class IndexQueue {
 	public const INDEX_TERMS    = 'csearch_job_index_terms';
 	public const TERM_PRODUCTS  = 'csearch_job_term_products';
 	public const UPGRADE        = 'csearch_job_upgrade';
+	public const INDEX_CONTENT  = 'csearch_job_index_content';
+	public const CONTENT_TYPE   = 'csearch_job_content_type';
 	public const BATCH          = 100;
 	public const PRIORITY       = 20;
 
@@ -83,6 +85,20 @@ final class IndexQueue {
 	 * @var array<string, array<int, true>>
 	 */
 	private array $termProducts = array();
+
+	/**
+	 * Post and page ids to index or remove, one job each.
+	 *
+	 * @var array<int, true>
+	 */
+	private array $content = array();
+
+	/**
+	 * Post types switched on or off: each walked in jobs of 100.
+	 *
+	 * @var array<string, true>
+	 */
+	private array $contentTypes = array();
 
 	/**
 	 * Products being saved: id to true (only stock changed), false (more changed) or null (no property changed,
@@ -246,9 +262,36 @@ final class IndexQueue {
 	}
 
 	/**
+	 * A post or page was saved, published, unpublished, trashed or deleted: index it or remove it.
+	 *
+	 * @param int $postId Post id.
+	 */
+	public function content( int $postId ): void {
+		if ( $postId <= 0 ) {
+			return;
+		}
+		$this->content[ $postId ] = true;
+		$this->attach();
+	}
+
+	/**
+	 * A post type was switched on or off in the settings: its posts are indexed, or its documents removed, in
+	 * jobs of 100.
+	 *
+	 * @param string $postType Post type.
+	 */
+	public function contentType( string $postType ): void {
+		if ( null === ContentReader::typeOf( $postType ) ) {
+			return;
+		}
+		$this->contentTypes[ $postType ] = true;
+		$this->attach();
+	}
+
+	/**
 	 * What is waiting, for the tests and the inline path.
 	 *
-	 * @return array{products: int[], bulk: int[], stock: int[], terms: array<string, int[]>, term_taxonomies: array<string, int[]>, term_products: array<string, int[]>}
+	 * @return array{products: int[], bulk: int[], stock: int[], terms: array<string, int[]>, term_taxonomies: array<string, int[]>, term_products: array<string, int[]>, content: int[], content_types: string[]}
 	 */
 	public function pending(): array {
 		return array(
@@ -258,6 +301,8 @@ final class IndexQueue {
 			'terms'           => array_map( 'array_keys', $this->terms ),
 			'term_taxonomies' => array_map( 'array_keys', $this->termTaxonomies ),
 			'term_products'   => array_map( 'array_keys', $this->termProducts ),
+			'content'         => array_keys( $this->content ),
+			'content_types'   => array_keys( $this->contentTypes ),
 		);
 	}
 
@@ -271,6 +316,8 @@ final class IndexQueue {
 		$this->terms          = array();
 		$this->termTaxonomies = array();
 		$this->termProducts   = array();
+		$this->content        = array();
+		$this->contentTypes   = array();
 		$this->stockOnly      = array();
 		$this->unclear        = array();
 		$this->attached       = false;
@@ -311,6 +358,12 @@ final class IndexQueue {
 			foreach ( $termIds as $termId ) {
 				self::schedule( self::TERM_PRODUCTS, array( $taxonomy, $termId, 0 ) );
 			}
+		}
+		foreach ( $pending['content'] as $postId ) {
+			self::schedule( self::INDEX_CONTENT, array( $postId ) );
+		}
+		foreach ( $pending['content_types'] as $postType ) {
+			self::schedule( self::CONTENT_TYPE, array( $postType, 0 ) );
 		}
 	}
 
@@ -378,7 +431,7 @@ final class IndexQueue {
 	/**
 	 * The jobs a WP-CLI request would have queued, run now.
 	 *
-	 * @param array{products: int[], bulk: int[], stock: int[], terms: array<string, int[]>, term_taxonomies: array<string, int[]>, term_products: array<string, int[]>} $pending What was collected.
+	 * @param array{products: int[], bulk: int[], stock: int[], terms: array<string, int[]>, term_taxonomies: array<string, int[]>, term_products: array<string, int[]>, content: int[], content_types: string[]} $pending What was collected.
 	 */
 	public function runInline( array $pending ): void {
 		foreach ( array_merge( $pending['products'], $pending['bulk'] ) as $productId ) {
@@ -407,6 +460,15 @@ final class IndexQueue {
 					$full  = count( $ids ) === self::BATCH;
 				} while ( $full );
 			}
+		}
+		foreach ( $pending['content'] as $postId ) {
+			$this->indexer->indexContent( $postId );
+		}
+		foreach ( $pending['content_types'] as $postType ) {
+			$after = 0;
+			do {
+				$after = $this->indexer->syncContentType( $postType, $after, self::BATCH );
+			} while ( null !== $after );
 		}
 	}
 

@@ -45,6 +45,49 @@ if ( ! get_page_by_path( 'search-block' ) ) {
 	);
 }
 
+// Button mode (D-099): the same block as an icon that opens a dialog.
+if ( ! get_page_by_path( 'search-button' ) ) {
+	wp_insert_post(
+		array(
+			'post_type'    => 'page',
+			'post_status'  => 'publish',
+			'post_name'    => 'search-button',
+			'post_title'   => 'Search button',
+			'post_content' => '<!-- wp:paragraph --><p>Above the button.</p><!-- /wp:paragraph --><!-- wp:creative-search/search {"mode":"button"} /-->',
+		)
+	);
+}
+
+// Pages and posts in the search (D-093, Skatehouse handoff item 7), and the no-results links (D-096).
+$csearch_content_new = false;
+foreach (
+	array(
+		array( 'page', 'size-guide', 'Size guide', 'Deck widths from 7.5″ to 9″, and which width suits which shoe size.' ),
+		array( 'page', 'shipping-and-returns', 'Shipping and returns', 'Orders ship the next business day. Returns within 30 days.' ),
+		array( 'post', 'choosing-a-deck', 'Choosing your first deck', 'Width matters more than the brand when you choose a deck.' ),
+	) as $csearch_content
+) {
+	if ( get_page_by_path( $csearch_content[1], OBJECT, $csearch_content[0] ) ) {
+		continue;
+	}
+	wp_insert_post(
+		array(
+			'post_type'    => $csearch_content[0],
+			'post_status'  => 'publish',
+			'post_name'    => $csearch_content[1],
+			'post_title'   => $csearch_content[2],
+			'post_content' => '<!-- wp:paragraph --><p>' . $csearch_content[3] . '</p><!-- /wp:paragraph -->',
+		)
+	);
+	$csearch_content_new = true;
+}
+if ( $csearch_content_new ) {
+	Settings::set( 'index_pages', 'yes' );
+	Settings::set( 'index_posts', 'yes' );
+	$csearch_help = get_page_by_path( 'shipping-and-returns' );
+	Settings::set( 'help_page', $csearch_help instanceof WP_Post ? $csearch_help->ID : 0 );
+}
+
 // The French run (tests/e2e/french.spec.ts): products answer in French too (the must-use plugin in
 // tests/e2e/fixtures/french.php reads this option on every request; this process adds its filter itself).
 $csearch_french_new = 'yes' !== get_option( 'csearch_e2e_french' );
@@ -54,9 +97,9 @@ Plugin::container()->get( \CreativeBranding\Search\Index\Languages::class )->flu
 Plugin::container()->get( \CreativeBranding\Search\Index\AnalyzerFactory::class )->flush();
 
 if ( wc_get_product_id_by_sku( 'KAZ-DEA-00001' ) ) {
-	if ( $csearch_french_new ) {
+	if ( $csearch_french_new || $csearch_content_new ) {
 		Plugin::container()->get( Reindex::class )->runInline();
-		echo "present, reindexed in French\n";
+		echo "present, reindexed\n";
 		return;
 	}
 	echo "present\n";
