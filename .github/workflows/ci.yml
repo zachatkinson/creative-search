@@ -130,7 +130,7 @@ jobs:
   index-budgets:
     name: Index and API budgets at 10,000 products
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2

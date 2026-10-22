@@ -22,10 +22,12 @@ Milestone 8, Languages and 1.0. The shop works in French end to end, the plugin 
 - Up from the field with no suggestion chosen went to the second-to-last row; it goes to the last, as the APG pattern says (D-079).
 
 ### Changed
-- A search reads only the SKU key it compares (the query's), not every SKU key of every matching product, and lets go of wpdb's copy of each result. At 10,000 products, `/suggest` p95 cold fell from 214 ms to 81 ms and `/search` from 209 ms to 77 ms (D-085).
-
-### Known issues
-- At 10,000 products a cold suggestion peaks at 8.4 MB above WordPress's baseline at p95, against the spec's 4 MB (D-085). At Skatehouse's size (300 products) it is 0.44 MB.
+- A search reads only the SKU key it compares (the query's), not every SKU key of every matching product, and lets go of wpdb's copy of each result (D-085).
+- Products are ranked by one statement in the database, as the spec describes: only the page of results reaches PHP, so memory no longer grows with the number of matches. `explain` keeps the ranking in PHP for its full breakdown, and a parity test holds the two to the same ids, order and totals over about 870 queries (D-086).
+- Each term's document count is stored per generation and language (`csearch_term_stats`, a seventh table) instead of counted on every search, and each posting carries its document's language and kind under a primary key that leads with them, so the search reads its postings from the index alone (D-087).
+- At 10,000 products, `/suggest` p95 cold went from 214 ms to 44 ms, `/search` from 209 ms to 43 ms, and a cold suggestion's memory from 14.5 MB to 1.7 MB, all within the spec's budgets.
+- Schema 2: `csearch_documents.name_key`, the postings' `lang` and `product`, and `csearch_term_stats`. An index built before it is migrated in place by a background job (or the first admin request, `wp csearch` command or activation) after the update, then rebuilt in the background. Until the migration is done, searches answer as 0.7.0 did and index writes wait; a migration cut off halfway resumes (D-090).
+- The mutation testing reaches the SQL builders: `composer infection:sql` runs Infection inside wp-env's tests container against the integration tests that hold them (D-088).
 
 ## [0.7.0] - 2026-10-21
 

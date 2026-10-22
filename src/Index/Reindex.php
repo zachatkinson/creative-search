@@ -9,9 +9,11 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Index;
 
+use CreativeBranding\Search\Install\Upgrader;
 use CreativeBranding\Search\Repository\DocumentRepository;
 use CreativeBranding\Search\Repository\ProductIdRepository;
 use CreativeBranding\Search\Support\Options;
+use RuntimeException;
 use Throwable;
 use WP_Term;
 
@@ -62,6 +64,29 @@ final class Reindex {
 	}
 
 	/**
+	 * Owe a full rebuild after a schema upgrade, and queue it. The option is 0 until a reindex starts, then that
+	 * reindex's generation; only that generation going live settles the debt, so neither a reindex begun before
+	 * the upgrade nor one cancelled or abandoned does (generation numbers are reused after an abandon, so they
+	 * cannot be compared, D-090).
+	 */
+	public function owe(): void {
+		update_option( Options::REBUILD_OWED, 0, false );
+		$this->queueOwed();
+	}
+
+	/**
+	 * Queue the rebuild a schema upgrade owes, unless one is running or waiting (D-090).
+	 *
+	 * @return bool Whether it was queued now.
+	 */
+	public function queueOwed(): bool {
+		if ( false === get_option( Options::REBUILD_OWED, false ) || ! IndexQueue::available() ) {
+			return false;
+		}
+		return $this->queue();
+	}
+
+	/**
 	 * The first build, queued once ever: on activation, or on the first admin request after it when Action
 	 * Scheduler was not ready at activation.
 	 *
@@ -86,6 +111,9 @@ final class Reindex {
 			return null;
 		}
 		$generation = $this->state->begin( $this->products->publishedCount() );
+		if ( false !== get_option( Options::REBUILD_OWED, false ) ) {
+			update_option( Options::REBUILD_OWED, $generation, false ); // This one settles it, if it goes live.
+		}
 		return array( self::BATCH_ACTION, array( $generation, 0 ) );
 	}
 
@@ -151,6 +179,10 @@ final class Reindex {
 		}
 		if ( count( $terms ) < self::BATCH ) {
 			$previous = $this->state->switchLive();
+			$owed     = get_option( Options::REBUILD_OWED, false );
+			if ( is_numeric( $owed ) && (int) $owed === $generation ) {
+				delete_option( Options::REBUILD_OWED ); // Built after the upgrade, so every document has its name key.
+			}
 			wp_cache_flush_group( Options::CACHE_GROUP );
 			/**
 			 * The index switched to a new generation after a full reindex.
@@ -180,7 +212,9 @@ final class Reindex {
 		$ids = $this->documents->idsInGeneration( $generation, self::CLEANUP_BATCH );
 		$this->indexer->removeDocuments( $ids );
 		if ( count( $ids ) < self::CLEANUP_BATCH ) {
+			$this->indexer->forgetGeneration( $generation );
 			$this->state->cleaned();
+			$this->queueOwed();
 			return null;
 		}
 		return array( self::CLEANUP, array( $generation, $round + 1 ) );
@@ -217,6 +251,9 @@ final class Reindex {
 	 * @return Job|null
 	 */
 	public function run( string $hook, array $args ): ?array {
+		if ( Upgrader::needed() && ! Upgrader::maybeUpgrade() && Upgrader::needed() ) {
+			return array( $hook, $args ); // Another request is upgrading the schema: this step waits for it (D-090).
+		}
 		switch ( $hook ) {
 			case self::START:
 				return $this->start();
@@ -250,8 +287,12 @@ final class Reindex {
 	 *
 	 * @param callable|null $afterStep Called after each job with the state.
 	 * @return bool False when a reindex was already running.
+	 * @throws RuntimeException While another request upgrades the schema.
 	 */
 	public function runInline( ?callable $afterStep = null ): bool {
+		if ( Upgrader::needed() && ! Upgrader::maybeUpgrade() && Upgrader::needed() ) {
+			throw new RuntimeException( esc_html__( 'The search index is being upgraded by another request. Try again in a few minutes.', 'creative-search' ) );
+		}
 		$this->unqueueStart();
 		$job = $this->start();
 		if ( null === $job ) {

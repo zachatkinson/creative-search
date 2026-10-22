@@ -142,7 +142,7 @@ final class ToolsTab {
 		if ( '' === $query ) {
 			return;
 		}
-		$result = $this->search->run( $query, $lang, self::TEST_LIMIT, Settings::TERMS_MAX );
+		$result = $this->search->run( $query, $lang, self::TEST_LIMIT, Settings::TERMS_MAX, true, true );
 		$hits   = array_merge( Explanation::rows( $result->products ), Explanation::rows( $result->terms ) );
 		echo '<p role="status">';
 		if ( null !== $result->corrected ) {

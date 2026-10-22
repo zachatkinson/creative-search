@@ -53,7 +53,13 @@ final class Activator {
 	 * Activate the current site.
 	 */
 	public static function site(): void {
-		Schema::install();
+		// Behind the upgrader's lock when an upgrade is due, so a reactivation never migrates beside a job that
+		// is already migrating (D-090); when the schema is current, dbDelta() only puts back anything missing.
+		if ( Upgrader::needed() ) {
+			Upgrader::maybeUpgrade();
+		} else {
+			Schema::install();
+		}
 		if ( false === get_option( Options::SETTINGS, false ) ) {
 			add_option( Options::SETTINGS, Settings::defaults(), '', true );
 		}

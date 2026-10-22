@@ -140,7 +140,7 @@ add_action( 'csearch_index_switched', static fn( int $generation ) => error_log(
 
 ### Jobs (Action Scheduler, group `csearch`)
 
-Internal, listed so an owner reading **Tools → Scheduled Actions** knows them; not for plugins to call. `csearch_job_index_product` (one product), `csearch_job_index_products` (up to 100, after a term is deleted), `csearch_job_update_stock` (a stock-only change), `csearch_job_index_term` and `csearch_job_index_terms` (category, tag and brand documents), `csearch_job_term_products` (a renamed term's products, 100 a job), `csearch_reindex`, `csearch_reindex_batch`, `csearch_reindex_terms` and `csearch_reindex_cleanup` (a full reindex). D-042 explains the `csearch_job_` prefix.
+Internal, listed so an owner reading **Tools → Scheduled Actions** knows them; not for plugins to call. `csearch_job_index_product` (one product), `csearch_job_index_products` (up to 100, after a term is deleted), `csearch_job_update_stock` (a stock-only change), `csearch_job_index_term` and `csearch_job_index_terms` (category, tag and brand documents), `csearch_job_term_products` (a renamed term's products, 100 a job), `csearch_reindex`, `csearch_reindex_batch`, `csearch_reindex_terms` and `csearch_reindex_cleanup` (a full reindex). `csearch_job_upgrade` (the schema upgrade, queued by any request while it is due, D-090). D-042 explains the `csearch_job_` prefix.
 
 ### WP-CLI
 

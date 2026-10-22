@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- Infection's view of the integration suite (D-048): the same bootstrap, run from this directory inside the tests container, so Infection reads the sources and the coverage against one base. -->
+<phpunit
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
+	bootstrap="../../tests/bootstrap-integration.php"
+	beStrictAboutTestsThatDoNotTestAnything="true"
+>
+	<testsuites>
+		<testsuite name="integration">
+			<directory suffix="Test.php">../../tests/Integration</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>

@@ -22,18 +22,19 @@ final class Tables {
 	public const TERMS     = 'terms';
 	public const POSTINGS  = 'postings';
 	public const TRIGRAMS  = 'trigrams';
+	public const STATS     = 'term_stats';
 	public const SYNONYMS  = 'synonyms';
 	public const LOG       = 'log';
 
 	public const PREFIX = 'csearch_';
 
 	/**
-	 * Every plugin table, in creation order (the index's four, then the owner's two).
+	 * Every plugin table, in creation order (the index's five, then the owner's two).
 	 *
 	 * @return string[]
 	 */
 	public static function all(): array {
-		return array( self::DOCUMENTS, self::TERMS, self::POSTINGS, self::TRIGRAMS, self::SYNONYMS, self::LOG );
+		return array( self::DOCUMENTS, self::TERMS, self::POSTINGS, self::TRIGRAMS, self::STATS, self::SYNONYMS, self::LOG );
 	}
 
 	/**
@@ -72,6 +73,13 @@ final class Tables {
 	 */
 	public static function trigrams(): string {
 		return self::name( self::TRIGRAMS );
+	}
+
+	/**
+	 * The per-language term statistics table name.
+	 */
+	public static function stats(): string {
+		return self::name( self::STATS );
 	}
 
 	/**

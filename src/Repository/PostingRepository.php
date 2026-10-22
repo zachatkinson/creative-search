@@ -17,7 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Owns `csearch_postings`: which terms are in which document's fields, how often and where first.
+ * Owns `csearch_postings`: which terms are in which document's fields, how often and where first. Each row
+ * carries its document's language and kind (D-087), so a lookup by term reads the primary key alone.
  */
 final class PostingRepository extends Repository {
 
@@ -31,10 +32,12 @@ final class PostingRepository extends Repository {
 	 *
 	 * @param int                                              $documentId Document id.
 	 * @param int                                              $generation Generation.
+	 * @param string                                           $lang       The document's language.
+	 * @param bool                                             $product    Whether the document is a product.
 	 * @param array<string, array<int, array{0: int, 1: int}>> $postings   Term to field to [tf, first position].
 	 * @param array<string, int>                               $termIds    Term to id.
 	 */
-	public function write( int $documentId, int $generation, array $postings, array $termIds ): void {
+	public function write( int $documentId, int $generation, string $lang, bool $product, array $postings, array $termIds ): void {
 		$rows = array();
 		foreach ( $postings as $term => $byField ) {
 			$termId = $termIds[ (string) $term ] ?? null;
@@ -42,30 +45,35 @@ final class PostingRepository extends Repository {
 				continue;
 			}
 			foreach ( $byField as $field => [ $tf, $position ] ) {
-				$rows[] = array( $termId, $documentId, $field, $generation, min( $tf, 65535 ), min( $position, 65535 ) );
+				$rows[] = array( $termId, $documentId, $field, $generation, $lang, $product ? 1 : 0, min( $tf, 65535 ), min( $position, 65535 ) );
 			}
 		}
 		foreach ( array_chunk( $rows, self::CHUNK ) as $chunk ) {
-			$values = implode( ',', array_fill( 0, count( $chunk ), '(%d,%d,%d,%d,%d,%d)' ) );
+			$values = implode( ',', array_fill( 0, count( $chunk ), '(%d,%d,%d,%d,%s,%d,%d,%d)' ) );
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the list holds placeholders only.
-			$this->run( $this->prepare( "INSERT INTO %i (term_id, document_id, field, generation, tf, first_pos) VALUES {$values}", Tables::postings(), ...array_merge( ...$chunk ) ) );
+			$this->run( $this->prepare( "INSERT INTO %i (term_id, document_id, field, generation, lang, product, tf, first_pos) VALUES {$values}", Tables::postings(), ...array_merge( ...$chunk ) ) );
 		}
 	}
 
 	/**
-	 * The terms of some documents, each with how many of those documents carry it.
+	 * The terms of some documents, each with how many of those documents carry it, per generation and language.
 	 *
 	 * @param int[] $documentIds Document ids.
-	 * @return array<int, int> Term id to documents.
+	 * @return array<int, array{term_id: int, generation: int, lang: string, n: int}>
 	 */
 	public function termCountsOf( array $documentIds ): array {
 		if ( array() === $documentIds ) {
 			return array();
 		}
-		$rows = $this->rows( $this->prepare( 'SELECT term_id, COUNT(DISTINCT document_id) AS n FROM %i WHERE document_id IN (' . self::ints( $documentIds ) . ') GROUP BY term_id', Tables::postings() ) );
+		$rows = $this->rows( $this->prepare( 'SELECT term_id, generation, lang, COUNT(DISTINCT document_id) AS n FROM %i WHERE document_id IN (' . self::ints( $documentIds ) . ') GROUP BY term_id, generation, lang', Tables::postings() ) );
 		$out  = array();
 		foreach ( $rows as $row ) {
-			$out[ (int) $row['term_id'] ] = (int) $row['n'];
+			$out[] = array(
+				'term_id'    => (int) $row['term_id'],
+				'generation' => (int) $row['generation'],
+				'lang'       => (string) $row['lang'],
+				'n'          => (int) $row['n'],
+			);
 		}
 		return $out;
 	}
@@ -96,15 +104,13 @@ final class PostingRepository extends Repository {
 			return array();
 		}
 		$list = self::strings( count( $terms ) );
-		$type = $products ? '=' : '<>';
 		$rows = $this->rows(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the list holds placeholders only; the operator is one of two literals.
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the list holds placeholders only.
 			$this->prepare(
-				"SELECT t.term, p.document_id, p.field, p.tf, p.first_pos FROM %i p INNER JOIN %i t ON t.id = p.term_id INNER JOIN %i d ON d.id = p.document_id WHERE t.term IN ({$list}) AND p.generation = %d AND d.lang = %s AND d.type {$type} %s ORDER BY p.document_id, p.field",
-				Tables::postings(),
+				"SELECT t.term, p.document_id, p.field, p.tf, p.first_pos FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE t.term IN ({$list}) ORDER BY p.document_id, p.field",
 				Tables::terms(),
-				Tables::documents(),
-				...array_merge( array_values( $terms ), array( $generation, $lang, 'product' ) )
+				Tables::postings(),
+				...array_merge( array( $generation, $lang, $products ? 1 : 0 ), array_values( $terms ) )
 			)
 		);
 		$out = array();
@@ -112,6 +118,27 @@ final class PostingRepository extends Repository {
 			$out[ (string) $row['term'] ][ (int) $row['document_id'] ][ (int) $row['field'] ] = array( (int) $row['tf'], (int) $row['first_pos'] );
 		}
 		return $out;
+	}
+
+	/**
+	 * How many products of one language carry any of some terms, in a generation.
+	 *
+	 * @param string[] $terms      Folded terms.
+	 * @param int      $generation Generation.
+	 * @param string   $lang       Language code.
+	 */
+	public function productCount( array $terms, int $generation, string $lang ): int {
+		if ( array() === $terms ) {
+			return 0;
+		}
+		return (int) $this->value(
+			$this->prepare(
+				'SELECT COUNT(DISTINCT p.document_id) FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = 1 WHERE t.term IN (' . self::strings( count( $terms ) ) . ')',
+				Tables::terms(),
+				Tables::postings(),
+				...array_merge( array( $generation, $lang ), array_values( $terms ) )
+			)
+		);
 	}
 
 	/**
@@ -150,5 +177,12 @@ final class PostingRepository extends Repository {
 	 */
 	public function count( int $generation ): int {
 		return (int) $this->value( $this->prepare( 'SELECT COUNT(*) FROM %i WHERE generation = %d', Tables::postings(), $generation ) );
+	}
+
+	/**
+	 * Refresh the table's index statistics after a reindex has rewritten it (D-089).
+	 */
+	public function analyze(): void {
+		$this->run( $this->prepare( 'ANALYZE TABLE %i', Tables::postings() ) );
 	}
 }

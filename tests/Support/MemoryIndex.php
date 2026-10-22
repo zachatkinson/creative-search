@@ -11,6 +11,8 @@ namespace CreativeBranding\Search\Tests\Support;
 
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\IndexStore;
+use CreativeBranding\Search\Domain\RankPlan;
+use CreativeBranding\Search\Domain\Ranker;
 use CreativeBranding\Search\Domain\Trigrams;
 
 /**
@@ -60,6 +62,13 @@ final class MemoryIndex implements IndexStore {
 	 * @var string[]
 	 */
 	public array $keysAsked = array();
+
+	/**
+	 * The plans rank() was asked to run, in order.
+	 *
+	 * @var RankPlan[]
+	 */
+	public array $plans = array();
 
 	/**
 	 * Add a document with its postings.
@@ -183,5 +192,41 @@ final class MemoryIndex implements IndexStore {
 			}
 		}
 		return $out;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function frequencies( array $terms, string $lang ): array {
+		$out = array();
+		foreach ( array( true, false ) as $products ) {
+			foreach ( $this->postings( $terms, $lang, $products ) as $term => $byDoc ) {
+				$out[ $term ] = ( $out[ $term ] ?? 0 ) + count( $byDoc );
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function productCount( array $terms, string $lang ): int {
+		$set = array();
+		foreach ( $this->postings( $terms, $lang, true ) as $byDoc ) {
+			$set += $byDoc;
+		}
+		return count( $set );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function rank( RankPlan $plan ): array {
+		$this->plans[] = $plan;
+		return ( new Ranker() )->rank(
+			$plan,
+			$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, true ),
+			fn( array $ids, string $key ): array => $this->documents( $ids, $key )
+		);
 	}
 }

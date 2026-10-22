@@ -1,0 +1,39 @@
+{
+	// The SQL builders, mutated inside wp-env's tests container against the integration tests that hold them (D-048):
+	// `composer infection:sql`. The tests share one database, so one thread.
+	"$schema": "../../vendor/infection/infection/resources/schema.json",
+	"source": {
+		"directories": [
+			"../../src/Repository"
+		],
+		"excludes": [
+			"DocumentRepository.php",
+			"IndexRepository.php",
+			"LogRepository.php",
+			"OptionRepository.php",
+			"ProductIdRepository.php",
+			"SynonymRepository.php",
+			"TermRepository.php",
+			"TrigramRepository.php",
+			"index.php"
+		]
+	},
+	// Infection loads each class to inspect it; the plugin's files exit without ABSPATH, so its own process
+	// takes the unit suite's bootstrap. The mutants run under the integration bootstrap in phpunit.xml.
+	"bootstrap": "../../tests/bootstrap.php",
+	"timeout": 120,
+	"logs": {
+		"text": "../../tmp/infection-sql.log",
+		"summary": "../../tmp/infection-sql-summary.log"
+	},
+	"tmpDir": "../../tmp/infection-sql",
+	"phpUnit": {
+		"configDir": ".",
+		"customPath": "vendor/bin/phpunit"
+	},
+	"testFramework": "phpunit",
+	"testFrameworkOptions": "--group=sql-mutation",
+	"mutators": {
+		"@default": true
+	}
+}

@@ -50,6 +50,11 @@ The plugin's repository (docs/BENCHMARK.md) has a feature-by-feature comparison 
 
 WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi deck"`.
 
+== Upgrade Notice ==
+
+= 1.0.0 =
+Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
+
 == Changelog ==
 
 = 1.0.0 =

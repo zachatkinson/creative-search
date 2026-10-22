@@ -64,19 +64,23 @@ Same machine and environment as v0.6.0. Milestone 8 changed no ranking; the 300-
 | Extra queries on a results page, warm | 1 (asserted, green) | 1 |
 | Every search statement has a key (`QueriesExplainTest`) | yes (docs/QUERIES.md) | — |
 
-### At 10,000 products (D-085)
+### At 10,000 products (D-085, D-086, D-087)
 
-The spec's size: 10,000 generated products with their variations, English and French, loaded through WooCommerce's CRUD into the test database (loading takes about 44 minutes on this Mac; the run is `CSEARCH_BENCH_PRODUCTS=10000 composer test:integration -- --group benchmark`). Measured on 2026-10-22 after the fixes in D-085; the first run's numbers are given for comparison.
+The spec's size: 10,000 generated products with their variations, English and French, loaded through WooCommerce's CRUD (loading takes between 44 minutes and 3 hours on this Mac, depending on what else runs; the test-database run is `CSEARCH_BENCH_PRODUCTS=10000 composer test:integration -- --group benchmark`). The first two columns were measured in the test database on 2026-10-22; the last on the development site's committed 10,000-product catalogue the same day, with the same 50 golden queries through `rest_do_request()`, three passes (`tmp/api.php`, not shipped), after products were ranked in the database (D-086) and the term counts stored and the postings keyed by language and kind (D-087).
 
-| What | First run | After D-085 | Budget |
-| --- | --- | --- | --- |
-| Full reindex, 10,000 products (10,051 documents, 564,991 postings, 63,575 terms) | 99.9 s, 10.0 ms a product | not re-run (indexing unchanged) | 300 s |
-| `/suggest` p95, cold (50 golden queries) | 213.6 ms | 81.4 ms | 100 ms |
-| `/suggest` p95, warm | 0.5 ms | 0.4 ms | 60 ms |
-| `/search` p95 | 209.2 ms | 76.9 ms | 100 ms |
-| Memory, p95 of a cold suggest | 14.45 MB | **8.41 MB: missed** | 4 MB |
+| What | First run | After D-085 | After D-086 and D-087 | Budget |
+| --- | --- | --- | --- | --- |
+| Full reindex, 10,000 products | 99.9 s, 10.0 ms a product | not re-run | 224.8 s for `wp csearch reindex --inline`, which also deleted the previous 1.1 million postings | 300 s |
+| `/suggest` p95, cold (50 golden queries) | 213.6 ms | 81.4 ms | **44.3 ms** | 100 ms |
+| `/suggest` p95, warm | 0.5 ms | 0.4 ms | 0.4 ms | 60 ms |
+| `/search` p95 | 209.2 ms | 76.9 ms | **43.2 ms** | 100 ms |
+| Memory, p95 of a cold suggest | 14.45 MB | 8.41 MB: missed | **1.69 MB** | 4 MB |
 
-The first run shared the machine with a second 10,000-product load, so its times are high; its memory is not affected by that. The golden set's expectations are checked at 300 products only (D-032).
+The first run shared the machine with a second 10,000-product load, so its times are high; its memory is not affected by that. The golden set's expectations are checked at 300 products only (D-032). The search's own work (`SearchService::run()`, `tmp/profile.php`) has a p95 of 51.1 ms and 0.38 MB over the golden set; its slowest query is the nine-word one, at 134.5 ms, nearly all of it the ranking statement over the products that carry "deck" and "skate".
+
+The index at this size, both languages: 20,104 documents, 1,144,797 postings, 64,171 terms and 127,157 term counts. On disk (data and keys): postings 292.6 MB, term counts 10.5 MB, documents 8.1 MB, terms 8.0 MB, trigrams 3.5 MB. The spec estimated "a few hundred megabytes".
+
+On MySQL 8.0 (the `csearch-mysql80` leg, 300 products), where CI had measured 227 ms for `/suggest` cold before D-086: 39.3 ms cold, 0.5 ms warm, `/search` 35.6 ms, 0.32 MB.
 
 ## v1.0.0: the FiboSearch comparison (D-005, D-081)
 

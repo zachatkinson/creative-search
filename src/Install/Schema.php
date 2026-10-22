@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Creates and upgrades the six plugin tables with dbDelta() (spec: Data model).
+ * Creates and upgrades the seven plugin tables with dbDelta() (spec: Data model).
  *
  * Keys are written exactly as dbDelta() parses them (two spaces after PRIMARY KEY, `UNIQUE KEY name (cols)`,
  * `KEY name (cols)`). Integer types carry the display width SHOW COLUMNS reports (bigint(20) unsigned,
@@ -31,7 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class Schema {
 
-	public const DB_VERSION = '1';
+	public const DB_VERSION = '2';
 
 	/**
 	 * Create or upgrade every table. Idempotent.
@@ -40,9 +40,19 @@ final class Schema {
 	 */
 	public static function install(): array {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$toTwo = version_compare( Upgrader::stored(), '2', '<' );
+		if ( $toTwo ) {
+			Migration::postingsToTwo();
+		}
 		$result = dbDelta( self::sql() );
-		// Autoloaded: Install\Upgrader compares it on admin requests.
-		update_option( Options::DB_VERSION, self::DB_VERSION, true );
+		if ( $toTwo ) {
+			Migration::statsToTwo();
+		}
+		// Autoloaded: Install\Upgrader compares it on every request. Recorded only once the tables are what the
+		// version says, so an upgrade cut off halfway runs again (D-090).
+		if ( Migration::complete() ) {
+			update_option( Options::DB_VERSION, self::DB_VERSION, true );
+		}
 		return array_values( $result );
 	}
 
@@ -57,6 +67,7 @@ final class Schema {
 		$terms     = Tables::terms();
 		$postings  = Tables::postings();
 		$trigrams  = Tables::trigrams();
+		$stats     = Tables::stats();
 		$synonyms  = Tables::synonyms();
 		$log       = Tables::log();
 
@@ -68,6 +79,7 @@ CREATE TABLE {$documents} (
   object_id bigint(20) unsigned NOT NULL,
   lang varchar(8) NOT NULL DEFAULT 'en',
   title varchar(255) NOT NULL,
+  name_key varchar(255) NOT NULL DEFAULT '',
   url varchar(1024) NOT NULL,
   image_id bigint(20) unsigned NULL,
   price_min decimal(19,4) NULL,
@@ -93,9 +105,11 @@ CREATE TABLE {$postings} (
   document_id bigint(20) unsigned NOT NULL,
   field tinyint(3) unsigned NOT NULL,
   generation int(10) unsigned NOT NULL DEFAULT 1,
+  lang varchar(8) NOT NULL DEFAULT '',
+  product tinyint(1) NOT NULL DEFAULT 0,
   tf smallint(5) unsigned NOT NULL DEFAULT 1,
   first_pos smallint(5) unsigned NOT NULL DEFAULT 0,
-  PRIMARY KEY  (term_id,document_id,field),
+  PRIMARY KEY  (term_id,generation,lang,product,document_id,field),
   KEY document_id (document_id),
   KEY generation (generation)
 ) {$charset};
@@ -103,6 +117,13 @@ CREATE TABLE {$trigrams} (
   trigram char(3) NOT NULL,
   term_id bigint(20) unsigned NOT NULL,
   PRIMARY KEY  (trigram,term_id)
+) {$charset};
+CREATE TABLE {$stats} (
+  term_id bigint(20) unsigned NOT NULL,
+  generation int(10) unsigned NOT NULL,
+  lang varchar(8) NOT NULL,
+  df int(10) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY  (term_id,generation,lang)
 ) {$charset};
 CREATE TABLE {$synonyms} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

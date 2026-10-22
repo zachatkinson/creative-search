@@ -299,7 +299,7 @@ The filter receives and returns an array of language code to readers: `product` 
 
 **Why:** Same reason as D-019: a mutation tool can only judge code its test runner can execute.
 
-**Spec deviation, flagged for Zach:** the spec asks for no escaped mutants in the SQL builders and 90 % MSI on the rest. Those builders are in `src/Repository`, outside this run, and the unit coverage floor does not measure them either; their checks are the integration tests and the grep gates. Running Infection inside the tests container against PHPUnit 9.6 may be possible and is the way to close this.
+**Spec deviation, flagged for Zach:** the spec asks for no escaped mutants in the SQL builders and 90 % MSI on the rest. Those builders are in `src/Repository`, outside this run, and the unit coverage floor does not measure them either; their checks are the integration tests and the grep gates. Running Infection inside the tests container against PHPUnit 9.6 may be possible and is the way to close this. (Done on 2026-10-22 for the SQL builders: D-088.)
 
 
 ### D-049 · Small choices in the indexer · 2026-10-21
@@ -348,6 +348,8 @@ Each reindex batch carries the last product id it walked and asks `ProductIdRepo
 **Why:** Found in review: with offset paging, trashing a product with a lower id during a reindex shifted every later product down one place, and one was never indexed into the new generation. WooCommerce's product query has no "id greater than" argument; the rules allow SQL in a repository, and listing ids is not reading products.
 
 ### D-055 · A suggest call is several statements, not two · 2026-10-21
+
+**Superseded by D-086 (2026-10-22):** products are now ranked by one statement; the other reads stay as described here.
 
 The spec says a suggest call is "one SQL statement against the index plus one against the documents table". The searcher from milestone 2 asks the store level by level: a cold `/suggest` runs 15 to 18 statements, all on primary or unique keys (the index state, the synonyms, a prefix lookup, the postings of each token's terms for products and for terms, a trigram lookup only when nothing else matched, the document count, the documents and their SKU keys). At 300 products in two languages the golden set's p95 is 6.3 ms cold and 0.4 ms warm against budgets of 100 and 60.
 
@@ -547,8 +549,80 @@ Measured again through the API: `/suggest` p95 cold 81.4 ms (budget 100), warm 0
 
 **Why:** the time fixes are exact and cheap. Meeting 4 MB needs either the spec's in-database scoring, which duplicates the Domain in SQL, or a compact postings structure in the Domain and a streamed read past wpdb. Either is a design change for Zach to choose, not something to slip into the 1.0 milestone overnight. The benchmark still asserts 4 MB, so the 10,000-product CI leg stays red until that choice is made.
 
+### D-086 · Products are ranked by one statement in the database · 2026-10-22
+
+Zach chose the spec's design after D-085: the widening plan runs as one SQL statement. The searcher still decides what to look for in PHP, from small lookups: each token's exact term, spellings, stem, synonyms, prefix terms and typo candidates, and each term's df over the query's language (`IndexStore::frequencies()`, D-050). It hands the store a `Domain\RankPlan`: per token its terms with their match weight and idf, the field weights, the minus words' terms, the quoted phrases, the query's key, hidden-by-SKU, the owner's rules and the limit. `Repository\RankRepository` runs it as one statement with common table expressions, which MySQL 8.0 and MariaDB 10.6 both have:
+
+- per posting, w · m · (1 + ln(1 + tf)) · idf, the best field per token, AND across tokens by `HAVING COUNT(*)`;
+- the phrase bonus and the quoted phrases from each token's first position per field;
+- the exact-SKU bonus and hidden-by-SKU from the `=`-prefixed SKU-key term (D-041);
+- the exact-name bonus from `csearch_documents.name_key`, a column Zach approved (schema 2, the key written at index time);
+- the stock penalty, the owner's boost and rules (through `term_relationships`), the minus words by `NOT EXISTS`;
+- the order (score to six decimals, in stock, sales, newest, id) and the limit.
+
+Only the page of results reaches PHP. The term ids are read first, so the statement joins integers and never compares a literal's collation with a column's. Floats go to SQL in PHP's round-trip form.
+
+`Domain\Ranker` keeps the same ranking in PHP: the in-memory index of the unit suite, and `explain` (`wp csearch explain`, the Tools tab's test search), which needs every part of every score. `RankParityTest` holds the statement to it: the golden set and 240 generated queries (words, prefixes, typos, minus words, quoted phrases, SKUs, both languages), each in three settings rounds (defaults; rules with hidden-by-SKU off; custom weights with it on), about 870 comparisons of ids, order and totals, on every matrix leg. Changing the adjacent-phrase bonus in the SQL by one point failed it at once. `Hit::compare()` compares totals to six decimals, because the two engines sum the same parts in a different order.
+
+The schema moves to version 2. The upgrader now also runs before the indexer writes, because a job or a save can come before any admin request after an update. When it upgrades an index built under schema 1, it queues a rebuild, so every document gets its name key. Until the rebuild finishes, an older document's name key is worked out when it is read, and the statement does not give the exact-name bonus to that document.
+
+**Why:** at 10,000 products, ranking in PHP held every matching product's postings in memory: 8.4 MB at p95 against the spec's 4 MB (D-085). The spec asked for one statement, and D-055 had deviated from it.
+
+### D-087 · Term counts are stored; postings carry their language and kind · 2026-10-22
+
+Zach asked whether the in-database search follows industry practice and approved the two fixes that answered him (a schema change, still schema 2, since 1.0 has not been tagged):
+
+- **`csearch_term_stats` (term, generation, language, df)**, a seventh table. An inverted index keeps a term's document frequency beside its postings (Lucene stores `docFreq` per term); D-044 and D-050 had the searcher count it at query time instead, with `COUNT(DISTINCT)` over every posting of the term joined to its document. The indexer now adds one to each of a document's terms when it writes it and takes them off when it removes it (`Repository\StatRepository`), and drops a row that reaches zero. The search reads the count by its primary key. The dictionary's own `df` still orders prefix candidates and typo candidates.
+- **`csearch_postings.lang` and `.product`**, written with the posting, and a primary key that leads with them: (term, generation, language, kind, document, field). Every postings read of the search (the ranking statement, the category, tag and brand lookups, the retry's product count, the SKU key, the minus words) names a term, a generation, a language and a kind, so it is a range scan of the clustered key; none joins `csearch_documents` to filter any more.
+
+An index built before this is migrated in place (`Install\Migration`, run inside `Schema::install()` so activation and the upgrader both take it): the two columns added and filled from the documents, the primary key replaced (`dbDelta()` never replaces one), then the counts made from the postings. Until the migration is recorded, searches read the index as schema 1 and writes wait (D-090); the rebuild D-086 queues follows. `IndexerTest` holds the counts to a recount from the postings after writes in two languages, a rewrite, a removal and a full reindex with its cleanup; `SchemaTest` migrates a schema-1 table and checks a second `dbDelta()` changes nothing.
+
+**Why:** both are the standard layout for an inverted index, and both take work off the shop's database on every search (no per-search count over the postings of common words, no lookup of each posting's document). The spec names six tables; this adds one for the reason above.
+
+### D-088 · Infection reaches the SQL builders, inside the tests container · 2026-10-22
+
+Zach's answer on D-048 was to try. It works: `composer infection:sql` runs Infection 0.35 inside wp-env's tests container under `phpdbg` (the container has no pcov or Xdebug) against PHPUnit 9.6 and the WordPress suite (`tools/integration/infection.json5` and its `phpunit.xml`), over `src/Repository/RankRepository.php`, `PostingRepository.php`, `StatRepository.php` and their base `Repository.php`. The tests it runs are the ones tagged `@group sql-mutation`: the parity test on 40 products with 60 generated queries and every hidden product's SKU in three settings rounds, the stored-count test, and `PostingRepositoryTest`, which holds the postings reads to a recount (the parity test cannot see them, because both of its sides read through them). One thread, because the tests share one database; about 40 minutes. `SchemaOneReads` (D-090) is left out: it is 0.7.0's postings reads moved into their own class and only runs before an upgrade, and `UpgradeWindowTest` holds it to the schema 2 answers; its test changes the schema, which the mutation run's shared database cannot undo between mutants.
+
+Three things it needed: it runs from `tools/integration/` (Infection resolves the source folders against its config file and the coverage filter against the PHPUnit config's folder, so the two must be one folder); Infection's own process takes the unit bootstrap, because the plugin's files `exit` without `ABSPATH` and that ended Infection silently with code 0; and no exclude may be a suffix of other files (Finder's `notPath()` matches anywhere in the path, so excluding `Repository.php` had excluded every repository).
+
+The result: 324 mutants, 260 killed, 64 escaped, none uncovered (80 % MSI). The first run escaped 74 and showed two real gaps, both closed: `StatRepository::frequencies()` and the postings reads had no direct test (a broken read fed both sides of the parity test alike). The 64 left are equivalent, each read one by one:
+
+- casts PHP makes anyway: a numeric string used as an array key becomes an integer, and `%d` casts what it is given (`(int) $row['document_id']`, `(string) $term` and the like);
+- chunk sizes (500, 1000) moved by one, which only change how many statements a batch takes;
+- `min( $tf, 65535 )` moved by one (no field repeats a term 65,535 times);
+- early returns that skip a statement whose answer is empty anyway (no ids, no term for a token, no rule);
+- `$wpdb->flush()` removed (memory only) and `run()`'s return value (no caller reads it);
+- the hidden-by-SKU flag's `0` becoming `-1` (both are not 1; its `1` becoming `0` was killed);
+- the rule references' parsing (`array_pad`, `explode`'s limit, the `isset … &&` guard) on references that are always well formed, because the settings sanitiser writes them.
+
+**Spec deviation, flagged for Zach:** the spec asks for no escaped mutants in the SQL builders. None of the 64 changes what the shop sees, but they are not zero. Making them zero would mean an ignore list in the config (the Domain run has three such entries, D-030) or code written for the tool. Neither was done without asking.
+
+### D-089 · A reindex refreshes the index statistics of the tables it rewrote · 2026-10-22
+
+When a reindex's cleanup finishes, it runs `ANALYZE TABLE` on `csearch_documents`, `csearch_postings` and `csearch_term_stats` (each repository's own `analyze()`, called from `Indexer::forgetGeneration()`). The query plans in `QueriesExplainTest` showed why: on statistics taken before a bulk rewrite, MariaDB chose to read `csearch_postings` whole for the category lookups and the ranking statement, though the primary key served them; with fresh statistics every postings read is a range of the primary key (docs/QUERIES.md). InnoDB refreshes statistics by itself once a tenth of a table has changed, but in the background and later; refreshing them when the bulk write ends is the usual practice. It runs in the cleanup job, once per reindex, never on a shopper's request.
+
+`ANALYZE TABLE` commits implicitly, which would end the integration suite's per-test transaction, so `IntegrationTestCase` records the tables a statement names and runs a no-op instead; `ReindexTest` asserts the three are refreshed once, after the cleanup. `QueriesExplainTest` waits for InnoDB's own refresh (`mysql.innodb_table_stats`) before it explains. The API benchmark runs the recorded statements on a second connection (`analyzeAside()`), which leaves the test's transaction open: on statistics taken from the emptied tables the planner chose differently and the 300-product `/suggest` p95 went from about 5 ms to 25 ms.
+
+On MySQL before 8.0.24, `ANALYZE TABLE` also evicts the table's definition, so the next statement on it waits for the queries already running on it; the cleanup is a background job and the three tables' queries are short, so the wait is milliseconds. MariaDB and later MySQL do not do this.
+
+**Why:** a search plan should not depend on when the database last sampled a table that a reindex has just replaced.
+
+### D-090 · The window between an update and its schema upgrade · 2026-10-22
+
+The review of D-086 and D-087 found what happens between deploying 1.0.0 over 0.7.0 and the upgrade running. Searches would have run the schema 2 statement against schema 1 tables and found nothing. A migration cut off halfway would never be retried. A write in between would count terms twice or lose them. What was done:
+
+- **Reads:** while `Upgrader::needed()`, `IndexRepository` reads postings, term counts and product counts through `Repository\SchemaOneReads` (the schema 1 joins to the documents) and ranks in PHP (`Ranker`), as 0.7.0 did. `UpgradeWindowTest` holds the answers to six queries identical, in the same order with the same totals, before the upgrade, while it waits and after it.
+- **Writes:** the indexer refuses to write while an upgrade is due and cannot run, with a translated message ("The search index is being upgraded by another request…"). The job is marked failed and Action Scheduler does not retry it: the write is dropped, and the rebuild the upgrade owes writes that product with every other. A full reindex returns the same job, or throws for `wp csearch reindex`. Nothing is half-written.
+- **Who upgrades:** `admin_init`, every `wp csearch` command and activation, as before, now all through the lock (activation used to call `Schema::install()` directly), and a job, `csearch_job_upgrade`, which any request queues once when an upgrade is due, so a shop whose owner does not visit the admin is upgraded on the next Action Scheduler run. A shopper's search never runs it.
+- **Resumable:** `Migration` checks before each step whether it is done: columns added only if missing, rows filled in batches of 5,000 documents with the lock's heartbeat after each, so a long backfill is not taken over as stale; the key swapped only if it differs; the counts remade from the postings. The version is recorded only when `Migration::complete()` sees schema 2 tables, so an upgrade cut off anywhere runs again on the next request. `SchemaTest` cuts it off after the columns and before the key swap, and runs it twice. A request that loaded the version before another finished the upgrade reads it again from the database before and after it takes the lock, so it never runs the migration a second time (`SchemaTest`, the stale version).
+- **The rebuild:** owed as an option (`csearch_rebuild_owed`) when an upgrade from schema 1 completes. The option is 0 until a reindex starts, then holds that reindex's generation. The rebuild is queued once nothing is running, and again after any reindex's cleanup while it is owed. Only that generation going live settles it (generation numbers are reused after an abandon, so they cannot be compared), so neither a reindex that was already running (it started before the name keys existed) nor an owed rebuild that is cancelled or abandoned loses it.
+- **The counts:** written after the postings they count, in the same write, so a failure between the two leaves the counts behind the postings and the next reindex corrects them.
+
+**Why:** a shop must search through an update as it did before it, and an upgrade that stops halfway must finish on its own, without the owner doing anything.
+
 ### Zach's answers on the flagged decisions · 2026-10-22
 
+- **The competitor scan and the Baymard audit (2026-10-22):** Zach wants every gap both found, the ones needing a schema change included (the variation's own photo when a search names it). Planned as 1.1 (posts and pages, plus the small autocomplete and results-page fixes) and 1.2 (the rest), each reviewed and tagged on its own. Posts and pages stay off by default (Claude's recommendation; Zach did not change it). "Why this matched" is the slim version Zach chose: one small line under a result's title, shown only when the match came from something the card does not show (SKU, an attribute value, the description), e.g. "Matches SKU KZ-825"; last in 1.2.
 - **D-001 to D-004:** confirmed (Zach was told that anything not mentioned stands).
 - **D-034:** kept: the retry runs only when the AND finds nothing.
 - **D-048:** try running Infection inside the tests container against the repositories as part of the in-database scoring work (D-086); if that cannot be made to work, the integration tests stay the check for that code.
@@ -557,3 +631,8 @@ Measured again through the API: `/suggest` p95 cold 81.4 ms (budget 100), warm 0
 - **D-062:** confirmed.
 - **D-070:** confirmed: the boost and exclusion stay on the parent product.
 - **The exact-name bonus under in-database scoring:** a `name_key` column on `csearch_documents` is approved (the schema change CLAUDE.md asks about after milestone 1). See D-086.
+- **Stored term counts and the postings' language and kind:** approved ("we should do it - we need to stick to standards and best practices"). See D-087.
+
+### Zach on 1.1 · 2026-10-22
+
+Posts and pages in the results (the spec's 1.1) come after the 1.0 tag, the same day. Zach: posts and pages are both off by default, each with a toggle in the admin. Where they show (the suggestion panel, the results page) is settled when 1.1 is built.

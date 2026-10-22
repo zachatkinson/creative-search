@@ -12,8 +12,10 @@ namespace CreativeBranding\Search\Domain;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The terms one query token reached at the widening level that found something, with their postings in the
- * products and in the categories, tags and brands (spec: Matching → Widening each token).
+ * The terms one query token reached at the widening level that found something, with their document
+ * frequencies and their postings in the categories, tags and brands (spec: Matching → Widening each token). The
+ * products' postings are filled only where products are ranked in PHP ({@see Ranker}); the store ranks them
+ * otherwise (D-086).
  *
  * @phpstan-type PostingsByTerm array<string, array<int, array<int, array{0: int, 1: int}>>>
  */
@@ -30,10 +32,10 @@ final class TokenWidening {
 	}
 
 	/**
-	 * No term reached any document.
+	 * No term reached any document: every match carries a df above zero.
 	 */
 	public function isEmpty(): bool {
-		return array() === $this->products && array() === $this->terms;
+		return array() === $this->matches;
 	}
 
 	/**

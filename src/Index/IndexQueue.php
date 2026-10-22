@@ -32,6 +32,7 @@ final class IndexQueue {
 	public const INDEX_TERM     = 'csearch_job_index_term';
 	public const INDEX_TERMS    = 'csearch_job_index_terms';
 	public const TERM_PRODUCTS  = 'csearch_job_term_products';
+	public const UPGRADE        = 'csearch_job_upgrade';
 	public const BATCH          = 100;
 	public const PRIORITY       = 20;
 

@@ -46,6 +46,7 @@ final class ApiBenchmarkTest extends IndexTestCase {
 			$this->service( SynonymRepository::class )->add( new Synonym( $row['lang'], $row['word'], $row['means'], $row['both_ways'] ) );
 		}
 		self::assertTrue( $this->service( Reindex::class )->runInline() );
+		$this->analyzeAside( self::$analyzed );
 		do_action( 'rest_api_init' );
 
 		$failures = array();

@@ -35,15 +35,12 @@ final class Scorer {
 	/**
 	 * A product's score.
 	 *
-	 * @param Query           $query     The query.
+	 * @param RankPlan        $plan      The plan: token texts, weights, N, the key and the owner's rules.
 	 * @param Document        $document  The product.
-	 * @param TokenWidening[] $widenings One per query token, in order.
-	 * @param int             $n         The number of documents in the language.
-	 * @param SearchOptions   $options   Weights and the owner's rules.
+	 * @param TokenWidening[] $widenings One per query token, in order, with this product's postings.
 	 */
-	public function score( Query $query, Document $document, array $widenings, int $n, SearchOptions $options ): Score {
-		$weights = $options->weightsById();
-		$idf     = static fn( int $df ): float => log( ( $n + 1 ) / ( $df + 1 ) );
+	public function score( RankPlan $plan, Document $document, array $widenings ): Score {
+		$weights = $plan->weights;
 		$tokens  = array();
 		$fields  = array();
 		foreach ( $widenings as $i => $widening ) {
@@ -52,10 +49,10 @@ final class Scorer {
 				$match = $widening->matches[ $term ];
 				$term  = (string) $term;
 				foreach ( $byField as $field => [ $tf, $position ] ) {
-					$value = ( $weights[ $field ] ?? 0 ) * $match->weight() * ( 1 + log( 1 + $tf ) ) * $idf( $match->df );
+					$value = ( $weights[ $field ] ?? 0 ) * $match->weight() * ( 1 + log( 1 + $tf ) ) * $plan->idf( $match->df );
 					if ( null === $best || $value > $best['score'] ) {
 						$best = array(
-							'token'  => $query->tokens[ $i ]->text,
+							'token'  => $plan->texts[ $i ],
 							'term'   => $term,
 							'kind'   => $match->kind,
 							'field'  => $field,
@@ -75,12 +72,12 @@ final class Scorer {
 		}
 		$owner = $document->boost;
 		foreach ( $document->termRefs as $ref ) {
-			$owner += $options->boostRules[ $ref ] ?? 0;
+			$owner += $plan->boostRules[ $ref ] ?? 0;
 		}
 		return new Score(
 			$tokens,
 			self::phraseBonus( $fields, count( $widenings ) ),
-			( $query->key() === $document->nameKey ? self::EXACT_NAME : 0.0 ) + ( in_array( $query->key(), $document->skuKeys, true ) ? self::EXACT_SKU : 0.0 ),
+			( $plan->key === $document->nameKey ? self::EXACT_NAME : 0.0 ) + ( in_array( $plan->key, $document->skuKeys, true ) ? self::EXACT_SKU : 0.0 ),
 			$document->inStock ? 0.0 : self::SOLD_OUT,
 			(float) $owner
 		);

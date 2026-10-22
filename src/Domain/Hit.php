@@ -26,14 +26,16 @@ final class Hit {
 	}
 
 	/**
-	 * Order for products: score, then in stock, then sales, then newest, then id (spec: Matching → Ties).
+	 * Order for products: score to six decimals, then in stock, then sales, then newest, then id (spec: Matching →
+	 * Ties). Six decimals, because the SQL store sums the same parts in another order and must tie where PHP ties
+	 * (D-086).
 	 *
 	 * @param Hit $a A hit.
 	 * @param Hit $b Another.
 	 */
 	public static function compare( Hit $a, Hit $b ): int {
-		return array( $b->score->total(), $b->document->inStock, $b->document->totalSales, $b->document->recency, $a->document->id )
-			<=> array( $a->score->total(), $a->document->inStock, $a->document->totalSales, $a->document->recency, $b->document->id );
+		return array( round( $b->score->total(), 6 ), $b->document->inStock, $b->document->totalSales, $b->document->recency, $a->document->id )
+			<=> array( round( $a->score->total(), 6 ), $a->document->inStock, $a->document->totalSales, $a->document->recency, $b->document->id );
 	}
 
 	/**

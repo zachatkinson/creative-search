@@ -87,10 +87,12 @@ final class SearchService {
 	 * @param int    $limit    Products at most.
 	 * @param int    $termLimit Terms at most.
 	 * @param bool   $retry     Retry without the least-matched token when nothing matches.
+	 * @param bool   $explain   Rank in PHP, with every part of each score (D-086): the same order, more memory.
 	 */
-	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true ): SearchResult {
+	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false ): SearchResult {
 		$options  = $this->options( $limit, $termLimit, $retry );
 		$store    = $this->index->at( $this->index->generation() )->withTermRefs( array() !== $options->boostRules );
+		$store    = $explain ? $store->explaining() : $store;
 		$langs    = array_values( array_unique( array_filter( array( $lang, $options->fallbackLang ) ) ) );
 		$parser   = new QueryParser( $this->analyzers->tokenizer(), new Synonyms( $this->synonyms->forLanguages( $langs ), $this->analyzers->tokenizer() ) );
 		$searcher = new Searcher( $store, $this->analyzers->analyzer() );

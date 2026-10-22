@@ -121,6 +121,7 @@ final class ReindexTest extends IndexTestCase {
 		self::assertGreaterThanOrEqual( 3, $steps, 'a product batch, a term batch, the cleanup' );
 		self::assertSame( array(), $this->pendingJobs(), 'nothing queued' );
 		self::assertSame( 0, (int) $GLOBALS['wpdb']->get_var( $GLOBALS['wpdb']->prepare( 'SELECT COUNT(*) FROM %i WHERE generation = 1', Tables::postings() ) ) ); // phpcs:ignore
+		self::assertSame( array( Tables::documents(), Tables::postings(), Tables::stats() ), self::$analyzed, 'the rewritten tables\' statistics are refreshed once, after the cleanup (D-089)' );
 	}
 
 	public function test_job_errors_are_recorded_not_fatal(): void {

@@ -12,6 +12,7 @@ namespace CreativeBranding\Search\Tests\Integration;
 use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
 use CreativeBranding\Search\Tests\Support\WooCommerceCatalogue;
@@ -33,11 +34,22 @@ final class QueriesExplainTest extends IndexTestCase {
 		$this->catalogue->load( ( new Catalogue() )->generate( 300 ) );
 		$this->service( IndexQueue::class )->clear();
 		self::assertTrue( $this->service( Reindex::class )->runInline() );
+		// The tables were emptied and filled seconds ago. InnoDB refreshes a table's statistics by itself after
+		// that much change, in the background; wait for it (ANALYZE TABLE would commit the test's transaction), so
+		// the plans are the ones a shop gets.
+		$rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Tables::postings() ) ); // phpcs:ignore
+		for ( $i = 0; $i < 100; $i++ ) {
+			$known = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT n_rows FROM mysql.innodb_table_stats WHERE database_name = DATABASE() AND table_name = %s', Tables::postings() ) ); // phpcs:ignore
+			if ( $known >= $rows * 0.8 ) {
+				break;
+			}
+			usleep( 100000 );
+		}
 		do_action( 'rest_api_init' );
 
 		$caught = array();
 		$spy    = static function ( $sql ) use ( &$caught ) {
-			if ( is_string( $sql ) && str_starts_with( ltrim( $sql ), 'SELECT' ) && str_contains( $sql, 'csearch_' ) ) {
+			if ( is_string( $sql ) && preg_match( '/^\s*(SELECT|WITH)\b/', $sql ) && str_contains( $sql, 'csearch_' ) ) {
 				// One plan per statement shape: values and lists of any length are the same statement.
 				$shape            = (string) preg_replace( '/\(\?(,\s*\?)*\)/', '(…)', (string) preg_replace( '/\d+|\'[^\']*\'/', '?', $sql ) );
 				$caught[ $shape ] = $sql;
@@ -73,9 +85,10 @@ final class QueriesExplainTest extends IndexTestCase {
 			foreach ( is_array( $plan ) ? $plan : array() as $row ) {
 				$out[] = sprintf( '| %s | %s | %s | %s | %s | %s |', $row['table'] ?? '', $row['type'] ?? '', $row['possible_keys'] ?? '', $row['key'] ?? '', $row['rows'] ?? '', $row['Extra'] ?? '' );
 				$table = (string) ( $row['table'] ?? '' );
-				// A key must exist for every read; the optimiser may still read a small table whole when the
-				// list covers much of it, which is cheaper than the key.
-				if ( 'ALL' === ( $row['type'] ?? '' ) && null === ( $row['possible_keys'] ?? null ) && ( str_contains( $table, 'csearch_' ) || in_array( $table, array( 'p', 't', 'd', 'g' ), true ) ) ) {
+				// A key must exist for every read of a plugin table (the ranking statement's own tables, q, w,
+				// f and the rest, are built in the statement and have none); the optimiser may still read a small
+				// table whole when the list covers much of it, which is cheaper than the key.
+				if ( 'ALL' === ( $row['type'] ?? '' ) && null === ( $row['possible_keys'] ?? null ) && ( str_contains( $table, 'csearch_' ) || in_array( $table, array( 'p', 't', 'd', 'g', 'ps', 'ts', 'px', 'tx' ), true ) ) ) {
 					$scans[] = $table . ': ' . $sql;
 				}
 			}

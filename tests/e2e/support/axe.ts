@@ -15,6 +15,18 @@ export async function axe(
 	include = 'body',
 	exempt: string[] = []
 ) {
+	// The panel fades in over 120 ms; colours read mid-fade are blended with the page, so let every running
+	// animation finish before axe measures contrast.
+	await page.evaluate( () =>
+		Promise.all(
+			document
+				.getAnimations()
+				.filter(
+					( a ) => a.effect?.getTiming().iterations !== Infinity
+				)
+				.map( ( a ) => a.finished.catch( () => undefined ) )
+		)
+	);
 	const results = await new AxeBuilder( { page } )
 		.withTags( [ 'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa' ] )
 		.include( include )

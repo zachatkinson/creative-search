@@ -121,7 +121,7 @@ final class SearchCommand {
 		$query  = SearchService::clean( $args[0] ?? '' );
 		$lang   = $this->search->language( isset( $assoc['lang'] ) && is_string( $assoc['lang'] ) ? $assoc['lang'] : null );
 		$limit  = max( 1, isset( $assoc['limit'] ) && is_numeric( $assoc['limit'] ) ? (int) $assoc['limit'] : 10 );
-		$result = $this->search->run( $query, $lang, $limit, 3 );
+		$result = $this->search->run( $query, $lang, $limit, 3, true, true );
 		$found  = sprintf(
 			/* translators: 1: products found, 2: categories, tags and brands found */
 			__( '%1$s, %2$s', 'creative-search' ),

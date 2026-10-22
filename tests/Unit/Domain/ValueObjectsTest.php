@@ -154,7 +154,8 @@ final class ValueObjectsTest extends TestCase {
 		self::assertSame( array( 'deck' => array( Fields::NAME => array( 1, 0 ) ) ), $w->postingsIn( 9, false ) );
 		self::assertSame( array(), $w->postingsIn( 9, true ) );
 		self::assertSame( array( 'deck', '80' ), array_map( 'strval', array_keys( $w->postingsIn( 2, true ) ) ) );
-		self::assertFalse( ( new TokenWidening( array(), array(), array( 'x' => array( 9 => array() ) ) ) )->isEmpty(), 'terms alone count' );
+		self::assertTrue( ( new TokenWidening( array(), array(), array( 'x' => array( 9 => array() ) ) ) )->isEmpty(), 'empty means no term found, whatever is attached' );
+		self::assertFalse( ( new TokenWidening( array( 'x' => new TermMatch( 'x', TermMatch::EXACT, 1 ) ), array(), array() ) )->isEmpty(), 'a found term alone counts (the store ranks the products)' );
 	}
 
 	public function test_token(): void {

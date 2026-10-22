@@ -11,11 +11,14 @@ namespace CreativeBranding\Search\Index;
 
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
+use CreativeBranding\Search\Install\Upgrader;
 use CreativeBranding\Search\Repository\DocumentRepository;
 use CreativeBranding\Search\Repository\PostingRepository;
 use CreativeBranding\Search\Repository\ProductIdRepository;
+use CreativeBranding\Search\Repository\StatRepository;
 use CreativeBranding\Search\Repository\TermRepository;
 use CreativeBranding\Search\Repository\TrigramRepository;
+use RuntimeException;
 use WC_Product;
 use WP_Term;
 
@@ -26,7 +29,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Writes documents (spec: Indexing): a product becomes one document per language, cut into tokens field by
  * field, with its stems and its SKU keys (D-041); categories, tags and brands become documents of their own;
- * a removed product loses its rows and its terms lose a count. Runs in jobs, never on the request that saved.
+ * a removed product loses its rows and its terms lose a count, in the dictionary and per generation and language
+ * (D-087). Runs in jobs, never on the request that saved.
  */
 final class Indexer {
 
@@ -47,6 +51,7 @@ final class Indexer {
 	 * @param PostingRepository   $postings  Postings.
 	 * @param TrigramRepository   $trigrams  Trigrams.
 	 * @param ProductIdRepository $productIds Product ids by term.
+	 * @param StatRepository      $stats     Term counts per generation and language.
 	 */
 	public function __construct(
 		private ProductReader $products,
@@ -57,7 +62,8 @@ final class Indexer {
 		private TermRepository $dictionary,
 		private PostingRepository $postings,
 		private TrigramRepository $trigrams,
-		private ProductIdRepository $productIds
+		private ProductIdRepository $productIds,
+		private StatRepository $stats
 	) {
 	}
 
@@ -69,6 +75,7 @@ final class Indexer {
 	 * @return bool Whether the product is in the index afterwards.
 	 */
 	public function indexProduct( int $productId, ?int $generation = null ): bool {
+		$this->ready();
 		$product = wc_get_product( $productId );
 		if ( $product instanceof WC_Product && $product->is_type( 'variation' ) ) {
 			$productId = $product->get_parent_id();
@@ -100,6 +107,7 @@ final class Indexer {
 	 * @return bool Whether the term is in the index afterwards.
 	 */
 	public function indexTerm( string $taxonomy, int $termId, ?int $generation = null ): bool {
+		$this->ready();
 		$type = TermReader::typeOf( $taxonomy );
 		if ( null === $type ) {
 			return false;
@@ -169,6 +177,7 @@ final class Indexer {
 	 * @param int $productId Product id.
 	 */
 	public function removeProduct( int $productId ): void {
+		$this->ready();
 		foreach ( $this->generations() as $target ) {
 			$this->remove( Document::PRODUCT, $productId, $target );
 		}
@@ -181,6 +190,7 @@ final class Indexer {
 	 * @param int    $termId   Term id.
 	 */
 	public function removeTerm( string $taxonomy, int $termId ): void {
+		$this->ready();
 		$type = TermReader::typeOf( $taxonomy );
 		if ( null === $type ) {
 			return;
@@ -197,6 +207,7 @@ final class Indexer {
 	 * @param int $productId Product id.
 	 */
 	public function updateStock( int $productId ): void {
+		$this->ready();
 		$product = wc_get_product( $productId );
 		if ( $product instanceof WC_Product && $product->is_type( 'variation' ) ) {
 			$productId = $product->get_parent_id();
@@ -234,12 +245,47 @@ final class Indexer {
 	 * @param int[] $ids Document ids.
 	 */
 	public function removeDocuments( array $ids ): void {
+		$this->ready();
 		if ( array() === $ids ) {
 			return;
 		}
-		$this->dictionary->decrement( $this->postings->termCountsOf( $ids ) );
+		$counts = $this->postings->termCountsOf( $ids );
+		$total  = array();
+		foreach ( $counts as $row ) {
+			$total[ $row['term_id'] ] = ( $total[ $row['term_id'] ] ?? 0 ) + $row['n'];
+		}
+		$this->dictionary->decrement( $total );
+		$this->stats->decrement( $counts );
 		$this->postings->deleteFor( $ids );
 		$this->documents->delete( $ids );
+	}
+
+	/**
+	 * After a reindex's cleanup: drop whatever term counts the deleted generation still holds (none, when every
+	 * removal was counted), and refresh the index statistics of the three tables the rebuild rewrote, so the
+	 * database plans the next search on the new rows at once instead of after its own background refresh
+	 * (D-089).
+	 *
+	 * @param int $generation A generation with no documents left.
+	 */
+	public function forgetGeneration( int $generation ): void {
+		$this->ready();
+		$this->stats->deleteGeneration( $generation );
+		$this->documents->analyze();
+		$this->postings->analyze();
+		$this->stats->analyze();
+	}
+
+	/**
+	 * Every write waits for the schema: the upgrade runs here when it is due, and when another request holds it,
+	 * nothing is written (the rebuild the upgrade owes writes it all, D-090).
+	 *
+	 * @throws RuntimeException While another request upgrades the schema.
+	 */
+	private function ready(): void {
+		if ( Upgrader::needed() && ! Upgrader::maybeUpgrade() && Upgrader::needed() ) {
+			throw new RuntimeException( esc_html__( 'The search index is being upgraded by another request. Try again in a few minutes.', 'creative-search' ) );
+		}
 	}
 
 	/**
@@ -260,13 +306,15 @@ final class Indexer {
 			}
 			$postings[ self::SKU_KEY_PREFIX . mb_substr( $key, 0, 63, 'UTF-8' ) ][ Fields::SKU ] = array( 1, 0 );
 		}
+		$title      = mb_substr( $text->title, 0, 255, 'UTF-8' );
 		$documentId = $this->documents->insert(
 			array(
 				'generation'  => $generation,
 				'type'        => $type,
 				'object_id'   => $objectId,
 				'lang'        => $text->lang,
-				'title'       => mb_substr( $text->title, 0, 255, 'UTF-8' ),
+				'title'       => $title,
+				'name_key'    => mb_substr( $this->analyzers->tokenizer()->key( $title, $text->lang ), 0, 255, 'UTF-8' ),
 				'url'         => mb_substr( $text->url, 0, 1024, 'UTF-8' ),
 				'image_id'    => $text->imageId,
 				'price_min'   => $text->priceMin,
@@ -284,8 +332,9 @@ final class Indexer {
 		$existing = $this->dictionary->idsOf( $terms );
 		$ids      = $this->dictionary->ensure( $terms );
 		$this->trigrams->write( array_diff_key( $ids, $existing ) );
+		$this->postings->write( $documentId, $generation, $text->lang, Document::PRODUCT === $type, $postings, $ids );
 		$this->dictionary->increment( array_values( $ids ) );
-		$this->postings->write( $documentId, $generation, $postings, $ids );
+		$this->stats->increment( array_values( $ids ), $generation, $text->lang );
 	}
 
 	/**

@@ -375,6 +375,8 @@ final class SearcherTest extends TestCase {
 		self::assertSame( array(), self::terms( $term ), 'Decks and KAZUMI are excluded' );
 		$number = $this->search( 'kazumi -8.25' );
 		self::assertSame( array(), self::titles( $number ) );
+		$two = $this->search( 'planches -roulettes -completes', 'fr' );
+		self::assertSame( array( 'Planches' ), self::terms( $two ), 'two categories excluded at once' );
 	}
 
 	public function test_quoted_phrases_must_be_adjacent_in_one_field(): void {

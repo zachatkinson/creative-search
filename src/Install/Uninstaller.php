@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Removes everything the plugin made: the six tables, every option and transient, the product meta, the
+ * Removes everything the plugin made: the seven tables, every option and transient, the product meta, the
  * scheduled actions and the object-cache group. Per site on a network. Never touches products or orders.
  */
 final class Uninstaller {

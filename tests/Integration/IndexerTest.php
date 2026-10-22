@@ -16,7 +16,9 @@ use CreativeBranding\Search\Domain\Token;
 use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\Indexer;
 use CreativeBranding\Search\Index\Languages;
+use CreativeBranding\Search\Index\Reindex;
 use CreativeBranding\Search\Repository\IndexRepository;
+use CreativeBranding\Search\Repository\StatRepository;
 use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
@@ -213,6 +215,80 @@ final class IndexerTest extends IndexTestCase {
 		self::assertSame( array( 'en' ), $this->service( Languages::class )->codes(), 'back to the site language' );
 	}
 
+	/**
+	 * Also the check of `StatRepository` and the postings' language and kind in Infection's run (D-048).
+	 *
+	 * @group sql-mutation
+	 */
+	public function test_the_stored_counts_match_the_postings_through_writes_removals_and_a_reindex(): void {
+		$ids       = $this->products( array( 0, 1, 2, 3 ) );
+		$languages = static fn( array $langs ): array => $langs + array(
+			'fr' => array(
+				'product' => static function ( WC_Product $product, array $fields ): array {
+					$fields[ Fields::NAME ] = 'Planche ' . $product->get_name();
+					return $fields;
+				},
+			),
+		);
+		add_filter( 'csearch_languages', $languages );
+		$this->service( AnalyzerFactory::class )->flush();
+		foreach ( $ids as $id ) {
+			$this->indexer()->indexProduct( $id );
+		}
+		$cat = get_term_by( 'slug', 'decks', 'product_cat' );
+		self::assertInstanceOf( \WP_Term::class, $cat );
+		$this->indexer()->indexTerm( 'product_cat', $cat->term_id );
+		$this->assertStatsMatchPostings( 'written in two languages' );
+		self::assertGreaterThan( 0, $this->rowCount( Tables::stats() ) );
+
+		$this->indexer()->indexProduct( $ids[0] );
+		$this->assertStatsMatchPostings( 'rewritten' );
+		$this->indexer()->removeProduct( $ids[1] );
+		$this->assertStatsMatchPostings( 'removed' );
+
+		global $wpdb;
+		$old = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(generation) FROM %i', Tables::documents() ) ); // phpcs:ignore
+		$wpdb->insert( Tables::stats(), array( 'term_id' => 999999, 'generation' => $old, 'lang' => 'en', 'df' => 3 ) ); // phpcs:ignore -- a stray count, as a crashed write could leave.
+		$this->service( Reindex::class )->runInline();
+		$this->assertStatsMatchPostings( 'after a reindex and its cleanup, which drops the old generation\'s strays' );
+		remove_filter( 'csearch_languages', $languages );
+		$this->service( AnalyzerFactory::class )->flush();
+
+		foreach ( $ids as $id ) {
+			$this->indexer()->removeProduct( $id );
+		}
+		$this->indexer()->removeTerm( 'product_cat', $cat->term_id );
+		$this->assertStatsMatchPostings( 'all removed but the reindex\'s other categories, tags and brands' );
+		self::assertSame( '0', $GLOBALS['wpdb']->get_var( $GLOBALS['wpdb']->prepare( 'SELECT COUNT(*) FROM %i WHERE df = 0', Tables::stats() ) ), 'no row at zero is kept' ); // phpcs:ignore
+	}
+
+	/**
+	 * The stats table holds exactly what counting the postings gives: documents per term, generation and
+	 * language, with no row at zero.
+	 *
+	 * @param string $when What just happened.
+	 */
+	private function assertStatsMatchPostings( string $when ): void {
+		global $wpdb;
+		$expected = $wpdb->get_results( $wpdb->prepare( 'SELECT p.term_id, p.generation, p.lang, COUNT(DISTINCT p.document_id) AS df FROM %i p INNER JOIN %i d ON d.id = p.document_id AND d.lang = p.lang AND d.generation = p.generation AND (d.type = %s) = p.product GROUP BY p.term_id, p.generation, p.lang ORDER BY 1, 2, 3', Tables::postings(), Tables::documents(), 'product' ), ARRAY_A ); // phpcs:ignore
+		$actual   = $wpdb->get_results( $wpdb->prepare( 'SELECT term_id, generation, lang, df FROM %i ORDER BY 1, 2, 3', Tables::stats() ), ARRAY_A ); // phpcs:ignore
+		self::assertSame( $expected, $actual, $when );
+		// And the store reads them back by term: every term of the live generation, in each language.
+		$live = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(generation) FROM %i', Tables::stats() ) ); // phpcs:ignore
+		foreach ( array( 'en', 'fr' ) as $lang ) {
+			$want = array();
+			foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT t.term, COUNT(DISTINCT p.document_id) AS df FROM %i p INNER JOIN %i t ON t.id = p.term_id WHERE p.generation = %d AND p.lang = %s GROUP BY t.term', Tables::postings(), Tables::terms(), $live, $lang ), ARRAY_A ) as $row ) { // phpcs:ignore
+				$want[ (string) $row['term'] ] = (int) $row['df'];
+			}
+			$asked = array_merge( array_keys( $want ), array( 'zzznotaterm' ) );
+			$got   = $this->service( StatRepository::class )->frequencies( $asked, $live, $lang );
+			ksort( $want );
+			ksort( $got );
+			self::assertSame( $want, $got, "{$when}: frequencies() in {$lang}" );
+		}
+		self::assertSame( (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', Tables::postings() ) ), (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i p INNER JOIN %i d ON d.id = p.document_id AND d.lang = p.lang AND (d.type = %s) = p.product', Tables::postings(), Tables::documents(), 'product' ) ), $when . ': every posting carries its document\'s language and kind' ); // phpcs:ignore
+	}
+
 	public function test_the_site_language_is_the_setting_not_the_visitors_locale(): void {
 		$french = static fn(): string => 'fr_CA';
 		add_filter( 'locale', $french );
@@ -351,6 +427,7 @@ final class IndexerTest extends IndexTestCase {
 					'object_id'   => $id,
 					'lang'        => (string) $row['lang'],
 					'title'       => 'duplicate',
+					'name_key'    => 'duplicate',
 					'url'         => '',
 					'image_id'    => null,
 					'price_min'   => null,

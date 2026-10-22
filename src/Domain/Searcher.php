@@ -63,38 +63,23 @@ final class Searcher {
 		foreach ( $query->tokens as $i => $token ) {
 			$widenings[ $i ] = $this->widen( $token, $lang );
 		}
-		$excluded = $this->excluded( $query, $lang );
+		$excluded = $this->excludedTerms( $query, $lang );
 		$n        = $this->index->documentCount( $lang );
 
-		$matched   = $this->intersect( $query, $widenings, $excluded, $options );
+		$products  = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
 		$corrected = null;
-		$extra     = array();
-		$reduced   = $query;
-		$kept      = $widenings;
-		if ( array() === $matched && $options->retry && count( $widenings ) >= 2 ) {
-			$drop    = self::leastMatched( $widenings );
-			$reduced = $query->without( $drop );
-			$kept    = array_values( array_filter( $widenings, static fn( int $i ): bool => $i !== $drop, ARRAY_FILTER_USE_KEY ) );
-			$extra   = $this->intersect( $reduced, $kept, $excluded, $options );
-			if ( array() !== $extra ) {
+		if ( array() === $products && $options->retry && count( $widenings ) >= 2 ) {
+			$drop     = $this->leastMatched( $widenings, $lang );
+			$reduced  = $query->without( $drop );
+			$kept     = array_values( array_filter( $widenings, static fn( int $i ): bool => $i !== $drop, ARRAY_FILTER_USE_KEY ) );
+			$products = $this->index->rank( RankPlan::of( $reduced, $kept, $lang, $n, $excluded, $options ) );
+			if ( array() !== $products ) {
 				$corrected = $reduced->text;
 			}
 		}
 
-		$products = array();
-		foreach ( $matched as $document ) {
-			$products[] = new Hit( $document, $this->scorer->score( $query, $document, $widenings, $n, $options ) );
-		}
-		usort( $products, array( Hit::class, 'compare' ) );
-		$more = array();
-		foreach ( $extra as $document ) {
-			$more[] = new Hit( $document, $this->scorer->score( $reduced, $document, $kept, $n, $options ) );
-		}
-		usort( $more, array( Hit::class, 'compare' ) );
-		$products = array_slice( array_merge( $products, $more ), 0, $options->limit );
-
 		$terms = array();
-		foreach ( $this->termDocuments( $widenings, $excluded ) as $document ) {
+		foreach ( $this->termDocuments( $widenings, $this->excludedOthers( $excluded, $lang ) ) as $document ) {
 			$terms[] = new Hit( $document, $this->scorer->scoreTerm( $query, $document, $widenings ) );
 		}
 		usort( $terms, array( Hit::class, 'compareTerms' ) );
@@ -172,25 +157,23 @@ final class Searcher {
 	}
 
 	/**
-	 * Fetch the postings of a set of candidate terms and fill in their document frequencies.
+	 * Fill in the document frequencies of a set of candidate terms, keep the ones some document carries, and
+	 * fetch their postings in the categories, tags and brands (few; the products are ranked by the store).
 	 *
 	 * @param array<string, TermMatch> $matches Candidate terms.
 	 * @param string                   $lang    Language code.
 	 */
 	private function lookup( array $matches, string $lang ): TokenWidening {
-		$terms    = self::termsOf( $matches );
-		$products = $this->index->postings( $terms, $lang, true );
-		$others   = $this->index->postings( $terms, $lang, false );
-		$found    = array();
+		$terms = self::termsOf( $matches );
+		$dfs   = $this->index->frequencies( $terms, $lang );
+		$found = array();
 		foreach ( $matches as $term => $match ) {
-			// df is the documents of this language that carry the term, counted from the postings just read: the
-			// spec's df, over the same set as N (D-050).
-			$df = count( $products[ $term ] ?? array() ) + count( $others[ $term ] ?? array() );
-			if ( $df > 0 ) {
-				$found[ $term ] = $match->withDf( $df );
+			// df is the documents of this language that carry the term: the spec's df, over the same set as N (D-050).
+			if ( isset( $dfs[ $term ] ) ) {
+				$found[ $term ] = $match->withDf( $dfs[ $term ] );
 			}
 		}
-		return new TokenWidening( $found, $products, $others ); // Every term with postings has a df, so both maps hold found terms only.
+		return new TokenWidening( $found, array(), $this->index->postings( self::termsOf( $found ), $lang, false ) );
 	}
 
 	/**
@@ -208,94 +191,47 @@ final class Searcher {
 	}
 
 	/**
-	 * The documents the minus words exclude (their exact terms, spellings and stems), as a set.
+	 * The terms the minus words exclude: their exact terms, spellings and stems (a repeat or an empty stem
+	 * matches nothing more).
 	 *
 	 * @param Query  $query The query.
 	 * @param string $lang  Language code.
-	 * @return array<int, mixed>
+	 * @return string[]
 	 */
-	private function excluded( Query $query, string $lang ): array {
-		$set = array();
+	private function excludedTerms( Query $query, string $lang ): array {
+		$terms = array();
 		foreach ( $query->excluded as $token ) {
-			$terms = array_merge( array( $token->text ), $token->variants );
+			array_push( $terms, $token->text, ...$token->variants );
 			if ( $token->stemmable() ) {
 				$terms[] = $this->analyzer->stemOf( $token->source, $lang );
 			}
-			foreach ( array( true, false ) as $products ) {
-				foreach ( $this->index->postings( $terms, $lang, $products ) as $byDoc ) {
-					$set += $byDoc;
-				}
-			}
+		}
+		return $terms;
+	}
+
+	/**
+	 * The categories, tags and brands the minus words exclude, as a set.
+	 *
+	 * @param string[] $terms The excluded terms.
+	 * @param string   $lang  Language code.
+	 * @return array<int, mixed>
+	 */
+	private function excludedOthers( array $terms, string $lang ): array {
+		$set = array();
+		foreach ( $this->index->postings( $terms, $lang, false ) as $byDoc ) {
+			$set += $byDoc;
 		}
 		return $set;
-	}
-
-	/**
-	 * The products every token reached, minus the excluded, phrases enforced, hidden ones only for their SKU.
-	 *
-	 * @param Query             $query     The query (for phrases and the SKU key).
-	 * @param TokenWidening[]   $widenings One per token.
-	 * @param array<int, mixed> $excluded Excluded document ids.
-	 * @param SearchOptions     $options   Options.
-	 * @return array<int, Document> By id.
-	 */
-	private function intersect( Query $query, array $widenings, array $excluded, SearchOptions $options ): array {
-		$set = null;
-		foreach ( $widenings as $widening ) {
-			$docs = $widening->productDocs();
-			$set  = null === $set ? $docs : array_intersect_key( $set, $docs );
-		}
-		$set = array_diff_key( $set ?? array(), $excluded );
-		foreach ( $query->phrases() as $indexes ) {
-			$set = array_filter( $set, fn( int $doc ): bool => self::hasPhrase( $widenings, $indexes, $doc ), ARRAY_FILTER_USE_KEY );
-		}
-		$documents = $this->index->documents( array_keys( $set ), $query->key() );
-		return array_filter(
-			$documents,
-			static fn( Document $d ): bool => $d->visible || ( $options->hiddenBySku && in_array( $query->key(), $d->skuKeys, true ) )
-		);
-	}
-
-	/**
-	 * Whether some field of a document holds the phrase's tokens adjacent and in order, by first positions.
-	 *
-	 * @param TokenWidening[] $widenings One per token.
-	 * @param int[]           $indexes   The phrase's token indexes, in order.
-	 * @param int             $doc       Document id.
-	 */
-	private static function hasPhrase( array $widenings, array $indexes, int $doc ): bool {
-		$fields = array();
-		foreach ( $indexes as $order => $i ) {
-			foreach ( $widenings[ $i ]->postingsIn( $doc, true ) as $byField ) {
-				foreach ( $byField as $field => [ , $position ] ) {
-					$fields[ $field ][ $order ] = min( $fields[ $field ][ $order ] ?? PHP_INT_MAX, $position );
-				}
-			}
-		}
-		foreach ( $fields as $positions ) {
-			if ( count( $positions ) !== count( $indexes ) ) {
-				continue;
-			}
-			$adjacent = true;
-			$previous = null;
-			foreach ( $positions as $position ) {
-				$adjacent = $adjacent && ( null === $previous || $position === $previous + 1 );
-				$previous = $position;
-			}
-			if ( $adjacent ) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**
 	 * The token that reached the fewest products; the later one on a tie.
 	 *
 	 * @param non-empty-array<int, TokenWidening> $widenings One per token.
+	 * @param string                              $lang      Language code.
 	 */
-	private static function leastMatched( array $widenings ): int {
-		$counts = array_map( static fn( TokenWidening $w ): int => count( $w->productDocs() ), $widenings );
+	private function leastMatched( array $widenings, string $lang ): int {
+		$counts = array_map( fn( TokenWidening $w ): int => $this->index->productCount( self::termsOf( $w->matches ), $lang ), $widenings );
 		arsort( $counts ); // Stable: equal counts keep their order, so the last key is the later token.
 		return array_key_last( $counts );
 	}

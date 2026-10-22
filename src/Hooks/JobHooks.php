@@ -56,6 +56,8 @@ final class JobHooks implements Hookable {
 			);
 		}
 		add_action( 'admin_init', array( $this, 'adminInit' ) );
+		add_action( IndexQueue::UPGRADE, array( $this, 'upgrade' ) );
+		add_action( 'init', array( $this, 'queueUpgrade' ) );
 	}
 
 	/**
@@ -128,5 +130,23 @@ final class JobHooks implements Hookable {
 	public function adminInit(): void {
 		Upgrader::maybeUpgrade();
 		$this->reindex->queueFirstBuild();
+		$this->reindex->queueOwed();
+	}
+
+	/**
+	 * The upgrade job.
+	 */
+	public function upgrade(): void {
+		Upgrader::maybeUpgrade();
+	}
+
+	/**
+	 * On any request while the schema is behind: queue the upgrade as a job, so a shop no admin visits after an
+	 * update is upgraded anyway (D-090). One option read when the schema is current.
+	 */
+	public function queueUpgrade(): void {
+		if ( Upgrader::needed() ) {
+			IndexQueue::schedule( IndexQueue::UPGRADE );
+		}
 	}
 }

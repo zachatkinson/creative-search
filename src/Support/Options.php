@@ -70,6 +70,11 @@ final class Options {
 	public const UPGRADE_LOCK = 'csearch_upgrade_lock';
 
 	/**
+	 * Set when a schema upgrade needs a full rebuild: 0, then the generation of the reindex begun to settle it; cleared when that generation goes live (D-090).
+	 */
+	public const REBUILD_OWED = 'csearch_rebuild_owed';
+
+	/**
 	 * Object-cache group for answers and rate-limit counters.
 	 */
 	public const CACHE_GROUP = 'csearch';
@@ -85,7 +90,7 @@ final class Options {
 	 * @return string[]
 	 */
 	public static function names(): array {
-		return array( self::SETTINGS, self::DB_VERSION, self::INDEX_STATE, self::UPGRADE_LOCK, self::REINDEX_CANCEL );
+		return array( self::SETTINGS, self::DB_VERSION, self::INDEX_STATE, self::UPGRADE_LOCK, self::REINDEX_CANCEL, self::REBUILD_OWED );
 	}
 
 	/**

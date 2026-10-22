@@ -1449,3 +1449,8 @@ msgstr "%1$d; en usage : %2$d"
 #, php-format
 msgid "Import finished. Added: %1$d. Already there: %2$d. Skipped: %3$d."
 msgstr "Importation terminée. Ajoutés : %1$d. Déjà présents : %2$d. Ignorés : %3$d."
+
+#: src/Index/Indexer.php:287
+#: src/Index/Reindex.php:277
+msgid "The search index is being upgraded by another request. Try again in a few minutes."
+msgstr "Une autre requête met à niveau l’index de recherche. Réessayez dans quelques minutes."
