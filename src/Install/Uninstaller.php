@@ -75,10 +75,49 @@ final class Uninstaller {
 			delete_post_meta_by_key( $key );
 		}
 
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( '', array(), Options::QUEUE_GROUP );
-		}
+		self::deleteJobs();
 
 		wp_cache_flush_group( Options::CACHE_GROUP );
+	}
+
+	/**
+	 * Delete every Action Scheduler action in the plugin's group, whatever its status. Unscheduling alone only
+	 * marks pending actions cancelled and leaves their rows and logs.
+	 */
+	public static function deleteJobs(): void {
+		if ( ! class_exists( 'ActionScheduler' ) || ! \ActionScheduler::is_initialized() ) {
+			return;
+		}
+		$store = \ActionScheduler::store();
+		do {
+			$ids = $store->query_actions(
+				array(
+					'group'    => Options::QUEUE_GROUP,
+					'status'   => '',
+					'per_page' => 500,
+				)
+			);
+			$ids = is_array( $ids ) ? $ids : array();
+			foreach ( $ids as $id ) {
+				$store->delete_action( is_scalar( $id ) ? (string) $id : '' );
+			}
+			$more = count( $ids ) === 500;
+		} while ( $more );
+	}
+
+	/**
+	 * The plugin's tables, for `wpmu_drop_tables` when a network site is deleted.
+	 *
+	 * @param mixed $tables Tables WordPress will drop.
+	 * @return mixed
+	 */
+	public static function siteTables( $tables ) {
+		if ( ! is_array( $tables ) ) {
+			return $tables;
+		}
+		foreach ( Tables::all() as $table ) {
+			$tables[] = Tables::name( $table );
+		}
+		return $tables;
 	}
 }

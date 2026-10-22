@@ -1,5 +1,5 @@
 {
-	// The plugin outside the domain, at 90 %. src/Domain has its own 100 % run in infection-domain.json5 (docs/DECISIONS.md D-019, D-030).
+	// The plugin outside the domain, at 90 %. src/Domain has its own 100 % run in infection-domain.json5 (docs/DECISIONS.md D-019, D-030). WordPress-bound directories are tested by the integration suite instead (D-048).
 	"$schema": "vendor/infection/infection/resources/schema.json",
 	"source": {
 		"directories": [
@@ -8,6 +8,13 @@
 		"excludes": [
 			"Domain",
 			"Install",
+			"Index",
+			"Hooks",
+			"Cli",
+			"Repository",
+			"Search",
+			"Rest",
+			"Block",
 			"Support/Options.php",
 			"Support/Tables.php",
 			"Plugin.php",

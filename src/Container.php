@@ -9,7 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search;
 
-use InvalidArgumentException;
+use CreativeBranding\Search\Support\PluginException;
 use ReflectionClass;
 use ReflectionNamedType;
 
@@ -29,16 +29,25 @@ final class Container {
 	 * @return array<class-string, class-string>
 	 */
 	private static function bindings(): array {
-		return array();
+		return array(
+			Domain\IndexStore::class => Repository\IndexRepository::class,
+		);
 	}
 
 	/**
-	 * Hookable classes, in registration order. Milestone 1 attaches nothing: the first hooks arrive with the indexer.
+	 * Hookable classes, in registration order.
 	 *
 	 * @return class-string<Hookable>[]
 	 */
 	private static function hookableClasses(): array {
-		return array();
+		return array(
+			Hooks\IndexHooks::class,
+			Hooks\JobHooks::class,
+			Hooks\CliHooks::class,
+			Hooks\InstallHooks::class,
+			Hooks\RestHooks::class,
+			Hooks\LogHooks::class,
+		);
 	}
 
 	/**
@@ -112,16 +121,16 @@ final class Container {
 	 * Build one service with its constructor dependencies resolved from this container.
 	 *
 	 * @param string $id Service class or interface.
-	 * @throws InvalidArgumentException When the class or a constructor argument can't be resolved.
+	 * @throws PluginException When the class or a constructor argument can't be resolved.
 	 */
 	private function build( string $id ): object {
 		$class = self::bindings()[ $id ] ?? $id;
 		if ( ! class_exists( $class ) && ! interface_exists( $class ) ) {
-			throw new InvalidArgumentException( esc_html( sprintf( 'Unknown service %s.', $id ) ) );
+			throw new PluginException( esc_html( sprintf( 'Unknown service %s.', $id ) ) );
 		}
 		$reflection = new ReflectionClass( $class );
 		if ( ! $reflection->isInstantiable() ) {
-			throw new InvalidArgumentException( esc_html( sprintf( 'Service %s is not instantiable and has no binding.', $id ) ) );
+			throw new PluginException( esc_html( sprintf( 'Service %s is not instantiable and has no binding.', $id ) ) );
 		}
 		$constructor = $reflection->getConstructor();
 		if ( null === $constructor ) {
@@ -140,7 +149,7 @@ final class Container {
 				$args[] = $parameter->getDefaultValue();
 				continue;
 			}
-			throw new InvalidArgumentException( esc_html( sprintf( 'Cannot resolve parameter $%s of %s.', $parameter->getName(), $class ) ) );
+			throw new PluginException( esc_html( sprintf( 'Cannot resolve parameter $%s of %s.', $parameter->getName(), $class ) ) );
 		}
 		return $reflection->newInstanceArgs( $args );
 	}

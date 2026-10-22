@@ -12,7 +12,7 @@ namespace CreativeBranding\Search\Domain;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The index store as the searcher sees it: a dictionary with document frequencies, prefix and trigram lookups,
+ * The index store as the searcher sees it: prefix and trigram lookups on the dictionary,
  * postings per language, and documents by id. The in-memory index of the test suite and the SQL repositories
  * of milestones 3 and 4 both implement it, so the ranking is tested once and runs everywhere (D-028).
  *
@@ -27,14 +27,6 @@ interface IndexStore {
 	 * @param string $lang Language code.
 	 */
 	public function documentCount( string $lang ): int;
-
-	/**
-	 * The document frequency of each term that exists.
-	 *
-	 * @param string[] $terms Folded terms; may be empty, which answers an empty array.
-	 * @return array<string, int> Term to df, never zero; a term the dictionary lacks is absent.
-	 */
-	public function documentFrequencies( array $terms ): array;
 
 	/**
 	 * The terms starting with a prefix, most frequent first.

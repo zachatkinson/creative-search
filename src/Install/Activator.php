@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Install;
 
+use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Plugin;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Options;
 
@@ -17,18 +19,45 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Creates the tables and the default settings. Does no heavy work: the first index build is the owner's
- * (Tools → Rebuild index, or `wp csearch reindex`), announced by a notice when the index is empty.
+ * Creates the tables and the default settings and queues the first index build as one Action Scheduler job
+ * (spec: Indexing → The first build); nothing is indexed on the activating request. On a network activation
+ * every site gets the same, the way `Uninstaller::run()` walks them (M1 review item 3).
  */
 final class Activator {
 
 	/**
 	 * Activation hook.
+	 *
+	 * @param bool|mixed $networkWide Whether the plugin is being network-activated.
 	 */
-	public static function activate(): void {
+	public static function activate( $networkWide = false ): void {
+		if ( is_multisite() && true === $networkWide ) {
+			/** @var int[] $siteIds */
+			$siteIds = get_sites(
+				array(
+					'fields' => 'ids',
+					'number' => 0,
+				)
+			);
+			foreach ( $siteIds as $siteId ) {
+				switch_to_blog( (int) $siteId ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.switch_to_blog_switch_to_blog -- activation walks every site once; only the plugin's tables and options are written.
+				self::site();
+				restore_current_blog();
+			}
+			return;
+		}
+		self::site();
+	}
+
+	/**
+	 * Activate the current site.
+	 */
+	public static function site(): void {
 		Schema::install();
 		if ( false === get_option( Options::SETTINGS, false ) ) {
 			add_option( Options::SETTINGS, Settings::defaults(), '', true );
 		}
+		Settings::flush();
+		Plugin::container()->get( Reindex::class )->queueFirstBuild();
 	}
 }

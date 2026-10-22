@@ -172,21 +172,25 @@ final class Searcher {
 	}
 
 	/**
-	 * Fill in document frequencies and fetch postings for a set of candidate terms.
+	 * Fetch the postings of a set of candidate terms and fill in their document frequencies.
 	 *
 	 * @param array<string, TermMatch> $matches Candidate terms.
 	 * @param string                   $lang    Language code.
 	 */
 	private function lookup( array $matches, string $lang ): TokenWidening {
-		$dfs   = $this->index->documentFrequencies( self::termsOf( $matches ) );
-		$found = array();
+		$terms    = self::termsOf( $matches );
+		$products = $this->index->postings( $terms, $lang, true );
+		$others   = $this->index->postings( $terms, $lang, false );
+		$found    = array();
 		foreach ( $matches as $term => $match ) {
-			if ( isset( $dfs[ $term ] ) ) {
-				$found[ $term ] = $match->withDf( $dfs[ $term ] );
+			// df is the documents of this language that carry the term, counted from the postings just read: the
+			// spec's df, over the same set as N (D-050).
+			$df = count( $products[ $term ] ?? array() ) + count( $others[ $term ] ?? array() );
+			if ( $df > 0 ) {
+				$found[ $term ] = $match->withDf( $df );
 			}
 		}
-		$terms = self::termsOf( $found );
-		return new TokenWidening( $found, $this->index->postings( $terms, $lang, true ), $this->index->postings( $terms, $lang, false ) );
+		return new TokenWidening( $found, $products, $others ); // Every term with postings has a df, so both maps hold found terms only.
 	}
 
 	/**

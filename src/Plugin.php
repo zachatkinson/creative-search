@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search;
 
-use CreativeBranding\Search\Install\Schema;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -48,8 +46,7 @@ final class Plugin {
 			return;
 		}
 
-		Schema::maybeUpgrade();
-
+		// The schema upgrade runs on admin_init and before WP-CLI commands (Install\Upgrader), never here.
 		foreach ( self::container()->hookables() as $hookable ) {
 			$hookable->register();
 		}

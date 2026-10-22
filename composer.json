@@ -47,6 +47,7 @@
 		"test:coverage": "phpunit -c phpunit.xml.dist --testsuite unit --exclude-group benchmark --coverage-text --coverage-clover tmp/coverage.xml",
 		"test:benchmark": "phpunit -c phpunit.xml.dist --testsuite unit --group benchmark",
 		"test:integration": "bash tools/integration.sh",
+		"test:integration:benchmark": "bash tools/integration.sh --group benchmark",
 		"infection": [
 			"@infection:core",
 			"@infection:domain"

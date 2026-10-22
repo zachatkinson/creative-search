@@ -105,4 +105,29 @@ final class AnalyzerTest extends TestCase {
 		self::assertSame( array(), ( new Analyzer() )->analyze( array(), 'en' ) );
 		self::assertSame( array(), ( new Analyzer() )->analyze( array( Fields::NAME => '' ), 'en' ) );
 	}
+
+	public function test_a_token_filter_runs_per_field_value_with_the_field_and_language(): void {
+		$seen   = array();
+		$filter = static function ( array $tokens, int $field, string $lang ) use ( &$seen ): array {
+			$seen[] = array( $field, $lang, count( $tokens ) );
+			$kept   = array_values( array_filter( $tokens, static fn( Token $t ): bool => 'maple' !== $t->text ) );
+			if ( Fields::NAME === $field ) {
+				$kept[] = new Token( 'added', 9 );
+			}
+			return $kept;
+		};
+		$p      = ( new Analyzer( new Tokenizer(), tokenFilter: $filter ) )->analyze(
+			array(
+				Fields::NAME => 'Maple Deck',
+				Fields::TAG  => array( 'maple', 'street' ),
+			),
+			'fr'
+		);
+		self::assertSame( array( array( Fields::NAME, 'fr', 2 ), array( Fields::TAG, 'fr', 1 ), array( Fields::TAG, 'fr', 1 ) ), $seen );
+		self::assertArrayNotHasKey( 'maple', $p, 'a dropped token is not a posting' );
+		self::assertSame( array( Fields::NAME => array( 1, 9 ) ), $p['added'], 'an added token keeps the position it was given' );
+		self::assertSame( array( Fields::NAME => array( 1, 1 ) ), $p['deck'] );
+		self::assertSame( array( Fields::TAG => array( 1, 1 ) ), $p['street'], 'an emptied value moves the offset by one (no token kept: -1 + 2), the same as an empty value' );
+		self::assertSame( ( new Analyzer() )->analyze( array( Fields::NAME => 'Maple Deck' ), 'en' ), ( new Analyzer( new Tokenizer(), tokenFilter: null ) )->analyze( array( Fields::NAME => 'Maple Deck' ), 'en' ), 'no filter: unchanged' );
+	}
 }

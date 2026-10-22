@@ -244,3 +244,115 @@ In the SKU field term frequency is capped at one, however many variations share 
 `phpunit.xml.dist` sets `memory_limit` to 512M. The unit suite builds the 300-product index once per class and holds the Snowball vectors in memory; the golden set at 10,000 products is run by hand from the scratch script, not in the suite.
 
 **Why:** The default 128M is enough for every test but the in-memory index tests; the setting is on the test runner only and says nothing about the plugin, which never builds an index in memory.
+
+## Milestone 3: the Index
+
+### D-041 · SKU keys are dictionary terms with an `=` prefix · 2026-10-21
+
+Each SKU a product carries (its own and every variation's) is stored once more as a posting in the SKU field whose term is the whole folded key with an `=` in front: `KAZ-DEA-00001` gives `=kaz dea 00001` beside the tokens `kaz`, `dea`, `00001`. Key terms get no trigrams, and no prefix lookup can return one, because no token starts with `=`. The searcher's `Document::$skuKeys` (the exact-SKU bonus and the hidden-by-SKU rule) is read back from these postings with the prefix stripped. A key is cut at 63 characters to fit the 64-character term column.
+
+**Why:** The exact-SKU rule needs every SKU of a document, and the documents table has no column for a list. A seventh table, or a column holding a list, is a schema change after milestone 1, which CLAUDE.md says to ask about. The dictionary already holds strings and the postings already join a term to a document and a field, so the keys fit the existing schema with no new statement shape.
+
+### D-042 · Job hooks carry a `csearch_job_` prefix · 2026-10-21
+
+The per-product and per-term Action Scheduler jobs are `csearch_job_index_product`, `csearch_job_update_stock`, `csearch_job_index_term`, `csearch_job_index_terms` and `csearch_job_term_products`. The full reindex keeps the spec's `csearch_reindex`, with `csearch_reindex_batch`, `csearch_reindex_terms` and `csearch_reindex_cleanup` for its steps.
+
+**Why:** The spec names both the indexing job and the public "index this product at all" filter `csearch_index_product`. WordPress keeps actions and filters in one table, so the job's callback ran inside `apply_filters()` and returned null, and every product was refused (found by the first integration test). The filter is public API and keeps its name; the job is internal and moves. Spec deviation, flagged for Zach.
+
+### D-043 · What a save request does: an id in memory, one job at shutdown · 2026-10-21
+
+The hook callbacks only add an id to `Index\IndexQueue`; the queue attaches to `shutdown` at priority 20, after WooCommerce's own deferred product sync (priority 10), and queues the jobs there. A save request therefore runs no query on the plugin's or Action Scheduler's tables until the response has been built, and the integration test proves it with a `query` filter. Under WP-CLI the collected ids are indexed inline at the same point. A change made after the flush attaches it again.
+
+A job is not queued while one with the same hook and arguments is **pending**. The plugin checks that itself rather than passing Action Scheduler's `$unique`, for two reasons found in review: before Action Scheduler 4.0 `$unique` ignored the arguments (one pending product job per site, and a reindex chain that refused its own next batch), and in every version it also counts a running job, so a save made while that product's job was running would be dropped.
+
+A stock-only save is told apart from a full one on `woocommerce_before_product_object_save`, the last moment WooCommerce's pending changes can be read (it applies them before `woocommerce_update_product`). When every changed property is stock quantity, stock status, manage stock, backorders, low-stock amount or modified date, the job is `csearch_job_update_stock`. A save with no changed property (how `wc_update_product_stock()` saves before firing its stock hook, but also how a save of meta alone looks) is indexed in full unless a stock hook for the same product follows in the same request. The stock job flips `in_stock` on the rows that exist and indexes in full only when the product has no row yet. `product_visibility` term changes are not a trigger: WooCommerce rewrites them on every stock change, and a visibility change made through the product save is in its changed properties anyway. A deleted term's products are queued in jobs of 100, never one job each.
+
+**Why:** The spec's budget is zero extra queries on the save request, and its "stock-only change updates `in_stock` directly" cannot be told from `woocommerce_update_product` alone.
+
+### D-044 · One dictionary for every generation; df for scoring comes from the postings · 2026-10-21
+
+`csearch_terms` has no generation or language column, so its `df` counts documents in every language and every generation present (both during a reindex). Removal subtracts, for each term, the number of removed documents that carried it, so the count is exact again after a cleanup. That count orders prefix candidates only. The score's `df` is counted by the searcher from the postings it has just read for the query's language in the live generation (D-050), so it is the spec's "documents containing it" over the same set as `N`, at no extra query.
+
+**Why:** The first version used the dictionary's count in the score, against a per-language `N`. The review showed that this can make IDF zero or negative in a two-language shop and during every reindex, and that a batched removal decremented a shared term once instead of once per document. A per-language, per-generation dictionary would be a schema change; counting from the postings needs none.
+
+### D-045 · The shape of `csearch_languages` · 2026-10-21
+
+The filter receives and returns an array of language code to readers: `product` (called with the `WC_Product`, the field texts read from the product itself, and the code; returns the field texts in that language) and `term` (called with the `WP_Term`, its name and the code; returns the name). Either can be left out to read the product as it is. The default is the site language (`get_locale()` cut to its code) plus any codes in the `languages` setting, with no readers. A code that is not two to eight letters is dropped, and an empty result falls back to the site language.
+
+**Why:** The spec says "a list of codes, each with a callback that returns a product's text in that language (name, descriptions, term names)". Field ids as keys let a reader replace any field, and the separate term reader serves category, tag and brand documents, which have no product to read from.
+
+### D-046 · Schema upgrades on admin requests and WP-CLI, behind a lock · 2026-10-21
+
+`Schema::maybeUpgrade()` is gone from `Plugin::boot()`. `Install\Upgrader::maybeUpgrade()` runs on `admin_init` (which also fires on `admin-ajax.php`, a logged-in or front-end AJAX request, never a page view) and before every `wp csearch` command, takes a lock row with `add_option()` (an INSERT that fails when the row exists), runs `dbDelta()` and releases it; a lock older than five minutes is taken over. Network activation walks every site the way the uninstaller does, and each site's activation queues its own first build.
+
+**Why:** M1 review items 2 and 3: a front-end request must never run `dbDelta()`, and two concurrent requests must not both run it.
+
+### D-047 · Index timings measured at 300 and 2,000 products here, 10,000 on CI · 2026-10-21
+
+`tests/Integration/IndexBenchmarkTest.php` (group `benchmark`, `composer test:integration:benchmark`) loads `CSEARCH_BENCH_PRODUCTS` catalogue products (default 300) into WooCommerce with their variations and times a full inline reindex against a budget scaled linearly from the spec's (5 minutes for 10,000 is 30 ms a product). The one-product budget (50 ms) is an assertion in the regular suite. Loading 10,000 products with 40,000 variations through WooCommerce's CRUD takes longer than the reindex it measures, so the full-size run belongs on the CI runner the spec names.
+
+**Why:** The spec's 10,000-product figure is for the CI runner; on this Mac the run is bounded by fixture loading, not by the indexer. The milestone review gives the measured rate and the extrapolation.
+
+### D-048 · WordPress-bound code leaves the core Infection run · 2026-10-21
+
+`src/Index`, `src/Hooks`, `src/Cli`, `src/Repository`, `src/Search` and `src/Rest` (and `src/Block` from milestone 6) join `src/Install` in `infection.json5`'s excludes. They are tested by the integration suite inside WordPress, which Infection cannot drive (it runs the unit suite on PHPUnit 13; the WordPress suite needs PHPUnit 9.6 in its own container, D-021). `Support\Cast` is plain PHP and joins both the unit coverage source and the core run.
+
+**Why:** Same reason as D-019: a mutation tool can only judge code its test runner can execute.
+
+**Spec deviation, flagged for Zach:** the spec asks for no escaped mutants in the SQL builders and 90 % MSI on the rest. Those builders are in `src/Repository`, outside this run, and the unit coverage floor does not measure them either; their checks are the integration tests and the grep gates. Running Infection inside the tests container against PHPUnit 9.6 may be possible and is the way to close this.
+
+
+### D-049 · Small choices in the indexer · 2026-10-21
+
+- A document's `nameKey` (the exact-name bonus) is computed from the stored title when the searcher reads it, with the same tokenizer; it is not stored.
+- `Document::$recency` is the object id: WooCommerce ids grow with time, and the column is not in the schema.
+- `Document::$termRefs` (the owner's boost rules) is filled in milestone 4, where the boost rules are applied; the indexer leaves it empty.
+- A variable product's attribute values are the parent's attribute list, which lists every value its variations choose among; variation SKUs are read from `_sku` meta of the children, without loading each variation.
+- A category, tag or brand document indexes its name (name field) and its description (short field); its product count rides in `total_sales` (D-013).
+- The `csearch_tokens` filter runs once per field value, before the stems are added, through an optional closure on `Domain\Analyzer` (the Domain stays free of WordPress).
+- A job that throws records `#id: message` in the index state (the last 50) and the reindex moves on; one broken product does not stop a rebuild.
+- `csearch_index_switched` (an action, with the new and old generation) fires after the switch, so milestone 4's cache can drop its answers; the plugin flushes its own cache group there too.
+
+**Why:** Each is a gap the spec leaves; recorded so the review can question them.
+
+### D-050 · `csearch_fields` is the weights; `csearch_product_fields` is the text · 2026-10-21
+
+The spec names `csearch_fields` "the field list and weights", and `docs/SETTINGS.md` says it runs over the `fields` setting. Milestone 3 had used the name for a product's field texts. Before either was released, the texts filter became `csearch_product_fields` and `csearch_fields` filters the weights the score uses, as the spec says. In the same change the searcher stopped asking the store for document frequencies and counts them from the postings it reads (D-044), so `IndexStore` lost `documentFrequencies()`.
+
+**Why:** One name with two contracts is the collision D-042 was about; the spec's meaning wins.
+
+### D-051 · Cache and rate limit live in the object cache only · 2026-10-21
+
+Answers are kept with `wp_cache_set()` under a key of the live generation, a salt and the normalised request, for 60 seconds (`csearch_cache_ttl`). A reindex changes the generation, so old answers are unreachable without a scan; a changed setting or synonym bumps the salt (`Search\Cache::bump()`, called from milestone 7's screens). "The last 10,000 distinct queries" is left to the cache's own eviction. The rate limit is a sliding window from two fixed 10-second counters, keyed by a hash of the WooCommerce session cookie or the remote address, in the object cache only. Without a persistent object cache both live for one request: answers are not shared and the limit does not hold.
+
+**Why:** The spec keeps rate-limit counters out of the database by name, and a transient fallback for the answer cache would write one row per distinct query. A shop that needs the rate limit has, or should have, a persistent object cache; the status screen in milestone 7 says which.
+
+### D-052 · A click finds its log row by query, not by id · 2026-10-21
+
+`POST /csearch/v1/click` takes the query, the language and what was clicked. It marks the newest unclicked log row with that normalised query and language written in the last ten minutes. Log rows are written after the response (spec: Logging), so the suggest response cannot carry the row's id.
+
+**Why:** The spec asks for both a deferred log write and a click keyed by the log row id, which cannot both hold. Matching by query loses only when two shoppers search the same words in the same ten minutes and one of them clicks, which credits the click to the wrong one of two identical rows: the counts the owner sees are the same.
+
+### D-053 · The index state is read fresh; cancel has its own option · 2026-10-21
+
+`csearch_index_state` is no longer autoloaded, and `IndexState::all()` reads it from the database each time (through `Options::fresh()`, which also clears WordPress's "option does not exist" cache). The cancel flag is `csearch_reindex_cancel`, holding the generation to stop. Progress is written by re-reading the state and adding the batch's counts. A search pins the generation once per call (`IndexRepository::at()`), so it reads the state once, not on every lookup. A new reindex takes a generation above the live one, any half-built one and any being cleaned.
+
+**Why:** Found in review: an Action Scheduler process runs many jobs and kept the state it read first, so a batch writing its progress put `cancelled` back to false, and a live product job could write into a generation already cleaned. A cancelled generation's number could also be reused while its cleanup was still queued.
+
+### D-054 · The reindex walks product ids by keyset, through SQL on `wp_posts` · 2026-10-21
+
+Each reindex batch carries the last product id it walked and asks `ProductIdRepository` for the next 100 published ids above it; a renamed term's products are walked the same way, descendants of a hierarchical term included. The ids come from one prepared statement on `wp_posts` (products are posts whatever the order storage); every product is still read through `wc_get_product()`.
+
+**Why:** Found in review: with offset paging, trashing a product with a lower id during a reindex shifted every later product down one place, and one was never indexed into the new generation. WooCommerce's product query has no "id greater than" argument; the rules allow SQL in a repository, and listing ids is not reading products.
+
+### D-055 · A suggest call is several statements, not two · 2026-10-21
+
+The spec says a suggest call is "one SQL statement against the index plus one against the documents table". The searcher from milestone 2 asks the store level by level: a cold `/suggest` runs 15 to 18 statements, all on primary or unique keys (the index state, the synonyms, a prefix lookup, the postings of each token's terms for products and for terms, a trigram lookup only when nothing else matched, the document count, the documents and their SKU keys). At 300 products in two languages the golden set's p95 is 6.3 ms cold and 0.4 ms warm against budgets of 100 and 60.
+
+**Why:** Compiling the widening plan into one statement would duplicate the Domain's logic in SQL and lose the in-memory store the golden set is proven against (D-028). The budgets are what the statement count was for, and they hold. Flagged for Zach: if a shop shows a slow database round trip, the first step is to merge the two postings reads per level.
+
+### D-056 · Milestones 3 and 4 ship as one commit · 2026-10-21
+
+The milestone 3 review's fixes (the store interface, the container's hook list, the CLI registration) touched files milestone 4 was already changing in the same tree, and the integration suite runs only against the working tree wp-env mounts. Milestone 3 alone could not be verified, so both are one commit, tagged `v0.4.0`, with a review for each in `docs/reviews/`. There is no `v0.3.0` tag.
+
+**Why:** A tag for a state no test ran against would be a claim, not a check.

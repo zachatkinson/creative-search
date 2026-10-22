@@ -13,6 +13,11 @@
 			<directory suffix="Test.php">tests/Integration</directory>
 		</testsuite>
 	</testsuites>
+	<groups>
+		<exclude>
+			<group>benchmark</group>
+		</exclude>
+	</groups>
 	<php>
 		<const name="WP_TESTS_PHPUNIT_POLYFILLS_PATH" value="tools/integration/vendor/yoast/phpunit-polyfills"/>
 	</php>

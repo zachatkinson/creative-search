@@ -41,21 +41,9 @@ final class Schema {
 	public static function install(): array {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		$result = dbDelta( self::sql() );
-		// Autoloaded: maybeUpgrade() reads it on every request.
+		// Autoloaded: Install\Upgrader compares it on admin requests.
 		update_option( Options::DB_VERSION, self::DB_VERSION, true );
 		return array_values( $result );
-	}
-
-	/**
-	 * Run the upgrade when the stored version is behind.
-	 */
-	public static function maybeUpgrade(): void {
-		$stored    = get_option( Options::DB_VERSION, '0' );
-		$installed = is_scalar( $stored ) ? (string) $stored : '0';
-		if ( version_compare( $installed, self::DB_VERSION, '>=' ) ) {
-			return;
-		}
-		self::install();
 	}
 
 	/**

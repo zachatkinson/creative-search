@@ -11,7 +11,7 @@ namespace CreativeBranding\Search\Tests\Unit;
 
 use CreativeBranding\Search\Container;
 use CreativeBranding\Search\Hookable;
-use InvalidArgumentException;
+use CreativeBranding\Search\Support\PluginException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -44,25 +44,35 @@ final class ContainerTest extends TestCase {
 	}
 
 	public function test_unknown_class_throws(): void {
-		$this->expectException( InvalidArgumentException::class );
+		$this->expectException( PluginException::class );
 		$this->expectExceptionMessage( 'Unknown service Nope\Missing.' );
 		( new Container() )->resolve( 'Nope\Missing' );
 	}
 
 	public function test_unbound_interface_throws(): void {
-		$this->expectException( InvalidArgumentException::class );
+		$this->expectException( PluginException::class );
 		$this->expectExceptionMessage( 'not instantiable' );
 		( new Container() )->resolve( Hookable::class );
 	}
 
 	public function test_unresolvable_scalar_throws(): void {
-		$this->expectException( InvalidArgumentException::class );
+		$this->expectException( PluginException::class );
 		$this->expectExceptionMessage( 'Cannot resolve parameter $name of ' . ContainerFixtureNeedsScalar::class );
 		( new Container() )->resolve( ContainerFixtureNeedsScalar::class );
 	}
 
-	public function test_hookables_is_empty_in_milestone_1(): void {
-		self::assertSame( array(), ( new Container() )->hookables(), 'the first hooks arrive with the indexer' );
+	public function test_hookables_are_built_once_in_registration_order(): void {
+		$container = new Container();
+		$hookables = $container->hookables();
+		self::assertSame(
+			array( \CreativeBranding\Search\Hooks\IndexHooks::class, \CreativeBranding\Search\Hooks\JobHooks::class, \CreativeBranding\Search\Hooks\CliHooks::class, \CreativeBranding\Search\Hooks\InstallHooks::class, \CreativeBranding\Search\Hooks\RestHooks::class, \CreativeBranding\Search\Hooks\LogHooks::class ),
+			array_map( static fn( object $h ): string => $h::class, $hookables )
+		);
+		self::assertSame( $hookables, $container->hookables(), 'the same instances on a second call' );
+	}
+
+	public function test_the_index_store_is_bound_to_the_sql_repository(): void {
+		self::assertInstanceOf( \CreativeBranding\Search\Repository\IndexRepository::class, ( new Container() )->get( \CreativeBranding\Search\Domain\IndexStore::class ) );
 	}
 }
 

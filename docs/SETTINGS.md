@@ -2,7 +2,7 @@
 
 Everything the owner can set, with its default and its range. All of it lives in one autoloaded option, `csearch_settings`, read through `Settings\Settings` and sanitised by `Settings::sanitize()` whichever screen or command writes it. Unknown keys are dropped; a missing key takes its default; every value is coerced to its type and range (so a corrupt option never breaks a request).
 
-Options beside it: `csearch_db_version` (the schema version `Install\Schema` compares), `csearch_index_state` (the running reindex and the live generation, from milestone 3), `csearch_stopwords_{lang}` (the owner's stop-word additions, from milestone 7). Product meta: `_csearch_boost` and `_csearch_exclude` (milestone 7).
+Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on admin requests), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, from milestone 7). Product meta: `_csearch_boost` and `_csearch_exclude` (milestone 7).
 
 ## What to index
 
@@ -11,7 +11,7 @@ Options beside it: `csearch_db_version` (the schema version `Install\Schema` com
 | `index_long_description` | `yes` | yes/no | Index the long description (2,000 characters at most). |
 | `index_tags` | `yes` | yes/no | Index product tags, and make tag documents. |
 | `index_variation_skus` | `yes` | yes/no | Index every variation's SKU on the parent document. |
-| `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting. A weight of 0 removes a field from the score but not from the index. |
+| `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
 
 ## Languages
 
@@ -52,3 +52,19 @@ A block instance can override each of these; they are the defaults for new block
 | --- | --- | --- | --- |
 | `retention_days` | 90 | 7 to 365 | Days a search-log row is kept before the nightly purge. |
 | `stats` | `[]` | `{ 'Y-m-d': { name: count } }` | Daily roll-ups the Analytics charts read, so they survive the purge. Written by the plugin, not the owner. |
+
+## The index state (`csearch_index_state`)
+
+Written by the plugin, not the owner. Not autoloaded: jobs read it fresh from the database each time and a search reads it once (D-053). Shown by `wp csearch status`, `GET /csearch/v1/status` and, from milestone 7, the Tools tab.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `live` | 1 | The generation the shop searches. |
+| `building` | `null` | The generation a reindex is writing, or null. |
+| `offset`, `total`, `done` | 0 | Products walked, products to walk, products written, for the progress bar. |
+| `last_id` | 0 | The highest product id walked (the walk is by id, D-054). |
+| `started_at`, `finished_at` | `null` | UTC times (`Y-m-d H:i:s`) of the last reindex. |
+| `cancelled` | `false` | Derived when read: whether `csearch_reindex_cancel` names the generation being built. |
+| `errors` | `[]` | The last 50 `#id: message` lines from jobs that threw. |
+| `cleaning` | `null` | The old or abandoned generation being deleted. |
+| `first_queued` | `false` | Activation (or the first admin request after it) queued the first build. |

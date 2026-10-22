@@ -14,5 +14,6 @@ parameters:
     scanFiles:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
         - vendor/php-stubs/woocommerce-stubs/woocommerce-packages-stubs.php
+        - tools/wp-cli-stubs.php
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true

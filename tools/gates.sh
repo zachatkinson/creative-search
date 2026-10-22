@@ -16,6 +16,8 @@ fi
 
 # 1b. Interpolated or concatenated SQL handed to $wpdb without prepare(): a string literal with a variable or a
 # concatenation inside the call. Identifier lists built from integers are allowed through implode() only.
+# The gate only sees SQL built inside the $wpdb call; a statement assembled in a variable first passes here, so
+# Repository::run()/rows()/value() take only prepare()d strings and PHPCS and the review carry the rule.
 hits="$(grep -rnE '\$wpdb->(query|get_results|get_row|get_var|get_col)\(\s*("[^"]*\$|'"'"'[^'"'"']*'"'"'\s*\.)' src --include='*.php' | grep -v 'prepare(' || true)"
 if [ -n "$hits" ]; then
 	echo "Gate 1b: string-built SQL (use \$wpdb->prepare()):"; echo "$hits"; status=1

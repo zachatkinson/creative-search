@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 0.2.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -35,6 +35,10 @@ No. The index, the suggestions and the analytics are all on the server; nothing 
 Nothing. The search log holds the words typed, the result count, the language and the time, for 90 days by default. No IP address, user id, session or page URL; queries that look like personal details are redacted.
 
 == Changelog ==
+
+= 0.4.0 =
+* Index: products, categories, tags and brands written to the plugin's own index in the background whenever they change, with a full rebuild into a new generation that goes live when complete, and `wp csearch index`, `reindex`, `status` and `explain`.
+* Query and API: suggestions and ranked results from four REST routes, cached, rate-limited, with an anonymous search log. Nothing a shopper sees yet.
 
 = 0.2.0 =
 * Domain: the tokenizer, the Porter and Snowball French stemmers, trigrams and edit distance, the query parser, the scorer, the searcher and the log scrubber as pure PHP, tested against an in-memory index. Nothing a shopper or owner sees yet.

@@ -104,7 +104,10 @@ final class MemoryIndex implements IndexStore {
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * The document frequency of each term that exists, across languages (the fixture's own check).
+	 *
+	 * @param string[] $terms Terms.
+	 * @return array<string, int>
 	 */
 	public function documentFrequencies( array $terms ): array {
 		$out = array();

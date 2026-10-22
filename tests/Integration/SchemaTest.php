@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Install\Schema;
+use CreativeBranding\Search\Install\Upgrader;
+use CreativeBranding\Search\Support\Clock;
 use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Support\IntegrationTestCase;
@@ -108,7 +110,7 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertSame( Schema::DB_VERSION, get_option( Options::DB_VERSION ) );
 		self::assertSame( '1', Schema::DB_VERSION );
 		$alloptions = wp_load_alloptions( true );
-		self::assertArrayHasKey( Options::DB_VERSION, $alloptions, 'maybeUpgrade() reads it on every request' );
+		self::assertArrayHasKey( Options::DB_VERSION, $alloptions, 'the upgrader compares it on admin requests' );
 	}
 
 	public function test_maybe_upgrade_runs_when_behind_and_not_when_current(): void {
@@ -117,15 +119,27 @@ final class SchemaTest extends IntegrationTestCase {
 		update_option( Options::DB_VERSION, '0' );
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN clicked_type', Tables::log() ) );
 		self::assertNotContains( 'clicked_type', $this->columns( Tables::log() ) );
-		Schema::maybeUpgrade();
+		self::assertTrue( Upgrader::maybeUpgrade() );
 		self::assertSame( '1', get_option( Options::DB_VERSION ) );
+		self::assertFalse( get_option( Options::UPGRADE_LOCK ), 'the lock is released' );
 		self::assertContains( 'clicked_type', $this->columns( Tables::log() ), 'the missing column came back' );
 
 		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN clicked_type', Tables::log() ) );
-		Schema::maybeUpgrade();
+		self::assertFalse( Upgrader::maybeUpgrade() );
 		self::assertNotContains( 'clicked_type', $this->columns( Tables::log() ), 'nothing runs when the version is current' );
 		Schema::install();
 		self::assertContains( 'clicked_type', $this->columns( Tables::log() ) );
+	}
+
+	public function test_upgrade_waits_for_a_held_lock_and_takes_over_a_stale_one(): void {
+		update_option( Options::DB_VERSION, '0' );
+		Clock::freeze( 1_800_000_000 );
+		add_option( Options::UPGRADE_LOCK, 1_800_000_000 - 10, '', false );
+		self::assertFalse( Upgrader::maybeUpgrade(), 'another request holds the lock' );
+		self::assertSame( '0', get_option( Options::DB_VERSION ) );
+		update_option( Options::UPGRADE_LOCK, 1_800_000_000 - Upgrader::LOCK_TTL - 1, false );
+		self::assertTrue( Upgrader::maybeUpgrade(), 'a lock older than five minutes is taken over' );
+		self::assertSame( Schema::DB_VERSION, get_option( Options::DB_VERSION ) );
 	}
 
 	public function test_column_types_are_lower_case(): void {

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Domain;
 
+use Closure;
 use CreativeBranding\Search\Domain\Stemmer\Stemmers;
 
 defined( 'ABSPATH' ) || exit;
@@ -31,10 +32,12 @@ final class Analyzer {
 	/**
 	 * Constructor.
 	 *
-	 * @param Tokenizer $tokenizer The tokenizer.
-	 * @param Stemmers  $stemmers  The stemmers.
+	 * @param Tokenizer                                     $tokenizer   The tokenizer.
+	 * @param Stemmers                                      $stemmers    The stemmers.
+	 * @param (Closure(Token[], int, string): Token[])|null $tokenFilter Runs over the tokens of each field value
+	 *     before they become postings (the `csearch_tokens` filter in WordPress); null keeps them as cut.
 	 */
-	public function __construct( private Tokenizer $tokenizer = new Tokenizer(), private Stemmers $stemmers = new Stemmers() ) {
+	public function __construct( private Tokenizer $tokenizer = new Tokenizer(), private Stemmers $stemmers = new Stemmers(), private ?Closure $tokenFilter = null ) {
 	}
 
 	/**
@@ -50,7 +53,10 @@ final class Analyzer {
 			$offset = 0;
 			foreach ( (array) $values as $value ) {
 				$tokens = $this->tokenizer->tokenize( $value, $lang );
-				$last   = -1;
+				if ( null !== $this->tokenFilter ) {
+					$tokens = ( $this->tokenFilter )( $tokens, $field, $lang );
+				}
+				$last = -1;
 				foreach ( $tokens as $token ) {
 					$position = $offset + $token->position;
 					$last     = max( $last, $token->position );

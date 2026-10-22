@@ -34,15 +34,28 @@ function csearch_uninstall_site(): void {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . 'csearch_' . $table ) );
 	}
-	foreach ( array( 'csearch_settings', 'csearch_db_version', 'csearch_index_state' ) as $option ) {
+	foreach ( array( 'csearch_settings', 'csearch_db_version', 'csearch_index_state', 'csearch_upgrade_lock', 'csearch_reindex_cancel' ) as $option ) {
 		delete_option( $option );
 	}
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s', $wpdb->options, $wpdb->esc_like( 'csearch_stopwords_' ) . '%', $wpdb->esc_like( '_transient_csearch_' ) . '%', $wpdb->esc_like( '_transient_timeout_csearch_' ) . '%' ) );
 	delete_post_meta_by_key( '_csearch_boost' );
 	delete_post_meta_by_key( '_csearch_exclude' );
-	if ( function_exists( 'as_unschedule_all_actions' ) ) {
-		as_unschedule_all_actions( '', array(), 'csearch' );
+	if ( class_exists( 'ActionScheduler' ) && ActionScheduler::is_initialized() ) {
+		$csearch_store = ActionScheduler::store();
+		do {
+			$csearch_ids = $csearch_store->query_actions(
+				array(
+					'group'    => 'csearch',
+					'status'   => '',
+					'per_page' => 500,
+				)
+			);
+			foreach ( (array) $csearch_ids as $csearch_id ) {
+				$csearch_store->delete_action( (string) $csearch_id );
+			}
+			$csearch_more = count( (array) $csearch_ids ) === 500;
+		} while ( $csearch_more );
 	}
 	wp_cache_flush_group( 'csearch' );
 }

@@ -47,6 +47,9 @@ abstract class IntegrationTestCase extends WP_UnitTestCase {
 		Clock::freeze( null );
 		update_option( Options::SETTINGS, Settings::defaults(), true );
 		Settings::flush();
+		// The spec: the rate limit is off in tests. The rate-limit test turns it back on. The suite restores hooks
+		// after each test.
+		add_filter( 'csearch_rate_limit', '__return_zero' );
 	}
 
 	/**

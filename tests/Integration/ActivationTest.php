@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Container;
+use CreativeBranding\Search\Index\Reindex;
 use CreativeBranding\Search\Install\Activator;
 use CreativeBranding\Search\Plugin;
 use CreativeBranding\Search\Settings\Settings;
@@ -37,13 +38,15 @@ final class ActivationTest extends IntegrationTestCase {
 		self::assertArrayHasKey( Options::SETTINGS, wp_load_alloptions( true ) );
 	}
 
-	public function test_activation_schedules_nothing_and_indexes_nothing(): void {
+	public function test_activation_queues_exactly_one_build_and_indexes_nothing(): void {
 		global $wpdb;
+		delete_option( Options::INDEX_STATE );
 		Activator::activate();
-		self::assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $wpdb->prefix . 'csearch_documents' ) ), 'the first build is the owner\'s' );
-		if ( function_exists( 'as_get_scheduled_actions' ) ) {
-			self::assertSame( array(), as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ), 'ids' ), 'activation queued work' );
-		}
+		self::assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $wpdb->prefix . 'csearch_documents' ) ), 'nothing indexed on the request' );
+		$pending = as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ) );
+		self::assertSame( array( Reindex::START ), array_values( array_map( static fn( $a ): string => $a->get_hook(), $pending ) ), 'one job: the first build' );
+		Activator::activate();
+		self::assertCount( 1, as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ), 'ids' ), 're-activation queues nothing more' );
 	}
 
 	public function test_plugin_booted_with_a_container_and_constants(): void {
@@ -52,7 +55,8 @@ final class ActivationTest extends IntegrationTestCase {
 		self::assertSame( '10.0', CSEARCH_MIN_WC );
 		self::assertInstanceOf( Container::class, Plugin::container() );
 		self::assertSame( Plugin::container(), Plugin::container() );
-		self::assertSame( array(), Plugin::container()->hookables(), 'milestone 1 attaches no hooks' );
+		self::assertCount( 6, Plugin::container()->hookables(), 'index, jobs, CLI, install, REST and log hooks' );
+		self::assertNotFalse( has_action( 'woocommerce_update_product' ), 'the index hooks are attached' );
 	}
 
 	public function test_plugin_headers_match_the_spec(): void {

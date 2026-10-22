@@ -36,7 +36,9 @@ final class UninstallTest extends IntegrationTestCase {
 		update_post_meta( $product->get_id(), Options::META_EXCLUDE, 'yes' );
 		wp_cache_set( 'suggest:abc', array( 1 ), Options::CACHE_GROUP );
 		$wpdb->insert( Tables::terms(), array( 'term' => 'deck', 'df' => 1 ) );
-		$actionId = as_schedule_single_action( time() + DAY_IN_SECONDS, 'csearch_index_product', array( 'product_id' => $product->get_id() ), Options::QUEUE_GROUP );
+		$actionId = as_schedule_single_action( time() + DAY_IN_SECONDS, 'csearch_job_index_product', array( $product->get_id() ), Options::QUEUE_GROUP );
+		$doneId   = as_enqueue_async_action( 'csearch_job_index_product', array( 1 ), Options::QUEUE_GROUP );
+		\ActionScheduler::store()->mark_complete( $doneId );
 		self::assertGreaterThan( 0, $actionId );
 
 		$this->withRealTables( static fn() => Uninstaller::run() );
@@ -48,9 +50,16 @@ final class UninstallTest extends IntegrationTestCase {
 		self::assertSame( array(), $options, 'options or transients left behind' );
 		$meta = $wpdb->get_col( $wpdb->prepare( 'SELECT meta_key FROM %i WHERE meta_key LIKE %s', $wpdb->postmeta, $wpdb->esc_like( '_csearch_' ) . '%' ) );
 		self::assertSame( array(), $meta, 'product meta left behind' );
-		self::assertSame( array(), as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => \ActionScheduler_Store::STATUS_PENDING, 'per_page' => 5 ), 'ids' ), 'scheduled actions left behind' );
+		self::assertSame( array(), as_get_scheduled_actions( array( 'group' => Options::QUEUE_GROUP, 'status' => '', 'per_page' => 5 ), 'ids' ), 'actions of any status left behind' );
 		self::assertFalse( wp_cache_get( 'suggest:abc', Options::CACHE_GROUP ), 'cache group not flushed' );
 		self::assertNotEmpty( get_post( $product->get_id() ), 'products are never touched' );
+	}
+
+	public function test_a_deleted_network_site_drops_the_plugin_tables(): void {
+		$tables = apply_filters( 'wpmu_drop_tables', array( 'wp_posts' ), 1 );
+		foreach ( Tables::all() as $table ) {
+			self::assertContains( Tables::name( $table ), $tables );
+		}
 	}
 
 	public function test_uninstall_php_fallback_lists_the_same_tables_options_and_meta(): void {

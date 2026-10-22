@@ -4,6 +4,44 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
+Milestones 3 and 4, Index and Query and API, released together (D-056; there is no 0.3.0). The Domain gets a database: products, categories, tags and brands are written to the four index tables in the background whenever they change, a full reindex builds the next generation beside the live one and switches when complete, and WP-CLI can index, rebuild and report. The searcher answers four REST routes from that index, cached, rate-limited and logged without the shopper. Nothing a shopper sees yet; the block in milestone 6 calls these routes.
+
+### Added
+- Repositories for the four index tables (`DocumentRepository`, `TermRepository`, `PostingRepository`, `TrigramRepository`, on a shared `Repository` base that is the only caller of `$wpdb`, every statement prepared) and `IndexRepository`, the SQL implementation of `Domain\IndexStore`, reading the live generation only; the container binds the interface to it.
+- `Index\Indexer`: a product becomes one document per language with its name, every SKU (variations included), short and long description (shortcodes and HTML stripped, 2,000 characters), category names with parents, tags, brands, every attribute value (global and custom), price range, stock roll-up, image, URL, visibility, the owner's boost and sales; categories, tags and brands become documents of their own; removal decrements `df` and keeps the row at 0; SKU keys stored as dictionary terms (D-041).
+- `Index\ProductReader`, `TermReader`, `Languages` and `AnalyzerFactory`, with the public filters `csearch_index_product`, `csearch_product_fields` (D-050), `csearch_document`, `csearch_tokens`, `csearch_stop_words` and `csearch_languages` (D-045), and the action `csearch_index_switched`.
+- The hook set: product, variation, stock, stock status, term assignment, trash, untrash, delete, status change, term edit, create and delete, CSV import and the boost and exclude meta, each queuing the product once per request in memory and handing Action Scheduler one unique job at shutdown (D-043); stock-only saves flip `in_stock` without re-tokenising; a renamed term re-queues its products 100 a job; under WP-CLI the work runs inline at shutdown.
+- `Index\Reindex`: walks products 100 a job in id order into generation N+1, then categories, tags and brands, then switches `csearch_index_state.live`, flushes the cache group and deletes the old generation 500 documents a job; Cancel gives the half-built generation up; a reindex already running is not started twice; a product that throws is recorded and skipped. Live changes during a reindex reach both generations.
+- `wp csearch index <id>...`, `wp csearch reindex [--inline] [--cancel]`, `wp csearch status`.
+- `Install\Upgrader`: schema upgrades on `admin_init` and before WP-CLI commands, behind a lock (D-046).
+- `Support\Cast` for hook arguments and filter results that arrive untyped; `Support\PluginException`.
+- `Search\SearchService` (the one place a query becomes a ranked answer: cleaned, language-checked, the owner's synonyms, weights through `csearch_fields`, boost rules, hidden-by-SKU, the fallback language), `Search\Suggestions` (the panel's answer from the documents table alone: name, URL, thumbnail with `srcset`, price through `wc_price()`, stock), `Search\Cache` (by generation, `csearch_cache_ttl`), `Search\RateLimiter` (sliding window per client, `csearch_rate_limit`), `Search\SearchLog` (one row per search written at shutdown, scrubbed), `Search\Clicks` and `Search\LogMaintenance` (`csearch_purge_log`: daily roll-up into `stats`, retention purge in batches of 1,000).
+- `GET /csearch/v1/suggest`, `GET /csearch/v1/search`, `GET /csearch/v1/status` and `POST /csearch/v1/click`, with argument and response schemas, `Cache-Control` and an ETag of the generation and the normalised query (a 304 costs no search), 429 with `Retry-After`.
+- `wp csearch explain "<query>"`.
+- `SynonymRepository`, `LogRepository`, `ProductIdRepository`.
+- Tests: 30 integration tests for the indexer, the hooks, the reindex and the CLI against WooCommerce 11.2.1, 11 for the REST API, the golden set's 50 queries through `/suggest` and `/search` in English and French with the p95 budgets, a `WooCommerceCatalogue` loader that writes the fixture catalogue through WooCommerce's CRUD, and a timing test (`composer test:integration:benchmark`, D-047).
+
+### Fixed before release (milestone 3 review)
+- `df` is decremented once per removed document, not once per term, so a cleanup batch or a two-language product leaves exact counts; the score counts `df` from the postings of the query's language (D-044, D-050).
+- Jobs are deduplicated on pending jobs only, so the oldest supported Action Scheduler does not drop other products' jobs or the reindex's next batch, and a save during a product's running job is not lost (D-043).
+- The index state is read fresh and the cancel flag has its own option, so a cancel is never overwritten by a running batch (D-053); a cancelled generation's number is never reused; a reindex whose chain died can be cancelled; a queued reindex can be cancelled before it starts and an inline one removes it.
+- The reindex walks product ids by keyset, so a product trashed mid-walk does not drop another from the new generation (D-054).
+- A quantity change that keeps the stock flag no longer re-tokenises the product; a renamed global attribute value or parent category reaches its products; a deleted term's products are queued 100 a job; the queue flushes after WooCommerce's deferred product sync.
+- A failed document insert throws instead of attaching postings to another document.
+- Uninstall deletes the plugin's Action Scheduler rows of every status; a deleted network site drops the six tables.
+- WP-CLI messages are translatable, `index` exits non-zero when a product cannot be indexed, and every command takes `--format=json`.
+- The texts filter is `csearch_product_fields`; `csearch_fields` is the spec's weights filter (D-050).
+- A CI job runs the reindex and API budgets at 10,000 products.
+
+### Changed
+- Activation queues the first build as one Action Scheduler job and indexes nothing on the request; network activation sets up every site (M1 review items 2 and 3).
+- `Schema::maybeUpgrade()` no longer runs on every request; it is replaced by `Install\Upgrader`.
+- `Domain\Analyzer` takes an optional token filter, the seam the `csearch_tokens` filter uses.
+- The per-product job is `csearch_job_index_product`, not `csearch_index_product`, which the spec also gives to the filter (D-042).
+- `src/Index`, `src/Hooks`, `src/Cli` and `src/Repository` leave the core Infection run for the integration suite (D-048).
+
 ## [0.2.0] - 2026-10-21
 
 Milestone 2, Domain. The whole search algorithm as pure PHP under `src/Domain`, with no WordPress import, run in the tests against an in-memory index built from the catalogue fixture. Nothing a shopper or owner sees yet; milestone 3 gives it a database.
