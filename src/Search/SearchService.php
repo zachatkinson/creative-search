@@ -273,9 +273,15 @@ final class SearchService {
 			foreach ( $result->products as $hit ) {
 				$docs[ $hit->document->objectId ] = $hit->document->id;
 			}
-			// The owner's pinned products first, in their order (D-110); WooCommerce's query still leaves out one
-			// that is not published or is hidden from search.
-			$pins   = $this->rules->pins( $query, $lang );
+			// The owner's pinned products first, in their order (D-110). One hidden from search is left out here: the
+			// ranked query lifts WooCommerce's search exclusion (a hidden product's exact SKU may be ranked), and
+			// WooCommerce's query still leaves out one that is not published.
+			$pins = array();
+			foreach ( $this->index->productDocuments( $result->lang, $this->rules->pins( $query, $lang ) ) as $document ) {
+				if ( $document->visible ) {
+					$pins[] = $document->objectId;
+				}
+			}
 			$cached = array(
 				'ids'       => array_slice( array_values( array_unique( array_merge( $pins, $result->productIds() ) ) ), 0, self::MAX_IDS ),
 				'corrected' => $result->corrected,

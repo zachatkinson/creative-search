@@ -126,7 +126,7 @@ final class ProductSearch {
 
 	/**
 	 * Set the ranked ids again after WooCommerce's own `pre_get_posts` pass, which resets `post__in` from its
-	 * `loop_shop_post_in` filter (priority 20).
+	 * `loop_shop_post_in` filter (priority 20), and lift its search exclusion as {@see ProductSearch::visibility()} does.
 	 *
 	 * @param WP_Query $query The query.
 	 */
@@ -135,6 +135,12 @@ final class ProductSearch {
 			return;
 		}
 		$query->set( 'post__in', array() === $this->answer['ids'] ? array( 0 ) : $this->answer['ids'] );
+		// WooCommerce 11.2 adds "hidden from search" to a search that is not a product archive straight to the query,
+		// not through `woocommerce_product_query_tax_query`; it is lifted here the same way.
+		$taxQuery = $query->get( 'tax_query' );
+		if ( is_array( $taxQuery ) && array() !== $taxQuery ) {
+			$query->set( 'tax_query', $this->visibility( $taxQuery ) );
+		}
 	}
 
 	/**
