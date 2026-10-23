@@ -79,6 +79,7 @@ const ANSWER = {
 			image: null,
 			price_html: '<span>$84.99</span>',
 			in_stock: true,
+			matched: 'Matches SKU KAZ-DEA-00001',
 		},
 		{
 			id: 12,
@@ -190,6 +191,16 @@ test( 'an answer becomes rows, a See all row and words in the live region', asyn
 		'KAZUMI Skate Deck, Ghost Tiger, $84.99, Out of stock'
 	);
 	assert.equal( ctx.rows[ 2 ].label, 'KAZUMI, Brand (3)' );
+	assert.equal(
+		ctx.rows[ 0 ].matched,
+		'Matches SKU KAZ-DEA-00001',
+		'what matched, when the row does not show it (D-105)'
+	);
+	assert.equal(
+		ctx.rows[ 1 ].matched,
+		'',
+		'an answer without it says nothing'
+	);
 	assert.equal( ctx.rows[ 3 ].name, 'See all 2 results for kazumi' );
 	assert.equal( ctx.live, '3 suggestions' );
 	assert.equal( ctx.activeId, null );

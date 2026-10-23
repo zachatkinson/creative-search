@@ -204,6 +204,15 @@
 	color: var(--csearch-muted);
 }
 
+/* What matched when the row does not show it (D-105): one muted line under the name. */
+.csearch-matched {
+	overflow: hidden;
+	font-size: 0.875em;
+	color: var(--csearch-muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .csearch-stock::before {
 	display: inline-block;
 	inline-size: 0.5em;

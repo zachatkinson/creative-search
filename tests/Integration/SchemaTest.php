@@ -21,7 +21,7 @@ use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Support\IntegrationTestCase;
 
 /**
- * dbDelta() must be idempotent, the seven tables InnoDB and utf8mb4, with the keys the spec names (and D-087's).
+ * dbDelta() must be idempotent, the eight tables InnoDB and utf8mb4, with the keys the spec names (and D-087's).
  */
 final class SchemaTest extends IntegrationTestCase {
 
@@ -31,9 +31,9 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertSame( array(), $second, 'dbDelta would alter tables on every upgrade: ' . implode( '; ', $second ) );
 	}
 
-	public function test_seven_tables_exist_with_innodb_and_utf8mb4(): void {
+	public function test_eight_tables_exist_with_innodb_and_utf8mb4(): void {
 		global $wpdb;
-		self::assertCount( 7, Tables::all() );
+		self::assertCount( 8, Tables::all() );
 		foreach ( Tables::all() as $table ) {
 			$name = Tables::name( $table );
 			$row  = $wpdb->get_row( $wpdb->prepare( 'SELECT ENGINE, TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $name ), ARRAY_A );
@@ -52,17 +52,19 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertSame( $wpdb->prefix . 'csearch_term_stats', Tables::stats() );
 		self::assertSame( $wpdb->prefix . 'csearch_synonyms', Tables::synonyms() );
 		self::assertSame( $wpdb->prefix . 'csearch_log', Tables::log() );
+		self::assertSame( $wpdb->prefix . 'csearch_facts', Tables::facts() );
 	}
 
 	public function test_the_columns_the_spec_names_exist(): void {
 		$expected = array(
-			Tables::documents() => array( 'id', 'generation', 'type', 'object_id', 'lang', 'title', 'name_key', 'url', 'image_id', 'price_min', 'price_max', 'in_stock', 'visible', 'boost', 'total_sales', 'indexed_at' ),
+			Tables::documents() => array( 'id', 'generation', 'type', 'object_id', 'lang', 'title', 'name_key', 'url', 'image_id', 'price_min', 'price_max', 'in_stock', 'visible', 'boost', 'total_sales', 'indexed_at', 'cart' ),
 			Tables::terms()     => array( 'id', 'term', 'df' ),
 			Tables::postings()  => array( 'term_id', 'document_id', 'field', 'generation', 'lang', 'product', 'tf', 'first_pos' ),
 			Tables::trigrams()  => array( 'trigram', 'term_id' ),
 			Tables::stats()     => array( 'term_id', 'generation', 'lang', 'df' ),
 			Tables::synonyms()  => array( 'id', 'lang', 'word', 'means', 'both_ways', 'created_by', 'created_at' ),
 			Tables::log()       => array( 'id', 'query', 'normalised', 'lang', 'results', 'clicked_type', 'clicked_id', 'source', 'created_at' ),
+			Tables::facts()     => array( 'document_id', 'position', 'variation_id', 'field', 'attribute', 'name', 'value', 'label', 'image_id', 'terms' ),
 		);
 		foreach ( $expected as $table => $columns ) {
 			// dbDelta() appends a column an upgrade adds (name_key, schema 2), so an upgraded table orders them differently.
@@ -89,6 +91,7 @@ final class SchemaTest extends IntegrationTestCase {
 			Tables::stats()     => array( 'PRIMARY' ),
 			Tables::synonyms()  => array( 'PRIMARY', 'lang_word', 'lang_means' ),
 			Tables::log()       => array( 'PRIMARY', 'created_at', 'normalised' ),
+			Tables::facts()     => array( 'PRIMARY' ),
 		);
 		foreach ( $expected as $table => $keys ) {
 			$names = array_keys( $this->indexes( $table ) );
@@ -103,6 +106,7 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertSame( array( 'term_id', 'generation', 'lang' ), $this->indexes( Tables::stats() )['PRIMARY'] );
 		self::assertSame( array( 'trigram', 'term_id' ), $this->indexes( Tables::trigrams() )['PRIMARY'] );
 		self::assertSame( array( 'generation', 'type', 'object_id', 'lang' ), $this->indexes( Tables::documents() )['object'], 'D-012' );
+		self::assertSame( array( 'document_id', 'position' ), $this->indexes( Tables::facts() )['PRIMARY'], 'a document\'s facts in order, read and deleted by document (D-104)' );
 	}
 
 	public function test_unique_keys_are_unique(): void {
@@ -117,7 +121,7 @@ final class SchemaTest extends IntegrationTestCase {
 	public function test_db_version_option_is_stored_and_autoloaded(): void {
 		Schema::install();
 		self::assertSame( Schema::DB_VERSION, get_option( Options::DB_VERSION ) );
-		self::assertSame( '2', Schema::DB_VERSION );
+		self::assertSame( '3', Schema::DB_VERSION );
 		$alloptions = wp_load_alloptions( true );
 		self::assertArrayHasKey( Options::DB_VERSION, $alloptions, 'the upgrader compares it on admin requests' );
 	}
@@ -207,7 +211,7 @@ final class SchemaTest extends IntegrationTestCase {
 
 		self::assertTrue( Upgrader::maybeUpgrade() );
 		self::assertTrue( Migration::complete() );
-		self::assertSame( '2', get_option( Options::DB_VERSION ) );
+		self::assertSame( Schema::DB_VERSION, get_option( Options::DB_VERSION ) );
 		self::assertSame( array( 'term_id', 'generation', 'lang', 'product', 'document_id', 'field' ), $this->indexes( Tables::postings() )['PRIMARY'] );
 		self::assertSame( array( 'en', 'fr', 'en' ), $wpdb->get_col( $wpdb->prepare( 'SELECT lang FROM %i WHERE field = 1 ORDER BY document_id', Tables::postings() ) ) );
 	}
@@ -226,7 +230,7 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertFalse( get_option( Options::REBUILD_OWED ), 'no rebuild is owed before the upgrade is done' );
 
 		self::assertTrue( Upgrader::maybeUpgrade(), 'the next request finishes it' );
-		self::assertSame( '2', get_option( Options::DB_VERSION ) );
+		self::assertSame( Schema::DB_VERSION, get_option( Options::DB_VERSION ) );
 		self::assertSame( '0', (string) get_option( Options::REBUILD_OWED ) );
 	}
 
@@ -252,6 +256,22 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertFalse( Upgrader::needed() );
 		self::assertFalse( get_option( Options::UPGRADE_LOCK ) );
 		self::assertFalse( get_option( Options::REBUILD_OWED ) );
+	}
+
+	public function test_schema_two_upgrades_to_three_and_owes_a_rebuild(): void {
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( 'ALTER TABLE %i DROP COLUMN cart', Tables::documents() ) );
+		update_option( Options::DB_VERSION, '2' );
+		self::assertFalse( Migration::complete(), 'no cart column: not schema 3' );
+		self::assertTrue( Upgrader::needed() );
+		self::assertFalse( Upgrader::below( '2' ), 'the searcher keeps its schema 2 reads while the upgrade waits' );
+		self::assertTrue( Upgrader::below( '3' ), 'and reads no facts' );
+
+		self::assertTrue( Upgrader::maybeUpgrade() );
+		self::assertTrue( Migration::complete() );
+		self::assertSame( '3', get_option( Options::DB_VERSION ) );
+		self::assertContains( 'cart', $this->columns( Tables::documents() ) );
+		self::assertSame( '0', (string) get_option( Options::REBUILD_OWED ), 'the rebuild fills the facts and the cart flags (D-104, D-106)' );
 	}
 
 	public function test_activation_does_not_migrate_beside_a_running_upgrade(): void {

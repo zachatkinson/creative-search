@@ -169,6 +169,8 @@ final class SearchForm {
 			. '<span class="csearch-kind" hidden data-wp-bind--hidden="!context.row.kind">' . $this->separator() . '<span data-wp-text="context.row.kind"></span></span>'
 			. '<span class="csearch-sr" hidden data-wp-bind--hidden="!context.row.type">' . $this->separator() . '<span data-wp-text="context.row.type"></span></span>'
 			. '</span>'
+			// What matched when the row does not show it ("Matches SKU KZ-825", D-105), on its own line.
+			. '<span class="csearch-matched" hidden data-wp-bind--hidden="!context.row.matched">' . $this->separator() . '<span data-wp-text="context.row.matched"></span></span>'
 			. '</span>'
 			. '</li>'
 			. '</template>';

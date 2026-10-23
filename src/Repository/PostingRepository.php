@@ -57,6 +57,38 @@ final class PostingRepository extends Repository {
 	}
 
 	/**
+	 * Which of some terms some product documents carry, field by field, read by the primary key's lead for each
+	 * term (D-105): only for the few products a panel or a results page shows.
+	 *
+	 * @param int[]    $documentIds Product document ids.
+	 * @param string[] $terms       Terms.
+	 * @param int      $generation  Generation.
+	 * @param string   $lang        Language code.
+	 * @return array<int, array<int, string[]>> Document id to field id to the terms there.
+	 */
+	public function fieldsOf( array $documentIds, array $terms, int $generation, string $lang ): array {
+		if ( array() === $documentIds || array() === $terms ) {
+			return array();
+		}
+		$rows = $this->rows(
+			$this->prepare(
+				'SELECT p.document_id, p.field, t.term FROM %i t INNER JOIN %i p ON p.term_id = t.id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE t.term IN (' . self::strings( count( $terms ) ) . ') AND p.document_id IN (' . self::ints( $documentIds ) . ')',
+				Tables::terms(),
+				Tables::postings(),
+				$generation,
+				$lang,
+				Kind::PRODUCT,
+				...$terms
+			)
+		);
+		$out  = array();
+		foreach ( $rows as $row ) {
+			$out[ (int) $row['document_id'] ][ (int) $row['field'] ][] = (string) $row['term'];
+		}
+		return $out;
+	}
+
+	/**
 	 * The terms of some documents, each with how many of those documents carry it, per generation and language.
 	 * The posts and pages are left out: their counts are not stored (D-093).
 	 *

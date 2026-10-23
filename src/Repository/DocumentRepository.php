@@ -26,21 +26,21 @@ final class DocumentRepository extends Repository {
 	/**
 	 * Insert a document row.
 	 *
-	 * @param array{generation: int, type: string, object_id: int, lang: string, title: string, name_key: string, url: string, image_id: ?int, price_min: ?float, price_max: ?float, in_stock: bool, visible: bool, boost: int, total_sales: int} $row The row.
+	 * @param array{generation: int, type: string, object_id: int, lang: string, title: string, name_key: string, url: string, image_id: ?int, price_min: ?float, price_max: ?float, in_stock: bool, visible: bool, boost: int, total_sales: int, cart?: bool} $row The row.
 	 * @return int The new id.
 	 * @throws PluginException When the row was not written (another process wrote the same document first).
 	 */
 	public function insert( array $row ): int {
 		$written = $this->run(
 			$this->prepare(
-				'INSERT INTO %i (generation, type, object_id, lang, title, name_key, url, image_id, price_min, price_max, in_stock, visible, boost, total_sales, indexed_at) VALUES (%d, %s, %d, %s, %s, %s, %s, ' . ( null === $row['image_id'] ? 'NULL' : '%d' ) . ', ' . ( null === $row['price_min'] ? 'NULL' : '%f' ) . ', ' . ( null === $row['price_max'] ? 'NULL' : '%f' ) . ', %d, %d, %d, %d, %s)',
+				'INSERT INTO %i (generation, type, object_id, lang, title, name_key, url, image_id, price_min, price_max, in_stock, visible, boost, total_sales, indexed_at, cart) VALUES (%d, %s, %d, %s, %s, %s, %s, ' . ( null === $row['image_id'] ? 'NULL' : '%d' ) . ', ' . ( null === $row['price_min'] ? 'NULL' : '%f' ) . ', ' . ( null === $row['price_max'] ? 'NULL' : '%f' ) . ', %d, %d, %d, %d, %s, %d)',
 				Tables::documents(),
 				...array_merge(
 					array( $row['generation'], $row['type'], $row['object_id'], $row['lang'], $row['title'], $row['name_key'], $row['url'] ),
 					null === $row['image_id'] ? array() : array( $row['image_id'] ),
 					null === $row['price_min'] ? array() : array( $row['price_min'] ),
 					null === $row['price_max'] ? array() : array( $row['price_max'] ),
-					array( (int) $row['in_stock'], (int) $row['visible'], $row['boost'], $row['total_sales'], Clock::now() )
+					array( (int) $row['in_stock'], (int) $row['visible'], $row['boost'], $row['total_sales'], Clock::now(), (int) ( $row['cart'] ?? false ) )
 				)
 			)
 		);
@@ -104,15 +104,17 @@ final class DocumentRepository extends Repository {
 	}
 
 	/**
-	 * Flip the stock flag of a product's documents without touching anything else.
+	 * Flip the stock flag of a product's documents, and with it whether the panel may add it to the cart (D-106),
+	 * without touching anything else.
 	 *
 	 * @param int  $productId  Product id.
 	 * @param int  $generation Generation.
 	 * @param bool $inStock    In stock.
+	 * @param bool $cart       Whether the panel may add it to the cart.
 	 * @return int Rows changed.
 	 */
-	public function setStock( int $productId, int $generation, bool $inStock ): int {
-		return $this->run( $this->prepare( 'UPDATE %i SET in_stock = %d WHERE generation = %d AND type = %s AND object_id = %d', Tables::documents(), (int) $inStock, $generation, Document::PRODUCT, $productId ) );
+	public function setStock( int $productId, int $generation, bool $inStock, bool $cart = false ): int {
+		return $this->run( $this->prepare( 'UPDATE %i SET in_stock = %d, cart = %d WHERE generation = %d AND type = %s AND object_id = %d', Tables::documents(), (int) $inStock, (int) $cart, $generation, Document::PRODUCT, $productId ) );
 	}
 
 	/**

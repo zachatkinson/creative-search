@@ -1658,3 +1658,26 @@ msgstr "%1$s (%2$s)"
 msgctxt "an attribute and its values, such as Width 8.25"
 msgid "%1$s %2$s"
 msgstr "%1$s %2$s"
+
+#. translators: %s: a product's or variation's SKU
+#: src/Search/MatchDetails.php:134
+#, php-format
+msgid "Matches SKU %s"
+msgstr "Correspond à l’UGS %s"
+
+#. translators: %s: an attribute value, such as 8.25
+#: src/Search/MatchDetails.php:138
+#, php-format
+msgid "Matches %s"
+msgstr "Correspond à %s"
+
+#. translators: 1: an attribute's name, such as Width, 2: its value, such as 8.25
+#: src/Search/MatchDetails.php:140
+#, php-format
+msgctxt "an attribute and its value"
+msgid "Matches %1$s: %2$s"
+msgstr "Correspond à %1$s : %2$s"
+
+#: src/Search/MatchDetails.php:142
+msgid "Matches the description"
+msgstr "Correspond à la description"

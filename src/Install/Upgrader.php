@@ -71,6 +71,16 @@ final class Upgrader {
 	}
 
 	/**
+	 * Whether the stored schema is older than a version: the searcher reads as schema 1 while it is below 2
+	 * (D-090), and a product's SKUs and attribute values are read only from 3 (D-104).
+	 *
+	 * @param string $version A schema version.
+	 */
+	public static function below( string $version ): bool {
+		return version_compare( self::stored(), $version, '<' );
+	}
+
+	/**
 	 * The stored schema version, '0' when none.
 	 */
 	public static function stored(): string {
@@ -79,14 +89,15 @@ final class Upgrader {
 	}
 
 	/**
-	 * Owe a rebuild when an index built before schema 2 was just upgraded, so every document gets its name key
-	 * (D-086), and queue it. Only a generation begun after the upgrade that goes live settles the debt
-	 * (`Reindex::owe()`), so neither a reindex already running nor one cancelled or abandoned loses it (D-090).
+	 * Owe a rebuild when an index built before the current schema was just upgraded, so every document gets its
+	 * name key (schema 2, D-086) and its SKUs, attribute values and cart flag (schema 3, D-104, D-106), and queue
+	 * it. Only a generation begun after the upgrade that goes live settles the debt (`Reindex::owe()`), so neither
+	 * a reindex already running nor one cancelled or abandoned loses it (D-090).
 	 *
 	 * @param string $stored The version stored before the upgrade.
 	 */
 	public static function rebuildAfter( string $stored ): void {
-		if ( version_compare( $stored, '1', '>=' ) && version_compare( $stored, '2', '<' ) && ! self::needed() ) {
+		if ( version_compare( $stored, '1', '>=' ) && version_compare( $stored, Schema::DB_VERSION, '<' ) && ! self::needed() ) {
 			Plugin::container()->get( Reindex::class )->owe();
 		}
 	}

@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Search;
 
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 
@@ -32,10 +33,11 @@ final class Suggestions {
 	/**
 	 * Constructor.
 	 *
-	 * @param SearchService $search The search service.
-	 * @param Cache         $cache  Answers.
+	 * @param SearchService $search  The search service.
+	 * @param Cache         $cache   Answers.
+	 * @param MatchDetails  $matches The variation a query named and why each product matched (D-104, D-105).
 	 */
-	public function __construct( private SearchService $search, private Cache $cache ) {
+	public function __construct( private SearchService $search, private Cache $cache, private MatchDetails $matches ) {
 	}
 
 	/**
@@ -68,7 +70,7 @@ final class Suggestions {
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms );
 			$answer = array(
-				'products'  => $this->products( array_slice( $result->products, 0, $limit ) ),
+				'products'  => $this->products( array_slice( $result->products, 0, $limit ), $result ),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
 				'total'     => count( $result->products ),
@@ -83,27 +85,34 @@ final class Suggestions {
 	}
 
 	/**
-	 * Product rows.
+	 * Product rows: a variation the query named shows its own image and opens with it chosen (D-104), and a match
+	 * the row does not show says what it was (D-105).
 	 *
-	 * @param Hit[] $hits Ranked products.
+	 * @param Hit[]        $hits   Ranked products.
+	 * @param SearchResult $result The search they came from.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $hits ): array {
-		$rows = $this->search->index()->rows( array_map( static fn( Hit $h ): int => $h->document->id, $hits ) );
-		$out  = array();
+	private function products( array $hits, SearchResult $result ): array {
+		$ids     = array_map( static fn( Hit $h ): int => $h->document->id, $hits );
+		$rows    = $this->search->index()->rows( $ids );
+		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
+		$out     = array();
 		foreach ( $hits as $hit ) {
 			$row = $rows[ $hit->document->id ] ?? null;
 			if ( null === $row ) {
 				continue;
 			}
+			$detail     = $details[ $hit->document->id ] ?? null;
+			$imageId    = $detail->imageId ?? Cast::int( $row['image_id'] );
 			$suggestion = array(
 				'id'         => $hit->document->objectId,
 				'name'       => $hit->document->title,
-				'url'        => Cast::str( $row['url'] ),
-				'image'      => self::image( Cast::int( $row['image_id'] ) ),
+				'url'        => null === $detail ? Cast::str( $row['url'] ) : MatchDetails::url( Cast::str( $row['url'] ), $detail ),
+				'image'      => self::image( $imageId ),
 				'price_html' => self::price( $row['price_min'], $row['price_max'] ),
 				'in_stock'   => $hit->document->inStock,
 				'type'       => 'product',
+				'matched'    => null === $detail ? '' : MatchDetails::line( $detail ),
 			);
 			/**
 			 * CSS classes for a product's suggestion row, as Mature Content adds one to blur flagged artwork
@@ -114,10 +123,10 @@ final class Suggestions {
 			 *
 			 * @param string[]             $classes   None by default.
 			 * @param int                  $productId The product.
-			 * @param int|null             $imageId   Its image, or null.
+			 * @param int|null             $imageId   The image the row shows (since 1.3.0 a variation's the query named), or null.
 			 * @param array<string, mixed> $row       The suggestion as the panel receives it.
 			 */
-			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $hit->document->objectId, Cast::int( $row['image_id'] ) > 0 ? Cast::int( $row['image_id'] ) : null, $suggestion );
+			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $hit->document->objectId, $imageId > 0 ? $imageId : null, $suggestion );
 			$suggestion['classes'] = self::classes( $classes );
 			$out[]                 = $suggestion;
 		}

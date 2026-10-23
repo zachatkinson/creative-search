@@ -25,16 +25,18 @@ final class Tables {
 	public const STATS     = 'term_stats';
 	public const SYNONYMS  = 'synonyms';
 	public const LOG       = 'log';
+	public const FACTS     = 'facts';
 
 	public const PREFIX = 'csearch_';
 
 	/**
-	 * Every plugin table, in creation order (the index's five, then the owner's two).
+	 * Every plugin table, in creation order (the index's five, the owner's two, then the products' SKUs and
+	 * attribute values, schema 3).
 	 *
 	 * @return string[]
 	 */
 	public static function all(): array {
-		return array( self::DOCUMENTS, self::TERMS, self::POSTINGS, self::TRIGRAMS, self::STATS, self::SYNONYMS, self::LOG );
+		return array( self::DOCUMENTS, self::TERMS, self::POSTINGS, self::TRIGRAMS, self::STATS, self::SYNONYMS, self::LOG, self::FACTS );
 	}
 
 	/**
@@ -94,5 +96,12 @@ final class Tables {
 	 */
 	public static function log(): string {
 		return self::name( self::LOG );
+	}
+
+	/**
+	 * The table of the products' and variations' SKUs and attribute values (D-104).
+	 */
+	public static function facts(): string {
+		return self::name( self::FACTS );
 	}
 }

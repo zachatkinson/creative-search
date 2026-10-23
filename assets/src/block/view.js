@@ -264,6 +264,7 @@ function productRow( ctx, p, index ) {
 		stock: stock || null,
 		out: ctx.stock && ! p.in_stock,
 		meta: Boolean( price || stock ),
+		matched: typeof p.matched === 'string' ? p.matched : '',
 		classes: Array.isArray( p.classes ) ? p.classes : [],
 	};
 }

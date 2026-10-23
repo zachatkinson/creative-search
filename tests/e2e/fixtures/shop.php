@@ -101,9 +101,51 @@ if ( array( 'pa_width' ) !== Settings::get( 'filter_attributes' ) ) {
 	Settings::set( 'filter_attributes', array( 'pa_width' ) );
 }
 
+// A variable grip in three designs, two with their own photo (D-104: "mumber fur fire" shows the Fire design).
+$csearch_grip_new = false;
+if ( ! wc_get_product_id_by_sku( 'MUM-FUR' ) && is_string( $csearch_file ) && file_exists( $csearch_file ) ) {
+	require_once ABSPATH . 'wp-admin/includes/image.php';
+	$csearch_images = array();
+	foreach ( array( 'fire', 'ice' ) as $csearch_design ) {
+		$csearch_upload = wp_upload_dir();
+		$csearch_target = trailingslashit( $csearch_upload['path'] ) . 'grip-' . $csearch_design . '.webp';
+		copy( $csearch_file, $csearch_target ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy -- a test fixture's image.
+		$csearch_images[ $csearch_design ] = wp_insert_attachment(
+			array(
+				'post_mime_type' => 'image/webp',
+				'post_title'     => 'Grip ' . $csearch_design,
+				'post_status'    => 'inherit',
+			),
+			$csearch_target
+		);
+		wp_update_attachment_metadata( $csearch_images[ $csearch_design ], wp_generate_attachment_metadata( $csearch_images[ $csearch_design ], $csearch_target ) );
+	}
+	$csearch_design_attribute = new WC_Product_Attribute();
+	$csearch_design_attribute->set_name( 'Design' );
+	$csearch_design_attribute->set_options( array( 'Fire', 'Ice', 'Leaf' ) );
+	$csearch_design_attribute->set_visible( true );
+	$csearch_design_attribute->set_variation( true );
+	$csearch_grip = new WC_Product_Variable();
+	$csearch_grip->set_name( 'Mumber-Fur Grip' );
+	$csearch_grip->set_sku( 'MUM-FUR' );
+	$csearch_grip->set_attributes( array( $csearch_design_attribute ) );
+	$csearch_grip_id = $csearch_grip->save();
+	foreach ( array( 'Fire', 'Ice', 'Leaf' ) as $csearch_design ) {
+		$csearch_variation = new WC_Product_Variation();
+		$csearch_variation->set_parent_id( $csearch_grip_id );
+		$csearch_variation->set_sku( 'MUM-FUR-' . strtoupper( $csearch_design ) );
+		$csearch_variation->set_regular_price( '14.99' );
+		$csearch_variation->set_attributes( array( 'design' => $csearch_design ) );
+		$csearch_variation->set_image_id( $csearch_images[ strtolower( $csearch_design ) ] ?? 0 );
+		$csearch_variation->save();
+	}
+	WC_Product_Variable::sync( $csearch_grip_id );
+	$csearch_grip_new = true;
+}
+
 if ( wc_get_product_id_by_sku( 'KAZ-DEA-00001' ) ) {
 	Plugin::container()->get( \CreativeBranding\Search\Index\AttributeTerms::class )->rebuild();
-	if ( $csearch_french_new || $csearch_content_new ) {
+	if ( $csearch_french_new || $csearch_content_new || $csearch_grip_new ) {
 		Plugin::container()->get( Reindex::class )->runInline();
 		echo "present, reindexed\n";
 		return;

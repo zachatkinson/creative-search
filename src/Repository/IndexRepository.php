@@ -12,6 +12,7 @@ namespace CreativeBranding\Search\Repository;
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\Fact;
 use CreativeBranding\Search\Domain\IndexStore;
 use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\RankPlan;
@@ -70,6 +71,7 @@ final class IndexRepository implements IndexStore {
 	 * @param RankRepository     $ranks      The ranking statement.
 	 * @param StatRepository     $stats      Term counts per generation and language.
 	 * @param SchemaOneReads     $schemaOne  The reads while the schema upgrade waits (D-090).
+	 * @param FactRepository     $facts      The products' SKUs and attribute values (D-104).
 	 */
 	public function __construct(
 		private IndexState $state,
@@ -80,7 +82,8 @@ final class IndexRepository implements IndexStore {
 		private AnalyzerFactory $analyzers,
 		private RankRepository $ranks,
 		private StatRepository $stats,
-		private SchemaOneReads $schemaOne
+		private SchemaOneReads $schemaOne,
+		private FactRepository $facts
 	) {
 	}
 
@@ -106,7 +109,7 @@ final class IndexRepository implements IndexStore {
 	 */
 	public function termsWithPrefix( string $prefix, int $limit, int $kind = Kind::PRODUCT, string $lang = '' ): array {
 		if ( Kind::CONTENT === $kind ) {
-			return Upgrader::needed() ? array() : $this->postings->contentPrefix( $prefix, $limit, $this->generation(), $lang );
+			return Upgrader::below( '2' ) ? array() : $this->postings->contentPrefix( $prefix, $limit, $this->generation(), $lang );
 		}
 		return $this->dictionary->withPrefix( $prefix, $limit );
 	}
@@ -131,7 +134,7 @@ final class IndexRepository implements IndexStore {
 	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>>
 	 */
 	public function postings( array $terms, string $lang, int $kind ): array {
-		if ( Upgrader::needed() ) {
+		if ( Upgrader::below( '2' ) ) {
 			// Schema 1 had no posts or pages (D-090, D-093).
 			return Kind::CONTENT === $kind ? array() : $this->schemaOne->forTerms( $terms, $this->generation(), $lang, Kind::PRODUCT === $kind );
 		}
@@ -186,9 +189,9 @@ final class IndexRepository implements IndexStore {
 	 */
 	public function frequencies( array $terms, string $lang, int $kind = Kind::PRODUCT ): array {
 		if ( Kind::CONTENT === $kind ) {
-			return Upgrader::needed() ? array() : $this->postings->contentFrequencies( $terms, $this->generation(), $lang );
+			return Upgrader::below( '2' ) ? array() : $this->postings->contentFrequencies( $terms, $this->generation(), $lang );
 		}
-		return Upgrader::needed()
+		return Upgrader::below( '2' )
 			? $this->schemaOne->frequencies( $terms, $this->generation(), $lang )
 			: $this->stats->frequencies( $terms, $this->generation(), $lang );
 	}
@@ -201,7 +204,7 @@ final class IndexRepository implements IndexStore {
 	 * @param int      $kind  Products or content.
 	 */
 	public function productCount( array $terms, string $lang, int $kind = Kind::PRODUCT ): int {
-		if ( Upgrader::needed() ) {
+		if ( Upgrader::below( '2' ) ) {
 			return Kind::CONTENT === $kind ? 0 : $this->schemaOne->productCount( $terms, $this->generation(), $lang );
 		}
 		return $this->postings->productCount( $terms, $this->generation(), $lang, $kind );
@@ -214,7 +217,7 @@ final class IndexRepository implements IndexStore {
 	 * @return Hit[]
 	 */
 	public function rank( RankPlan $plan ): array {
-		if ( $this->explaining || Upgrader::needed() ) { // While the schema upgrade waits, the statement's columns may not be there yet (D-090).
+		if ( $this->explaining || Upgrader::below( '2' ) ) { // While the schema upgrade waits, the statement's columns may not be there yet (D-090).
 			return ( new Ranker() )->rank(
 				$plan,
 				$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, $plan->kind ),
@@ -323,6 +326,29 @@ final class IndexRepository implements IndexStore {
 			}
 		}
 		return $ids;
+	}
+
+	/**
+	 * Which of some terms some product documents of a language carry, field by field, in the live generation
+	 * (D-105).
+	 *
+	 * @param int[]    $documentIds Product document ids.
+	 * @param string[] $terms       Terms.
+	 * @param string   $lang        Language code.
+	 * @return array<int, array<int, string[]>> Document id to field id to terms.
+	 */
+	public function fieldsOf( array $documentIds, array $terms, string $lang ): array {
+		return Upgrader::below( '3' ) ? array() : $this->postings->fieldsOf( $documentIds, $terms, $this->generation(), $lang );
+	}
+
+	/**
+	 * The SKUs and attribute values of some product documents (D-104); none until the schema has them.
+	 *
+	 * @param int[] $documentIds Product document ids.
+	 * @return array<int, Fact[]> Document id to its facts.
+	 */
+	public function facts( array $documentIds ): array {
+		return Upgrader::below( '3' ) ? array() : $this->facts->of( $documentIds );
 	}
 
 	/**

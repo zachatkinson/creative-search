@@ -48,6 +48,7 @@ final class Schemas {
 								'type'  => 'array',
 								'items' => array( 'type' => 'string' ),
 							),
+							'matched'    => array( 'type' => 'string' ),
 						),
 					),
 				),
