@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Rest;
 
 use CreativeBranding\Search\Search\SearchLog;
 use CreativeBranding\Search\Search\SearchService;
+use CreativeBranding\Search\Results\CategoryScope;
 use CreativeBranding\Search\Search\Suggestions;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
@@ -57,6 +58,12 @@ final class SuggestRoute implements Route {
 							'maximum'     => Settings::LIMIT_MAX,
 							'default'     => Settings::LIMIT_DEFAULT,
 						),
+						'cat'   => array(
+							'description' => __( 'A product category’s slug: suggest only its products and its subcategories’ (1.3).', 'creative-search' ),
+							'type'        => 'string',
+							'pattern'     => '^[^\\s/?#]{1,200}$',
+							'required'    => false,
+						),
 					),
 				),
 				'schema' => array( Schemas::class, 'suggest' ),
@@ -77,10 +84,11 @@ final class SuggestRoute implements Route {
 		$query = SearchService::clean( Cast::str( $request->get_param( 'q' ) ) );
 		$lang  = $this->search->language( Args::langOf( $request ) );
 		$limit = Cast::int( $request->get_param( 'limit' ), Settings::LIMIT_DEFAULT );
+		$scope = CategoryScope::ttIds( CategoryScope::bySlug( Cast::str( $request->get_param( 'cat' ) ) ) );
 		return Responses::cacheable(
 			$request,
 			$this->search->index()->generation(),
-			fn(): array => $this->suggestions->answer( $query, $lang, $limit )
+			fn(): array => $this->suggestions->answer( $query, $lang, $limit, $scope )
 		);
 	}
 }

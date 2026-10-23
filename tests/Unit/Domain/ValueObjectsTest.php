@@ -82,6 +82,8 @@ final class ValueObjectsTest extends TestCase {
 		self::assertSame( 500, $o->limit );
 		self::assertSame( 3, $o->termLimit );
 		self::assertSame( array(), $o->boostRules );
+		self::assertFalse( $o->strict, 'every match by default (D-118)' );
+		self::assertSame( array(), $o->scope, 'every category by default (D-117)' );
 		self::assertSame( Fields::weightsById( array() ), $o->weightsById() );
 		$custom = new SearchOptions( array( 'name' => 1 ), false, null, array( 'brand:kazumi' => 2 ), 10, 1 );
 		self::assertSame( 1, $custom->weightsById()[ Fields::NAME ] );

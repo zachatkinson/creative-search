@@ -74,14 +74,34 @@ final class ResultsView {
 			return '';
 		}
 		$count = $this->products->shown();
-		$html  = $this->categoriesLine() . '<p class="csearch-results-summary" role="status">' . esc_html(
-			sprintf(
+		$scope = CategoryScope::requested();
+		$line  = null === $scope
+			? sprintf(
 				/* translators: 1: number of products found, 2: the search query */
 				_n( '%1$s result for “%2$s”', '%1$s results for “%2$s”', $count, 'creative-search' ),
 				number_format_i18n( $count ),
 				$answer['query']
 			)
-		) . '</p>';
+			: sprintf(
+				/* translators: 1: number of products found, 2: the search query, 3: the category searched */
+				_n( '%1$s result for “%2$s” in %3$s', '%1$s results for “%2$s” in %3$s', $count, 'creative-search' ),
+				number_format_i18n( $count ),
+				$answer['query'],
+				$scope->name
+			);
+		$html = $this->categoriesLine() . '<p class="csearch-results-summary" role="status">' . esc_html( $line ) . '</p>';
+		if ( null !== $scope ) {
+			// The same search in every category, the page's filters and sort with it, not its page, and not sent on to a
+			// category it names: the shopper asked for every product (D-117).
+			$all   = add_query_arg( QueryRouter::ALL_ARG, '1', remove_query_arg( array( CategoryScope::ARG, 'paged', 'product-page' ) ) );
+			$html .= '<p class="csearch-results-scope"><a href="' . esc_url( $all ) . '">' . esc_html(
+				sprintf(
+					/* translators: %s: the query the shopper typed */
+					__( 'Search all products for “%s”.', 'creative-search' ),
+					$answer['query']
+				)
+			) . '</a></p>';
+		}
 		if ( null !== $answer['corrected'] ) {
 			// The page the shopper is on, with its language and filters, asked for the exact words.
 			$exact = add_query_arg( ProductSearch::EXACT_ARG, '1', remove_query_arg( array( 'paged', 'product-page' ) ) );

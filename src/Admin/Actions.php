@@ -317,6 +317,9 @@ final class Actions {
 				$changes[ $key ] = $input[ $key ];
 			}
 		}
+		if ( isset( $input['custom_fields'] ) || isset( $input['custom_fields_other'] ) ) {
+			$changes['custom_fields'] = self::metaKeys( $input['custom_fields'] ?? array(), $input['custom_fields_other'] ?? '' );
+		}
 		$after = Settings::update( $changes );
 		foreach ( $this->languages->codes() as $lang ) {
 			if ( isset( $input['stopwords'] ) && is_array( $input['stopwords'] ) && array_key_exists( $lang, $input['stopwords'] ) ) {
@@ -329,6 +332,7 @@ final class Actions {
 		foreach ( self::INDEX_FLAGS as $flag ) {
 			$rebuild = $rebuild || $before[ $flag ] !== $after[ $flag ];
 		}
+		$rebuild = $rebuild || $before['custom_fields'] !== $after['custom_fields'];
 		foreach ( ContentReader::TYPES as $postType => [ , $flag ] ) {
 			if ( $before[ $flag ] !== $after[ $flag ] ) {
 				$this->queue->contentType( $postType ); // Indexed or removed in jobs; no rebuild needed (D-093).
@@ -341,6 +345,23 @@ final class Actions {
 				: __( 'Settings saved.', 'creative-search' )
 		);
 		return AdminPage::url( 'tools' );
+	}
+
+	/**
+	 * The custom fields from the Tools tab (D-119): the boxes ticked, then the other names typed, separated by
+	 * commas or new lines; sanitised by the settings.
+	 *
+	 * @param mixed $ticked The boxes.
+	 * @param mixed $typed  The other names.
+	 * @return string[]
+	 */
+	public static function metaKeys( mixed $ticked, mixed $typed ): array {
+		$keys  = Cast::strings( is_array( $ticked ) ? $ticked : array() );
+		$parts = preg_split( '/[\s,]+/', Cast::str( $typed ) );
+		foreach ( is_array( $parts ) ? $parts : array() as $key ) {
+			$keys[] = $key;
+		}
+		return Settings::sanitizeMetaKeys( $keys );
 	}
 
 	/**

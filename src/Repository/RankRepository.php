@@ -23,8 +23,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * postings of the plan's terms, scored per field as the Domain's `Scorer` does (w · m · (1 + ln(1 + tf)) · idf,
  * the idf worked out in PHP), the best field per token, AND across tokens, the phrase bonus and the quoted
  * phrases from first positions, the exactness bonuses from the name key and the SKU key, the stock penalty, the
- * owner's boost and rules, the minus words, hidden-by-SKU, and the order and limit. Only the page of results
- * comes back to PHP, so memory no longer grows with the number of matching products.
+ * owner's boost and rules, the minus words, hidden-by-SKU, the category a search is kept to (D-117), and the order
+ * and limit. Only the page of results comes back to PHP, so memory no longer grows with the number of matching
+ * products.
  *
  * The term ids are read first (a unique-key lookup), so the statement joins integers and never compares a
  * literal's collation with a column's. Every postings read names the term, generation, language and kind, the
@@ -41,6 +42,7 @@ final class RankRepository extends Repository {
 	 * @return array<int, array<string, string|null>> In rank order.
 	 */
 	public function rank( RankPlan $plan, int $generation, array $taxonomies ): array {
+		global $wpdb;
 		$ids = $this->termIds( $plan->terms() );
 		$q   = array();
 		$sql = array();
@@ -106,10 +108,13 @@ final class RankRepository extends Repository {
 			foreach ( $rules as $ttId => $points ) {
 				$cases[] = $this->prepare( 'WHEN %d THEN %d', $ttId, $points );
 			}
-			global $wpdb;
 			$sql[] = $this->prepare( 'LEFT JOIN (SELECT object_id, SUM(CASE term_taxonomy_id ' . implode( ' ', $cases ) . ' ELSE 0 END) AS points FROM %i WHERE term_taxonomy_id IN (' . self::ints( array_keys( $rules ) ) . ') GROUP BY object_id) r ON r.object_id = d.object_id', $wpdb->term_relationships );
 		}
 		$sql[] = $this->prepare( 'WHERE (d.visible = 1 OR (%d = 1 AND sku.doc IS NOT NULL))', $plan->hiddenBySku ? 1 : 0 );
+		if ( array() !== $plan->scope ) {
+			// A search kept to a category (D-117): its products and its subcategories', through the relationships' primary key.
+			$sql[] = $this->prepare( 'AND EXISTS (SELECT 1 FROM %i tr WHERE tr.object_id = d.object_id AND tr.term_taxonomy_id IN (' . self::ints( $plan->scope ) . '))', $wpdb->term_relationships );
+		}
 		if ( array() !== $plan->excluded ) {
 			$sql[] = $this->prepare(
 				'AND NOT EXISTS (SELECT 1 FROM %i tx INNER JOIN %i px ON px.term_id = tx.id AND px.generation = %d AND px.lang = %s AND px.product = %d AND px.document_id = d.id WHERE tx.term IN (' . self::strings( count( $plan->excluded ) ) . '))',
@@ -127,6 +132,25 @@ final class RankRepository extends Repository {
 		$sql[] = $this->prepare( 'ORDER BY total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
 
 		return $this->rows( implode( ' ', $sql ) );
+	}
+
+	/**
+	 * Which of some products are in any of some term-taxonomies: a category and its subcategories (D-117).
+	 *
+	 * @param int[] $objects Product ids.
+	 * @param int[] $scope   Term-taxonomy ids.
+	 * @return array<int, true> The products in it, as keys.
+	 */
+	public function scopedObjects( array $objects, array $scope ): array {
+		if ( array() === $objects || array() === $scope ) {
+			return array();
+		}
+		global $wpdb;
+		$out = array();
+		foreach ( $this->rows( $this->prepare( 'SELECT DISTINCT object_id FROM %i WHERE object_id IN (' . self::ints( $objects ) . ') AND term_taxonomy_id IN (' . self::ints( $scope ) . ')', $wpdb->term_relationships ) ) as $row ) {
+			$out[ (int) $row['object_id'] ] = true;
+		}
+		return $out;
 	}
 
 	/**

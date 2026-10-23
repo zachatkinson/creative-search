@@ -9,9 +9,11 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Block;
 
+use CreativeBranding\Search\Results\CategoryScope;
 use CreativeBranding\Search\Results\QueryRouter;
 use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
+use WP_Term;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -74,14 +76,28 @@ final class SearchForm {
 
 		$labelClass = $options->labelVisible ? 'csearch-label' : 'csearch-label csearch-sr';
 		$current    = $this->current();
+		$scope      = CategoryScope::current();
 
 		$dialog = FormOptions::BUTTON === $options->mode;
-		$html   = '<div ' . $wrapper . ' data-wp-interactive="' . esc_attr( self::STORE ) . '" ' . wp_interactivity_data_wp_context( $this->context( $id, $options, $current ) ) . ( $dialog ? ' data-csearch-mode="button"' : ' data-wp-class--is-dimmed="context.panel"' ) . ' data-wp-on-document--pointerdown="actions.outside">';
+		$html   = '<div ' . $wrapper . ' data-wp-interactive="' . esc_attr( self::STORE ) . '" ' . wp_interactivity_data_wp_context( $this->context( $id, $options, $current, $scope ) ) . ( $dialog ? ' data-csearch-mode="button"' : ' data-wp-class--is-dimmed="context.panel"' ) . ' data-wp-on-document--pointerdown="actions.outside">';
 		if ( $dialog ) {
 			$html .= $this->dialogStart( $id );
 		}
 		$html .= '<form role="search" class="csearch-form" method="get" action="' . esc_url( home_url( '/' ) ) . '" data-wp-on--submit="actions.submit">';
 		$html .= '<label class="' . esc_attr( $labelClass ) . '" for="' . esc_attr( $input ) . '">' . esc_html( $label ) . '</label>';
+		if ( null !== $scope ) {
+			// On a category page, or a search already kept to one: the search stays in it unless the shopper unticks
+			// the box (D-117). An unticked box sends nothing, so the search covers every product. Above the field, so
+			// the suggestions open right under it.
+			$html .= '<label class="csearch-scope" for="' . esc_attr( $id . '-scope' ) . '"><input type="checkbox" id="' . esc_attr( $id . '-scope' ) . '" name="' . esc_attr( CategoryScope::ARG ) . '" value="' . esc_attr( $scope->slug ) . '" checked data-wp-bind--checked="context.scoped" data-wp-on--change="actions.scope"> '
+				. esc_html(
+					sprintf(
+						/* translators: %s: the category the shopper is in, such as Decks */
+						__( 'Only in %s', 'creative-search' ),
+						$scope->name
+					)
+				) . '</label>';
+		}
 		$html .= '<div class="csearch-field">';
 		$html .= '<input id="' . esc_attr( $input ) . '" class="csearch-input" type="text" name="s" value="' . esc_attr( $current ) . '"'
 			. ' placeholder="' . esc_attr( $placeholder ) . '"'
@@ -187,12 +203,13 @@ final class SearchForm {
 	 * The block's initial context: the request parameters, the options the script applies, every word the
 	 * script shows (translated here, where `_n()` and the text domain are), and the empty state.
 	 *
-	 * @param string      $id      The instance id the row ids build on.
-	 * @param FormOptions $options The resolved options.
-	 * @param string      $current The query the page answers, kept in the field.
+	 * @param string       $id      The instance id the row ids build on.
+	 * @param FormOptions  $options The resolved options.
+	 * @param string       $current The query the page answers, kept in the field.
+	 * @param WP_Term|null $scope   The category the form offers to search in (D-117), or null.
 	 * @return array<string, mixed>
 	 */
-	private function context( string $id, FormOptions $options, string $current ): array {
+	private function context( string $id, FormOptions $options, string $current, ?WP_Term $scope = null ): array {
 		$counts = array();
 		for ( $n = 0; $n <= self::MAX_SUGGESTIONS; $n++ ) {
 			$counts[] = 0 === $n
@@ -263,6 +280,8 @@ final class SearchForm {
 			'answered'  => '',
 			'above'     => Settings::PANEL_ABOVE === $options->panelPosition,
 			'dialog'    => FormOptions::BUTTON === $options->mode,
+			'scope'     => null === $scope ? '' : $scope->slug,
+			'scoped'    => null !== $scope,
 		);
 	}
 

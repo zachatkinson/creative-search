@@ -38,6 +38,8 @@ final class RankPlan {
 	 * @param string[]                             $names       The name keys that count as exact: the query's
 	 *                                                          key, and that key with the word being typed
 	 *                                                          completed (D-100); empty reads the key alone.
+	 * @param int[]                                $scope       Products of these term-taxonomy ids only (D-117);
+	 *                                                          none limits nothing.
 	 */
 	public function __construct(
 		public readonly string $lang,
@@ -52,7 +54,8 @@ final class RankPlan {
 		public readonly array $boostRules,
 		public readonly int $limit,
 		public readonly int $kind = Kind::PRODUCT,
-		public readonly array $names = array()
+		public readonly array $names = array(),
+		public readonly array $scope = array()
 	) {
 	}
 
@@ -82,7 +85,7 @@ final class RankPlan {
 			$texts[ $i ]  = $query->tokens[ $i ]->text;
 			$tokens[ $i ] = $widening->matches;
 		}
-		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ) );
+		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ), $options->scope );
 	}
 
 	/**

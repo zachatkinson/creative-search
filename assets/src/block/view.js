@@ -547,10 +547,13 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			}
 			const p = priv( ctx );
 			const input = document.getElementById( `${ ctx.id }-input` );
-			const cached = p.cache.get( q );
+			// A search kept to a category suggests from it alone (D-117), so each scope has its own answers.
+			const cat = ctx.scoped && ctx.scope ? ctx.scope : '';
+			const key = cat ? `${ q }\n${ cat }` : q;
+			const cached = p.cache.get( key );
 			if ( cached ) {
-				p.cache.delete( q );
-				p.cache.set( q, cached );
+				p.cache.delete( key );
+				p.cache.set( key, cached );
 				showAnswer( ctx, cached, input );
 				return;
 			}
@@ -572,6 +575,9 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 				lang: pageLang( ctx.lang ),
 				limit: String( ctx.limit ),
 			} );
+			if ( cat ) {
+				params.set( 'cat', cat );
+			}
 			const url =
 				ctx.suggest +
 				( ctx.suggest.includes( '?' ) ? '&' : '?' ) +
@@ -592,7 +598,7 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 				if ( seq !== p.seq ) {
 					return;
 				}
-				p.cache.set( q, data );
+				p.cache.set( key, data );
 				if ( p.cache.size > CACHE ) {
 					p.cache.delete( p.cache.keys().next().value );
 				}
@@ -703,6 +709,13 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			if ( input ) {
 				input.value = '';
 				input.focus();
+			}
+		},
+		scope( event ) {
+			const ctx = getContext();
+			ctx.scoped = Boolean( event.target.checked );
+			if ( ctx.query.trim().length >= ctx.min ) {
+				actions.request();
 			}
 		},
 		submit( event ) {

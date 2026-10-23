@@ -44,9 +44,10 @@ final class Suggestions {
 	 * @param string      $raw   Query as received.
 	 * @param string|null $lang  Language asked for.
 	 * @param int         $limit Products, 1 to 10.
+	 * @param int[]       $scope Products of these term-taxonomy ids only: the category the form searches (D-117).
 	 * @return array<mixed> `products`, `terms`, `content` (posts and pages, 1.1), `total`, `query`, `corrected`, `lang`.
 	 */
-	public function answer( string $raw, ?string $lang, int $limit ): array {
+	public function answer( string $raw, ?string $lang, int $limit, array $scope = array() ): array {
 		$query = SearchService::clean( $raw );
 		$lang  = $this->search->language( $lang );
 		$limit = max( Settings::LIMIT_MIN, min( Settings::LIMIT_MAX, $limit ) );
@@ -63,10 +64,10 @@ final class Suggestions {
 			return $empty;
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $this->search->settingsKey(), get_locale() ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, $this->search->settingsKey(), get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
-			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms );
+			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
 			$answer = array(
 				'products'  => $this->products( array_slice( $result->products, 0, $limit ) ),
 				'terms'     => $this->terms( $result->terms ),

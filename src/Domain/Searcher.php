@@ -63,7 +63,7 @@ final class Searcher {
 		$kind      = $options->kind;
 		$widenings = array();
 		foreach ( $query->tokens as $i => $token ) {
-			$widenings[ $i ] = $this->widen( $token, $lang, $kind );
+			$widenings[ $i ] = $this->widen( $token, $lang, $kind, $options->strict );
 		}
 		$excluded = $this->excludedTerms( $query, $lang );
 		$n        = $this->index->documentCount( $lang, $kind );
@@ -96,11 +96,12 @@ final class Searcher {
 	 * Widen one token: the exact term, its spellings, its stem and its synonyms, plus the terms it is a prefix
 	 * of when it is the unfinished last token; typo candidates only when none of that finds anything.
 	 *
-	 * @param QueryToken $token A token.
-	 * @param string     $lang  Language code.
-	 * @param int        $kind  What is searched ({@see Kind}): its terms alone are kept.
+	 * @param QueryToken $token  A token.
+	 * @param string     $lang   Language code.
+	 * @param int        $kind   What is searched ({@see Kind}): its terms alone are kept.
+	 * @param bool       $strict Strong matches only (D-118): no prefix terms, no typo candidates.
 	 */
-	public function widen( QueryToken $token, string $lang, int $kind = Kind::PRODUCT ): TokenWidening {
+	public function widen( QueryToken $token, string $lang, int $kind = Kind::PRODUCT, bool $strict = false ): TokenWidening {
 		$matches = array( $token->text => new TermMatch( $token->text, TermMatch::EXACT ) );
 		foreach ( $token->variants as $variant ) {
 			$matches[ $variant ] = new TermMatch( $variant, TermMatch::EXACT );
@@ -118,7 +119,7 @@ final class Searcher {
 				$matches[ $stem ] ??= new TermMatch( $stem, TermMatch::SYNONYM );
 			}
 		}
-		if ( $token->prefix ) {
+		if ( $token->prefix && ! $strict ) {
 			foreach ( $this->index->termsWithPrefix( $token->text, self::PREFIX_TERMS, $kind, $lang ) as $term => $df ) {
 				$matches[ $term ] ??= new TermMatch( (string) $term, TermMatch::PREFIX, $df );
 			}
@@ -127,7 +128,7 @@ final class Searcher {
 		if ( ! $level->isEmpty() ) {
 			return $level;
 		}
-		if ( $token->fuzzable() ) {
+		if ( $token->fuzzable() && ! $strict ) {
 			$level = $this->lookup( $this->typoCandidates( $token->text ), $lang, $kind, self::TYPO_TERMS );
 			if ( ! $level->isEmpty() ) {
 				return $level;

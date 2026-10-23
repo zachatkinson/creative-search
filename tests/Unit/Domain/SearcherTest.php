@@ -292,6 +292,22 @@ final class SearcherTest extends TestCase {
 		self::assertNull( $this->search( 'snowboard' )->corrected );
 	}
 
+	public function test_strict_keeps_every_word_as_typed_but_no_completion_or_typo(): void {
+		$strict   = new SearchOptions( retry: false, strict: true );
+		$synonyms = new Synonyms( array( new Synonym( 'en', 'board', 'deck' ) ) );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'kazumi decks', 'en', $strict ) ), 'a stem is a strong match' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'kazumi board', 'en', $strict, $synonyms ) ), 'so is the owner\'s synonym' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'kaz', 'en', $strict ) ), 'a word that is itself a term still matches' );
+		self::assertSame( array(), self::titles( $this->search( 'hoo', 'en', $strict ) ), 'a word being typed is not completed (D-118)' );
+		self::assertSame( array( 'Skatehouse Hoodie, Logo' ), self::titles( $this->search( 'hoo' ) ), 'it is without strict' );
+		self::assertSame( array(), self::titles( $this->search( 'kazuni', 'en', $strict ) ), 'a typo finds nothing strong' );
+		self::assertCount( 2, $this->search( 'kazuni' )->products, 'it does without strict' );
+		$searcher = new Searcher( $this->index );
+		self::assertSame( array(), $searcher->widen( new QueryToken( 'kazuni', 'kazuni' ), 'en', Kind::PRODUCT, true )->matches );
+		self::assertSame( array(), $searcher->widen( new QueryToken( 'hoo', 'hoo', false, 0, true ), 'en', Kind::PRODUCT, true )->matches, 'no prefix terms' );
+		self::assertArrayHasKey( 'hoodie', $searcher->widen( new QueryToken( 'hoo', 'hoo', false, 0, true ), 'en' )->matches );
+	}
+
 	public function test_the_retry_can_be_turned_off_for_the_shoppers_exact_words(): void {
 		$exact = $this->search( 'kazumi wheels', 'en', new SearchOptions( retry: false ) );
 		self::assertSame( array(), $exact->products, 'no product matches both, and nothing is dropped' );
@@ -561,5 +577,8 @@ final class SearcherTest extends TestCase {
 		self::assertSame( 'fr', $content->fallbackLang );
 		self::assertFalse( $content->retry );
 		self::assertSame( Kind::PRODUCT, $base->kind );
+		$scoped = new SearchOptions( strict: true, scope: array( 12, 14 ) );
+		self::assertFalse( $scoped->forContent( 2 )->strict, 'the posts and pages are never narrowed' );
+		self::assertSame( array(), $scoped->forContent( 2 )->scope, 'nor kept to a category' );
 	}
 }

@@ -101,10 +101,10 @@ final class ScorerTest extends TestCase {
 
 	public function test_custom_weights_and_unknown_fields(): void {
 		$options = new SearchOptions( array( 'name' => 3 ) );
-		$score   = ( new Scorer() )->score( self::plan( self::query( 'deck' ), $options, self::N ), self::doc(), array( self::widening( 'deck', TermMatch::EXACT, 3, array( Fields::NAME => array( 1, 0 ), 9 => array( 1, 0 ) ) ) ) );
+		$score   = ( new Scorer() )->score( self::plan( self::query( 'deck' ), $options, self::N ), self::doc(), array( self::widening( 'deck', TermMatch::EXACT, 3, array( Fields::NAME => array( 1, 0 ), 10 => array( 1, 0 ) ) ) ) );
 		self::assertSame( 3, $score->tokens[0]['weight'] );
 		self::assertEqualsWithDelta( 3 * ( 1 + log( 2 ) ) * log( 11 / 4 ), $score->total(), 1e-9 );
-		$zero = ( new Scorer() )->score( self::plan( self::query( 'deck' ), $options, self::N ), self::doc(), array( self::widening( 'deck', TermMatch::EXACT, 3, array( 9 => array( 1, 0 ) ) ) ) );
+		$zero = ( new Scorer() )->score( self::plan( self::query( 'deck' ), $options, self::N ), self::doc(), array( self::widening( 'deck', TermMatch::EXACT, 3, array( 10 => array( 1, 0 ) ) ) ) );
 		self::assertSame( 0, $zero->tokens[0]['weight'], 'an unknown field weighs nothing' );
 		self::assertSame( 0.0, $zero->total() );
 	}

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.3.0] - unreleased
+
+### Added
+- Search within the current category (Baymard): on a category page, and on a search already kept to one, the search form offers "Only in Decks", ticked. The search then sends `product_cat=decks`, the suggestions and the results keep to Decks and its subcategories (ranked within them, not cut from the shop's ranking), and the results page reads "3 results for “kazumi” in Decks" with a link to search every product. Such a search is never sent to another category; a size in it becomes the filter in the same category. `/suggest` takes `cat` (D-117).
+- Custom fields, ACF's among them: product meta keys ticked or typed under Tools → What to index (`custom_fields`, none by default) are searched as their own field, weight 4. Lists are flattened; ACF choices add their labels, post and taxonomy fields their titles and names; a product's custom text is capped at 2,000 characters; a change to one of those fields reindexes the product (D-119, D-120).
+
+### Changed
+- A sort other than Relevance (price, popularity, rating, date) lists the strong matches only: every word as typed, its spellings, stem or synonyms, never a completion of an unfinished word or a typo's neighbour, so a sort never brings a weak match to the top (Baymard). When nothing is strong, every match is listed. The count and filters follow (D-118, which replaces D-057's "any other sort keeps the match set").
+
 ## [1.2.0] - 2026-10-22
 
 Items 9 to 11 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md).

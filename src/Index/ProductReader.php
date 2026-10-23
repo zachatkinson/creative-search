@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Index;
 
 use CreativeBranding\Search\Domain\Fields;
+use CreativeBranding\Search\Domain\MetaText;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Options;
@@ -33,6 +34,22 @@ final class ProductReader {
 	public const CATEGORY_TAXONOMY      = 'product_cat';
 	public const TAG_TAXONOMY           = 'product_tag';
 	public const BRAND_TAXONOMY         = 'product_brand';
+
+	/**
+	 * ACF field types whose stored value is not words a shopper types: an attachment, a user, a map, a colour, a
+	 * password, an address (D-119).
+	 */
+	public const ACF_SKIPPED = array( 'image', 'file', 'gallery', 'user', 'google_map', 'color_picker', 'password', 'url', 'email', 'oembed', 'true_false' );
+
+	/**
+	 * ACF field types that store choices: their labels are searched as well as their values.
+	 */
+	public const ACF_CHOICES = array( 'select', 'checkbox', 'radio', 'button_group' );
+
+	/**
+	 * ACF field types that store post ids: their titles are searched.
+	 */
+	public const ACF_POSTS = array( 'post_object', 'relationship', 'page_link' );
 
 	/**
 	 * Constructor.
@@ -125,6 +142,7 @@ final class ProductReader {
 			Fields::TAG       => Settings::isOn( 'index_tags' ) ? $this->termNames( $product, self::TAG_TAXONOMY, false ) : array(),
 			Fields::BRAND     => $this->termNames( $product, self::BRAND_TAXONOMY, false ),
 			Fields::ATTRIBUTE => $this->attributeValues( $product ),
+			Fields::CUSTOM    => $this->customValues( $product ),
 		);
 		/**
 		 * The fields of a product before tokenising.
@@ -220,6 +238,56 @@ final class ProductReader {
 			}
 		}
 		return array_values( array_unique( array_filter( $values, static fn( string $v ): bool => '' !== trim( $v ) ) ) );
+	}
+
+	/**
+	 * The texts of the custom fields the owner chose (D-119), each through ACF's own reading when ACF knows the
+	 * field: choices add their labels, post fields their titles, taxonomy fields their term names, and fields
+	 * that hold no words are skipped. Stripped of tags and capped together at 2,000 characters.
+	 *
+	 * @param WC_Product $product The product.
+	 * @return string[]
+	 */
+	public function customValues( WC_Product $product ): array {
+		$texts = array();
+		foreach ( Cast::strings( Settings::get( 'custom_fields' ) ) as $key ) {
+			$raw   = get_post_meta( $product->get_id(), $key, true );
+			$field = function_exists( 'get_field_object' ) ? get_field_object( $key, $product->get_id(), false, false ) : false;
+			$type  = is_array( $field ) ? Cast::str( $field['type'] ?? '' ) : '';
+			if ( in_array( $type, self::ACF_SKIPPED, true ) ) {
+				continue;
+			}
+			$values = MetaText::values( $raw );
+			if ( in_array( $type, self::ACF_CHOICES, true ) && is_array( $field ) ) {
+				$choices = is_array( $field['choices'] ?? null ) ? $field['choices'] : array();
+				foreach ( $values as $value ) {
+					if ( isset( $choices[ $value ] ) && is_scalar( $choices[ $value ] ) && (string) $choices[ $value ] !== $value ) {
+						$values[] = (string) $choices[ $value ];
+					}
+				}
+			} elseif ( in_array( $type, self::ACF_POSTS, true ) ) {
+				$values = array_values( array_filter( array_map( static fn( string $id ): string => is_numeric( $id ) ? get_the_title( (int) $id ) : $id, $values ) ) );
+			} elseif ( 'taxonomy' === $type ) {
+				$values = array_values(
+					array_filter(
+						array_map(
+							static function ( string $id ): string {
+								$term = is_numeric( $id ) ? get_term( (int) $id ) : null;
+								return $term instanceof WP_Term ? $term->name : '';
+							},
+							$values
+						)
+					)
+				);
+			}
+			foreach ( $values as $value ) {
+				$text = self::plain( $value, Settings::CUSTOM_FIELD_CHARS );
+				if ( '' !== trim( $text ) ) {
+					$texts[] = $text;
+				}
+			}
+		}
+		return MetaText::cap( $texts, Settings::CUSTOM_FIELD_CHARS );
 	}
 
 	/**

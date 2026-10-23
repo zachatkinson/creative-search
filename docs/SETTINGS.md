@@ -15,7 +15,8 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | `index_variation_skus` | `yes` | yes/no | Index every variation's SKU on the parent document. |
 | `index_posts` | `no` | yes/no | Index published posts, searched apart from the products and shown after them (D-093). Changing it queues the posts' indexing or the removal of their documents. |
 | `index_pages` | `no` | yes/no | Index published pages the same way, except the front page and WooCommerce's shop, cart, checkout and account pages. |
-| `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
+| `custom_fields` | `[]` | meta keys, 1 to 64 characters of letters, digits, `_ . : -`, not `_wp_…` or `_edit_…`; 20 at most | Product meta keys (ACF field names among them) searched as the `custom` field, 2,000 characters a product in all (D-119). A change asks for a rebuild; a change to one of these fields on a product reindexes it. |
+| `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1, custom 4 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
 
 ## Languages
 

@@ -14,6 +14,7 @@ use CreativeBranding\Search\Index\IndexHealth;
 use CreativeBranding\Search\Index\Languages;
 use CreativeBranding\Search\Search\Explanation;
 use CreativeBranding\Search\Search\SearchService;
+use CreativeBranding\Search\Repository\MetaKeyRepository;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Options;
@@ -29,16 +30,22 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class ToolsTab {
 
+	/**
+	 * The meta keys offered as custom fields at most (D-119).
+	 */
+	public const META_KEYS_SHOWN = 30;
+
 	public const TEST_LIMIT = 10;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param IndexHealth   $health    The index's status.
-	 * @param SearchService $search    The search, for the test box.
-	 * @param Languages     $languages The indexed languages.
+	 * @param IndexHealth       $health    The index's status.
+	 * @param SearchService     $search    The search, for the test box.
+	 * @param Languages         $languages The indexed languages.
+	 * @param MetaKeyRepository $metaKeys  The meta keys products carry, offered as custom fields (D-119).
 	 */
-	public function __construct( private IndexHealth $health, private SearchService $search, private Languages $languages ) {
+	public function __construct( private IndexHealth $health, private SearchService $search, private Languages $languages, private MetaKeyRepository $metaKeys ) {
 	}
 
 	/**
@@ -200,6 +207,7 @@ final class ToolsTab {
 		self::flag( 'index_variation_skus', __( 'Variation SKUs', 'creative-search' ), __( 'Find a variable product by any of its variations’ SKUs.', 'creative-search' ), $settings );
 		self::flag( 'index_posts', __( 'Posts', 'creative-search' ), __( 'Search the blog’s posts too, shown apart from the products.', 'creative-search' ), $settings );
 		self::flag( 'index_pages', __( 'Pages', 'creative-search' ), __( 'Search the site’s pages too, shown apart from the products.', 'creative-search' ), $settings );
+		$this->customFields( $settings );
 		echo '</tbody></table><p class="description">' . esc_html__( 'A change to the product settings applies to products as they are next indexed; rebuild the index to apply it to all of them. Posts and pages are added or removed in the background as soon as you save.', 'creative-search' ) . '</p>';
 
 		echo '<h3>' . esc_html__( 'Results page', 'creative-search' ) . '</h3><table class="form-table" role="presentation"><tbody>';
@@ -257,6 +265,30 @@ final class ToolsTab {
 		echo '</tbody></table>';
 		submit_button( __( 'Save settings', 'creative-search' ) );
 		echo '</form>';
+	}
+
+	/**
+	 * The custom fields row (D-119): a box for each meta key the products use (and each one already chosen), and
+	 * a field for any other key, ACF field names included.
+	 *
+	 * @param array<string, mixed> $settings The settings.
+	 */
+	private function customFields( array $settings ): void {
+		$chosen = Cast::strings( $settings['custom_fields'] ?? array() );
+		$keys   = array_values( array_unique( array_merge( $chosen, $this->metaKeys->productKeys( self::META_KEYS_SHOWN ) ) ) );
+		echo '<tr><th scope="row">' . esc_html__( 'Custom fields', 'creative-search' ) . '</th><td><fieldset aria-describedby="csearch-custom-fields-help"><legend class="screen-reader-text">' . esc_html__( 'Custom fields', 'creative-search' ) . '</legend><input type="hidden" name="custom_fields[]" value="">';
+		foreach ( $keys as $i => $key ) {
+			$id = 'csearch-custom-field-' . $i;
+			echo '<label for="' . esc_attr( $id ) . '"><input type="checkbox" id="' . esc_attr( $id ) . '" name="custom_fields[]" value="' . esc_attr( $key ) . '"' . checked( in_array( $key, $chosen, true ), true, false ) . '> <code>' . esc_html( $key ) . '</code></label><br>';
+		}
+		echo '<label for="csearch-custom-fields-other">' . esc_html__( 'Other fields', 'creative-search' ) . '</label> <input type="text" id="csearch-custom-fields-other" name="custom_fields_other" class="regular-text" value="">';
+		echo '<p class="description" id="csearch-custom-fields-help">' . esc_html(
+			sprintf(
+				/* translators: %s: the most custom fields that can be searched */
+				__( 'Search these product fields too, such as an Advanced Custom Fields field by its name. Separate other names with commas; up to %s fields. Rebuild the index after a change.', 'creative-search' ),
+				number_format_i18n( Settings::CUSTOM_FIELDS_MAX )
+			)
+		) . '</p></fieldset></td></tr>';
 	}
 
 	/**

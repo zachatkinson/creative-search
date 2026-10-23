@@ -25,6 +25,7 @@ final class Fields {
 	public const TAG       = 6;
 	public const BRAND     = 7;
 	public const ATTRIBUTE = 8;
+	public const CUSTOM    = 9;
 
 	/**
 	 * Field names by id, in id order.
@@ -40,10 +41,12 @@ final class Fields {
 		self::TAG       => 'tag',
 		self::BRAND     => 'brand',
 		self::ATTRIBUTE => 'attribute',
+		self::CUSTOM    => 'custom',
 	);
 
 	/**
-	 * The spec's weights: name 10, SKU 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1.
+	 * The spec's weights: name 10, SKU 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1; and the owner's
+	 * custom fields 4 (1.3, D-119), between an attribute and a tag.
 	 *
 	 * @var array<string, int>
 	 */
@@ -56,6 +59,7 @@ final class Fields {
 		'tag'       => 3,
 		'short'     => 2,
 		'long'      => 1,
+		'custom'    => 4,
 	);
 
 	/**

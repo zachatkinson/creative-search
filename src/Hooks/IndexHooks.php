@@ -13,10 +13,11 @@ use CreativeBranding\Search\Hookable;
 use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\TermReader;
+use CreativeBranding\Search\Settings\Settings;
+use CreativeBranding\Search\Support\Cast;
 use WC_Product;
 use WP_Post;
 use WP_Term;
-use CreativeBranding\Search\Support\Cast;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -355,13 +356,18 @@ final class IndexHooks implements Hookable {
 	}
 
 	/**
-	 * The owner's boost or exclude flag changed on a product, post or page.
+	 * The owner's boost or exclude flag changed on a product, post or page, or a custom field the owner searches
+	 * changed on a product (D-119).
 	 *
 	 * @param mixed     $metaId  Meta id.
 	 * @param int|mixed $postId  Post id.
 	 * @param mixed     $metaKey Meta key.
 	 */
 	public function metaChanged( $metaId, $postId, $metaKey ): void {
+		if ( in_array( $metaKey, Cast::strings( Settings::get( 'custom_fields' ) ), true ) && 'product' === get_post_type( Cast::int( $postId ) ) ) {
+			$this->queue->product( Cast::int( $postId ) );
+			return;
+		}
 		if ( ! in_array( $metaKey, \CreativeBranding\Search\Support\Options::metaKeys(), true ) ) {
 			return;
 		}

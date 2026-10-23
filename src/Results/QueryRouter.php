@@ -83,7 +83,12 @@ final class QueryRouter {
 		}
 		$lang  = $this->search->language( ProductSearch::lang() );
 		$route = $this->routes->route( $words, $lang );
-		$term  = $this->category( $route['categories'], $words, $lang );
+		$scope = CategoryScope::requested();
+		if ( null !== $scope ) {
+			$this->scoped( $query, $words, $lang, $route, $scope );
+			return;
+		}
+		$term = $this->category( $route['categories'], $words, $lang );
 		if ( null === $term && count( $route['categories'] ) > 1 ) {
 			// Two categories of one name: the shopper chooses, on the results page for every word they typed.
 			$this->categories = $route['categories'];
@@ -113,6 +118,45 @@ final class QueryRouter {
 		// The query the shopper typed, once, with what the page they land on lists: that page does not log it again.
 		$this->log->record( $words, $lang, self::count( $term, $route['filters'], $ids ), 'page' );
 		// The page is left: no ranking, no search clause, nothing fetched.
+		$query->set( 'csearch_routed', true );
+		$query->set( 'post__in', array( 0 ) );
+	}
+
+	/**
+	 * A search kept to a category (D-117) stays in it: no other category is opened, and a size it names becomes the
+	 * filter on the search for its other words in the same category, or on the category itself when nothing else
+	 * is left.
+	 *
+	 * @param WP_Query                                                                 $query The query.
+	 * @param string                                                                   $words The query's words.
+	 * @param string                                                                   $lang  Its language.
+	 * @param array{filters: array<string, string[]>, rest: string, categories: int[]} $route The reading of the query.
+	 * @param WP_Term                                                                  $scope The category.
+	 */
+	private function scoped( WP_Query $query, string $words, string $lang, array $route, WP_Term $scope ): void {
+		if ( array() === $route['filters'] ) {
+			return;
+		}
+		$args = self::filterArgs( $route['filters'] ) + self::fromArgs( $words );
+		$ids  = null;
+		$term = $scope;
+		if ( '' !== $route['rest'] ) {
+			$args = array(
+				's'                => rawurlencode( $route['rest'] ),
+				'post_type'        => 'product',
+				CategoryScope::ARG => $scope->slug,
+			) + $args;
+			$base = home_url( '/' );
+			$ids  = $this->search->rankedIds( $route['rest'], $lang, '', false, CategoryScope::ttIds( $scope ) )['ids'];
+			$term = null;
+		} else {
+			$base = get_term_link( $scope );
+		}
+		if ( ! is_string( $base ) || '' === $base ) {
+			return;
+		}
+		$this->target = add_query_arg( $args, $base );
+		$this->log->record( $words, $lang, self::count( $term, $route['filters'], $ids ), 'page' );
 		$query->set( 'csearch_routed', true );
 		$query->set( 'post__in', array( 0 ) );
 	}

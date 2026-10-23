@@ -51,7 +51,8 @@ final class SettingsTest extends TestCase {
 		}
 		self::assertSame( 'yes', $d['category_redirect'], 'a category name opens the category (D-102)' );
 		self::assertSame( array(), $d['filter_attributes'], 'no attribute filters until the owner ticks one (D-101)' );
-		self::assertCount( 30, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertSame( array(), $d['custom_fields'], 'no custom fields until the owner picks one (D-119)' );
+		self::assertCount( 31, $d, 'every key is documented in docs/SETTINGS.md' );
 	}
 
 	public function test_the_filter_attributes_are_attribute_taxonomies(): void {
@@ -65,6 +66,14 @@ final class SettingsTest extends TestCase {
 		self::assertSame( 'no', $out['category_redirect'] );
 		self::assertSame( 'yes', Settings::sanitize( array( 'category_redirect' => 'yes' ) )['category_redirect'] );
 		self::assertSame( array(), Settings::sanitize( array( 'filter_attributes' => 'pa_width' ) )['filter_attributes'], 'not a list' );
+	}
+
+	public function test_the_custom_fields_are_meta_keys(): void {
+		$keys = array( 'material', 'material', ' grip_type ', 'acf:field.name-2', '_private', '_wp_attached_file', '_edit_lock', 'has space', 'bad/slash', '', 7, array( 'x' ), str_repeat( 'k', 64 ), str_repeat( 'k', 65 ) );
+		self::assertSame( array( 'material', 'grip_type', 'acf:field.name-2', '_private', str_repeat( 'k', 64 ) ), Settings::sanitize( array( 'custom_fields' => $keys ) )['custom_fields'], 'unique, trimmed, a meta key of 64 characters at most, not WordPress\'s own' );
+		$many = array_map( static fn( int $n ): string => 'field_' . $n, range( 1, 25 ) );
+		self::assertSame( array_slice( $many, 0, Settings::CUSTOM_FIELDS_MAX ), Settings::sanitizeMetaKeys( $many ), '20 at most' );
+		self::assertSame( array(), Settings::sanitize( array( 'custom_fields' => 'material' ) )['custom_fields'], 'not a list' );
 	}
 
 	public function test_the_no_results_links_keep_a_page_id_and_plain_wording(): void {
@@ -95,11 +104,12 @@ final class SettingsTest extends TestCase {
 				'tag'       => 3,
 				'short'     => 2,
 				'long'      => 1,
+				'custom'    => 4,
 			),
 			Settings::defaultFieldWeights()
 		);
 		self::assertSame( Settings::defaultFieldWeights(), Settings::defaults()['fields'] );
-		self::assertSame( array( 'name', 'sku', 'short', 'long', 'category', 'tag', 'brand', 'attribute' ), Settings::FIELDS, 'field ids 1 to 8 in the postings table' );
+		self::assertSame( array( 'name', 'sku', 'short', 'long', 'category', 'tag', 'brand', 'attribute', 'custom' ), Settings::FIELDS, 'field ids 1 to 9 in the postings table' );
 	}
 
 	public function test_sanitize_of_an_empty_array_is_the_defaults(): void {

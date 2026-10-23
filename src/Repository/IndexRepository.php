@@ -85,6 +85,23 @@ final class IndexRepository implements IndexStore {
 	}
 
 	/**
+	 * The documents whose product is in a category or its subcategories, as the ranking statement keeps them (D-117):
+	 * all of them when the search is not kept to one.
+	 *
+	 * @param array<int, Document> $documents Documents by id.
+	 * @param int[]                $scope     Term-taxonomy ids; none keeps every document.
+	 * @return array<int, Document>
+	 */
+	private function inScope( array $documents, array $scope ): array {
+		if ( array() === $scope || array() === $documents ) {
+			return $documents;
+		}
+		$objects = array_map( static fn( Document $d ): int => $d->objectId, $documents );
+		$rows    = $this->ranks->scopedObjects( $objects, $scope );
+		return array_filter( $documents, static fn( Document $d ): bool => isset( $rows[ $d->objectId ] ) );
+	}
+
+	/**
 	 * The number of documents in a language in the live generation: the catalogue's, or the posts and pages'.
 	 *
 	 * @param string $lang Language code.
@@ -218,7 +235,7 @@ final class IndexRepository implements IndexStore {
 			return ( new Ranker() )->rank(
 				$plan,
 				$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, $plan->kind ),
-				fn( array $ids, string $key ): array => $this->documents( $ids, $key )
+				fn( array $ids, string $key ): array => $this->inScope( $this->documents( $ids, $key ), $plan->scope )
 			);
 		}
 		$hits = array();

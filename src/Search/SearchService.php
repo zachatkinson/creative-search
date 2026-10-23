@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Search;
 
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
@@ -103,9 +104,10 @@ final class SearchService {
 	 * @param int    $termLimit Terms at most.
 	 * @param bool   $retry     Retry without the least-matched token when nothing matches.
 	 * @param bool   $explain   Rank in PHP, with every part of each score (D-086): the same order, more memory.
+	 * @param int[]  $scope     Products of these term-taxonomy ids only (D-117).
 	 */
-	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false ): SearchResult {
-		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry ), $explain );
+	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false, array $scope = array() ): SearchResult {
+		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry, $scope ), $explain );
 	}
 
 	/**
@@ -236,9 +238,11 @@ final class SearchService {
 	 * @param string|null $lang   Language asked for.
 	 * @param string      $source page or suggest; empty for a repeat of a search already logged.
 	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
+	 * @param int[]       $scope  Products of these term-taxonomy ids only: a category and its subcategories (D-117).
+	 * @param bool        $strong The strong matches only, when any (D-118): a sort other than Relevance.
 	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}
 	 */
-	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false ): array {
+	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false, array $scope = array(), bool $strong = false ): array {
 		$query = self::clean( $raw );
 		$lang  = $this->language( $lang );
 		if ( '' === $query ) {
@@ -249,10 +253,14 @@ final class SearchService {
 				'lang'      => $lang,
 			);
 		}
-		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $this->settingsKey() ) );
+		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $scope, $strong, $this->settingsKey() ) );
 		$cached = $this->cache->get( $key );
 		if ( null === $cached ) {
-			$result = $this->run( $query, $lang, self::MAX_IDS, 0, ! $exact );
+			$result = $strong ? $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, false, $scope, true ), false ) : null;
+			if ( null === $result || array() === $result->products ) {
+				// Nothing matches every word as typed: the sort keeps every match rather than show nothing (D-118).
+				$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact, $scope ), false );
+			}
 			$cached = array(
 				'ids'       => $result->productIds(),
 				'corrected' => $result->corrected,
@@ -274,11 +282,13 @@ final class SearchService {
 	/**
 	 * The search options from the settings.
 	 *
-	 * @param int  $limit     Products at most.
-	 * @param int  $termLimit Terms at most.
-	 * @param bool $retry     Retry without the least-matched token.
+	 * @param int   $limit     Products at most.
+	 * @param int   $termLimit Terms at most.
+	 * @param bool  $retry     Retry without the least-matched token.
+	 * @param int[] $scope     Products of these term-taxonomy ids only (D-117).
+	 * @param bool  $strict    Strong matches only (D-118).
 	 */
-	public function options( int $limit, int $termLimit, bool $retry = true ): SearchOptions {
+	public function options( int $limit, int $termLimit, bool $retry = true, array $scope = array(), bool $strict = false ): SearchOptions {
 		$weights = Settings::fieldWeights();
 		/**
 		 * The field weights the score uses, by field name (name, sku, short, long, category, tag, brand, attribute).
@@ -299,7 +309,10 @@ final class SearchService {
 			self::boostRules( Settings::get( 'boost_rules' ) ),
 			max( 1, min( self::MAX_IDS, $limit ) ),
 			max( 0, min( self::MAX_TERMS, $termLimit ) ),
-			$retry
+			$retry,
+			Kind::PRODUCT,
+			$strict,
+			array_values( array_unique( array_map( 'intval', $scope ) ) )
 		);
 	}
 

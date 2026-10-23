@@ -46,11 +46,17 @@ final class Settings {
 	public const PANEL_ABOVE = 'above';
 
 	/**
-	 * The field names the index knows, in the order of their field ids (name 1 … attribute 8).
+	 * The field names the index knows, in the order of their field ids (name 1 … attribute 8, custom fields 9).
 	 *
 	 * @var string[]
 	 */
-	public const FIELDS = array( 'name', 'sku', 'short', 'long', 'category', 'tag', 'brand', 'attribute' );
+	public const FIELDS = array( 'name', 'sku', 'short', 'long', 'category', 'tag', 'brand', 'attribute', 'custom' );
+
+	/**
+	 * Custom fields indexed at most, and the characters kept of all of a product's custom fields together (D-119).
+	 */
+	public const CUSTOM_FIELDS_MAX  = 20;
+	public const CUSTOM_FIELD_CHARS = 2000;
 
 	/**
 	 * Request-level cache of the option.
@@ -73,6 +79,8 @@ final class Settings {
 			'index_posts'                  => 'no',
 			'index_pages'                  => 'no',
 			'fields'                       => self::defaultFieldWeights(),
+			// Product meta keys (ACF field names among them) searched as the "custom" field (D-119).
+			'custom_fields'                => array(),
 			// Languages: empty means the site's language only; the csearch_languages filter adds more.
 			'languages'                    => array(),
 			'fallback_to_default_language' => 'yes',
@@ -122,6 +130,7 @@ final class Settings {
 			'tag'       => 3,
 			'short'     => 2,
 			'long'      => 1,
+			'custom'    => 4,
 		);
 	}
 
@@ -235,6 +244,9 @@ final class Settings {
 		if ( isset( $input['fallback_products'] ) && is_array( $input['fallback_products'] ) ) {
 			$out['fallback_products'] = self::sanitizeIds( $input['fallback_products'] );
 		}
+		if ( isset( $input['custom_fields'] ) && is_array( $input['custom_fields'] ) ) {
+			$out['custom_fields'] = self::sanitizeMetaKeys( $input['custom_fields'] );
+		}
 		if ( isset( $input['filter_attributes'] ) && is_array( $input['filter_attributes'] ) ) {
 			$out['filter_attributes'] = self::sanitizeTaxonomies( $input['filter_attributes'] );
 		}
@@ -345,6 +357,24 @@ final class Settings {
 			$name = is_string( $name ) ? sanitize_key( $name ) : '';
 			if ( 1 === preg_match( '/^pa_[a-z0-9_-]{1,29}$/', $name ) && ! in_array( $name, $out, true ) ) {
 				$out[] = $name;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Meta keys (D-119): letters, digits, underscores, hyphens, dots and colons, 1 to 64 characters, not one of
+	 * WordPress's own `_wp_` or `_edit_` keys; unique, in the order given, 20 at most.
+	 *
+	 * @param array<mixed, mixed> $input Raw keys.
+	 * @return string[]
+	 */
+	public static function sanitizeMetaKeys( array $input ): array {
+		$out = array();
+		foreach ( $input as $key ) {
+			$key = is_string( $key ) ? trim( $key ) : '';
+			if ( 1 === preg_match( '/^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,63}$/', $key ) && 1 !== preg_match( '/^_(wp|edit)_/', $key ) && ! in_array( $key, $out, true ) && count( $out ) < self::CUSTOM_FIELDS_MAX ) {
+				$out[] = $key;
 			}
 		}
 		return $out;

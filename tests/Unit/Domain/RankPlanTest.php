@@ -49,6 +49,9 @@ final class RankPlanTest extends TestCase {
 		self::assertSame( 12, $plan->limit );
 		self::assertSame( array( 'kazumi', '825', 'deck' ), $plan->terms(), 'each term once, numbers as strings, in order' );
 		self::assertSame( log( 100 / 4 ), $plan->idf( 3 ) );
+		self::assertSame( array(), $plan->scope, 'every category' );
+		$scoped = RankPlan::of( $query, array( new TokenWidening( array( 'kazumi' => $deck ), array(), array() ) ), 'en', 9, array(), new SearchOptions( scope: array( 31, 33 ) ) );
+		self::assertSame( array( 31, 33 ), $scoped->scope, 'a category and its subcategories (D-117)' );
 	}
 
 	public function test_while_the_last_word_is_typed_its_completions_name_the_product_too(): void {
