@@ -40,14 +40,54 @@ final class WooCommerceCatalogue {
 	 * @param array<int, array<string, mixed>> $products   Products from the catalogue generator.
 	 * @param bool                             $variations False writes a variable product as a simple one carrying the
 	 *                                                     same attribute values (faster, for the timing runs).
+	 * @param bool                             $quiet      Skip the work nobody measures while loading (the benchmark):
+	 *                                                     WordPress's term counts wait until the end (else each save
+	 *                                                     counts every product in its terms, so a large load slows
+	 *                                                     as it grows), and the plugin's index hooks are detached
+	 *                                                     (a full reindex follows). Measured on 1,000 products: 63 ms
+	 *                                                     a product throughout, against 77 ms growing to 105 ms.
 	 * @return array<int, int> Catalogue id to WooCommerce product id.
 	 */
-	public function load( array $products, bool $variations = true ): array {
+	public function load( array $products, bool $variations = true, bool $quiet = false ): array {
+		$detached = $quiet ? self::detachIndexHooks() : array();
+		if ( $quiet ) {
+			wp_defer_term_counting( true );
+		}
 		$ids = array();
 		foreach ( $products as $spec ) {
 			$ids[ (int) $spec['id'] ] = $this->product( $spec, $variations );
 		}
+		if ( $quiet ) {
+			wp_defer_term_counting( false );
+			if ( function_exists( 'wc_recount_all_terms' ) ) {
+				wc_recount_all_terms(); // WooCommerce's own counts, which the term suggestions show.
+			}
+		}
+		foreach ( $detached as [ $tag, $callback, $priority, $args ] ) {
+			add_action( $tag, $callback, $priority, $args );
+		}
 		return $ids;
+	}
+
+	/**
+	 * Take the plugin's index hooks off, returning them to put back.
+	 *
+	 * @return array<int, array{0: string, 1: callable, 2: int, 3: int}>
+	 */
+	private static function detachIndexHooks(): array {
+		$hooks    = \CreativeBranding\Search\Plugin::container()->get( \CreativeBranding\Search\Hooks\IndexHooks::class );
+		$detached = array();
+		foreach ( $GLOBALS['wp_filter'] as $tag => $hook ) {
+			foreach ( $hook->callbacks as $priority => $callbacks ) {
+				foreach ( $callbacks as $callback ) {
+					if ( is_array( $callback['function'] ) && $callback['function'][0] === $hooks ) {
+						remove_action( (string) $tag, $callback['function'], (int) $priority );
+						$detached[] = array( (string) $tag, $callback['function'], (int) $priority, (int) $callback['accepted_args'] );
+					}
+				}
+			}
+		}
+		return $detached;
 	}
 
 	/**

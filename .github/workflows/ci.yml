@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
 
+# A new push to a branch or pull request cancels the run it replaces; tags each keep their own run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   static:
     name: Lint, analyse, gates, unit tests (PHP ${{ matrix.php }})
@@ -130,7 +135,7 @@ jobs:
   index-budgets:
     name: Index and API budgets at 10,000 products
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -146,6 +151,7 @@ jobs:
       - run: npm run build
       - run: npx wp-env start
       - run: composer install --working-dir=tools/integration --no-interaction
-      # Most of this step is loading the catalogue through WooCommerce (an hour or more); each phase's time is in the log.
+      # Most of this step is loading the catalogue through WooCommerce, quietly (term counts deferred, the plugin's index
+      # hooks detached: about 63 ms a product locally, flat as it grows); each phase's time is in the log.
       - name: Load 10,000 products, then the full reindex (5-minute budget) and the golden set through the API (p95 budgets)
         run: npx wp-env run tests-cli --env-cwd=wp-content/plugins/creative-search -- env CSEARCH_BENCH_PRODUCTS=10000 php -d memory_limit=4G tools/integration/vendor/bin/phpunit -c phpunit-integration.xml.dist --group benchmark

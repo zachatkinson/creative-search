@@ -15,6 +15,7 @@ use CreativeBranding\Search\Search\Cache;
 use CreativeBranding\Search\Search\SearchService;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
+use WC_Query;
 use WC_Shortcode_Products;
 use WP_Term;
 
@@ -59,8 +60,9 @@ final class ResultsView {
 	 * @param ProductSearch $products The ranked search.
 	 * @param SearchService $search   The search service, for the nearest categories.
 	 * @param Cache         $cache    Answers, for the nearest categories.
+	 * @param QueryRouter   $router   The categories a query named.
 	 */
-	public function __construct( private ProductSearch $products, private SearchService $search, private Cache $cache ) {
+	public function __construct( private ProductSearch $products, private SearchService $search, private Cache $cache, private QueryRouter $router ) {
 	}
 
 	/**
@@ -72,7 +74,7 @@ final class ResultsView {
 			return '';
 		}
 		$count = $this->products->shown();
-		$html  = '<p class="csearch-results-summary" role="status">' . esc_html(
+		$html  = $this->categoriesLine() . '<p class="csearch-results-summary" role="status">' . esc_html(
 			sprintf(
 				/* translators: 1: number of products found, 2: the search query */
 				_n( '%1$s result for “%2$s”', '%1$s results for “%2$s”', $count, 'creative-search' ),
@@ -94,6 +96,102 @@ final class ResultsView {
 			$html .= $this->contentSection();
 		}
 		return $html;
+	}
+
+	/**
+	 * The categories a query named when two or more did, so none was opened (D-102): "Categories: Decks,
+	 * Fingerboard decks", each a link.
+	 */
+	public function categoriesLine(): string {
+		$terms = array();
+		$urls  = array();
+		foreach ( $this->router->categories() as $id ) {
+			$term = get_term( $id, 'product_cat' );
+			$url  = $term instanceof WP_Term ? get_term_link( $term ) : '';
+			if ( $term instanceof WP_Term && is_string( $url ) ) {
+				$terms[]                = $term;
+				$urls[ $term->term_id ] = $url;
+			}
+		}
+		if ( count( $terms ) < 2 ) {
+			return '';
+		}
+		// Two links of one text would not say where each goes: a shared name carries its parent.
+		$counts = array_count_values( wp_list_pluck( $terms, 'name' ) );
+		$links  = array();
+		foreach ( $terms as $term ) {
+			$name   = $term->name;
+			$parent = $counts[ $term->name ] > 1 && $term->parent > 0 ? get_term( $term->parent, 'product_cat' ) : null;
+			if ( $parent instanceof WP_Term ) {
+				/* translators: 1: a category, 2: the category it is in */
+				$name = sprintf( _x( '%1$s (%2$s)', 'a category and its parent', 'creative-search' ), $term->name, $parent->name );
+			}
+			$links[] = '<a href="' . esc_url( $urls[ $term->term_id ] ) . '">' . esc_html( $name ) . '</a>';
+		}
+		return '<p class="csearch-results-categories">' . sprintf(
+			/* translators: %s: a list of links to categories */
+			esc_html__( 'Categories: %s', 'creative-search' ),
+			wp_sprintf( '%l', $links )
+		) . '</p>';
+	}
+
+	/**
+	 * On the page a query was sent to (D-101, D-102), what it shows and the way back to every product: "Showing
+	 * Wheels. Search all products for “wheels”." Empty on any other page.
+	 */
+	public function routedLine(): string {
+		$from = QueryRouter::from();
+		if ( '' === $from ) {
+			return '';
+		}
+		$filters  = self::chosenFilters();
+		$category = is_tax( 'product_cat' ) ? get_queried_object() : null;
+		if ( $category instanceof WP_Term ) {
+			$showing = '' === $filters
+				/* translators: %s: a category */
+				? sprintf( __( 'Showing %s.', 'creative-search' ), $category->name )
+				/* translators: 1: a category, 2: the filters applied, such as "Width 8.25" */
+				: sprintf( __( 'Showing %1$s with %2$s.', 'creative-search' ), $category->name, $filters );
+		} elseif ( '' !== $filters ) {
+			/* translators: %s: the filters applied, such as "Width 8.25" */
+			$showing = sprintf( __( 'Showing products with %s.', 'creative-search' ), $filters );
+		} else {
+			return '';
+		}
+		$all = add_query_arg(
+			array(
+				's'                  => rawurlencode( $from ),
+				'post_type'          => 'product',
+				QueryRouter::ALL_ARG => '1',
+			),
+			home_url( '/' )
+		);
+		return '<p class="csearch-results-routed">' . esc_html( $showing ) . ' <a href="' . esc_url( $all ) . '">' . esc_html(
+			sprintf(
+				/* translators: %s: the query the shopper typed */
+				__( 'Search all products for “%s”.', 'creative-search' ),
+				$from
+			)
+		) . '</a></p>';
+	}
+
+	/**
+	 * The attribute filters on the page, as WooCommerce reads them: "Width 8.25 and Wheel size 54mm".
+	 */
+	private static function chosenFilters(): string {
+		$parts = array();
+		foreach ( class_exists( WC_Query::class ) ? WC_Query::get_layered_nav_chosen_attributes() : array() as $taxonomy => $chosen ) {
+			$names = array();
+			foreach ( Cast::strings( $chosen['terms'] ?? array() ) as $slug ) {
+				$term    = get_term_by( 'slug', $slug, (string) $taxonomy );
+				$names[] = $term instanceof WP_Term ? $term->name : $slug;
+			}
+			if ( array() !== $names ) {
+				/* translators: 1: an attribute, such as Width, 2: its values, such as 8.25 */
+				$parts[] = sprintf( _x( '%1$s %2$s', 'an attribute and its values, such as Width 8.25', 'creative-search' ), wc_attribute_label( (string) $taxonomy ), wp_sprintf( '%l', $names ) );
+			}
+		}
+		return wp_sprintf( '%l', $parts );
 	}
 
 	/**

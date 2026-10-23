@@ -19,6 +19,9 @@
 /.eslintcache
 *.log
 
+# The copy of the Skatehouse demo the skatehouse test group runs on (D-103): products and pages, never committed
+/tests/fixtures/skatehouse/
+
 # Local environment
 /.wp-env.override.json
 /.env

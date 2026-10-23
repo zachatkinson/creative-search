@@ -81,6 +81,13 @@ final class ProductSearch {
 	}
 
 	/**
+	 * The language the shopper asked for (`lang`), else the request's locale.
+	 */
+	public static function lang(): string {
+		return isset( $_GET['lang'] ) && is_string( $_GET['lang'] ) ? sanitize_key( wp_unslash( $_GET['lang'] ) ) : get_locale(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only search parameter.
+	}
+
+	/**
 	 * Rank the main product search: `pre_get_posts` at priority 5, before WooCommerce's own pass (which reads
 	 * the answer for its visibility clause and overwrites `post__in`; {@see ProductSearch::enforce()} sets it
 	 * again after).
@@ -95,10 +102,13 @@ final class ProductSearch {
 		if ( '' === $words ) {
 			return; // An empty search lists the catalogue, as WooCommerce does.
 		}
-		$lang  = isset( $_GET['lang'] ) && is_string( $_GET['lang'] ) ? sanitize_key( wp_unslash( $_GET['lang'] ) ) : get_locale(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only search parameter.
+		if ( true === $query->get( 'csearch_routed' ) ) {
+			return; // The shopper is sent to a category or a filter ({@see QueryRouter}).
+		}
+		$lang  = self::lang();
 		$exact = isset( $_GET[ self::EXACT_ARG ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only search parameter.
-		// A second page or another sort is the same search, not a new one for the log.
-		$repeat       = Cast::int( $query->get( 'paged' ) ) > 1 || isset( $_GET['orderby'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only sort parameter.
+		// A second page, another sort, or the page a redirect landed on is the same search, not a new one for the log.
+		$repeat       = Cast::int( $query->get( 'paged' ) ) > 1 || isset( $_GET['orderby'] ) || QueryRouter::arrived(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public, read-only parameters.
 		$this->answer = $this->search->rankedIds( $words, $lang, $repeat ? '' : 'page', $exact );
 		$query->set( 'post__in', array() === $this->answer['ids'] ? array( 0 ) : $this->answer['ids'] );
 		$query->set( 'csearch_ranked', true );
@@ -118,14 +128,15 @@ final class ProductSearch {
 	}
 
 	/**
-	 * Remove WordPress's search clause and search terms from the ranked query: the match set is `post__in`.
+	 * Remove WordPress's search clause and search terms from the ranked query (the match set is `post__in`) and from
+	 * a query sent on to a category or a filter (nothing is fetched before the redirect).
 	 *
 	 * @param string|mixed $search The clause.
 	 * @param mixed        $query  The query.
 	 * @return string|mixed
 	 */
 	public function searchClause( $search, $query = null ) {
-		if ( ! $query instanceof WP_Query || true !== $query->get( 'csearch_ranked' ) ) {
+		if ( ! $query instanceof WP_Query || ( true !== $query->get( 'csearch_ranked' ) && true !== $query->get( 'csearch_routed' ) ) ) {
 			return $search;
 		}
 		$query->set( 'search_terms', array() );

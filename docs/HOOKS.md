@@ -385,6 +385,40 @@ The block's `mode` attribute and the shortcode's `mode="button"` show the form a
 
 A "Search" box in the post and page editors ("Exclude from search", nonce `csearch_content_exclude`, saved on `save_post` for a user who can edit the post).
 
+## 1.2: sizes and categories in the query (1.2.0)
+
+### `csearch_query_filters` (filter)
+
+- **Since:** 1.2.0
+- **Signature:** `apply_filters( 'csearch_query_filters', array $filters, string $query ): array`
+- **What it does:** the shop filters a results-page query names (D-101), attribute taxonomy to term slugs (`array( 'pa_width' => array( '8-25' ) )`), read from the attributes ticked under Tools → Results page. Return an empty array to search those words instead; add an entry to filter by a value the plugin did not read. Only attribute taxonomies that exist are kept. A word whose filter is removed is searched again.
+- **Where it runs:** `Search\QueryRoutes::route()`, from `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), for the main product search on its first page.
+- **Example:**
+
+```php
+// Never treat a bare 8 as a size.
+add_filter( 'csearch_query_filters', static fn( array $filters ): array => array_map( static fn( array $slugs ): array => array_values( array_diff( $slugs, array( '8-0' ) ) ), $filters ) );
+```
+
+### `csearch_category_redirect` (filter)
+
+- **Since:** 1.2.0
+- **Signature:** `apply_filters( 'csearch_category_redirect', ?WP_Term $term, string $query ): ?WP_Term`
+- **What it does:** the category a results-page query opens (D-102): the one category with products whose name the query reads as, when no product is named exactly as the query reads and `category_redirect` is on; null otherwise. Return null to show the results; return another `product_cat` term to open it instead.
+- **Where it runs:** `Results\QueryRouter::route()`, on `pre_get_posts` (priority 4). The shopper is sent there on `template_redirect` (priority 5, a 302), before WooCommerce's own single-result redirect.
+- **Example:**
+
+```php
+// Keep "sale" on the results page even though a Sale category exists.
+add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $query ): ?WP_Term => 'sale' === strtolower( $query ) ? null : $term, 10, 2 );
+```
+
+### Query arguments
+
+- `csearch_from` and `csearch_sig`: set on the page a query was sent to (a category, or the search with its filters); the query as typed and the site's hash of it (`wp_hash`, 12 characters). Without a matching signature `csearch_from` is ignored. That page shows "Showing Wheels. Search all products for “wheels”." (`.csearch-results-routed`), keeps the typed query in the search field, does not log the query again, does not route again, and is not replaced by WooCommerce's single-result redirect.
+- `csearch_all=1`: the ranked results page for the words as typed, never sent to a category or a filter (the link in that line).
+- A search that already carries a `filter_*`, `query_type_*`, price or rating filter, an `orderby`, `csearch_exact` or a page past the first is never routed.
+
 ## Format for later entries
 
 ### `csearch_example` (filter)

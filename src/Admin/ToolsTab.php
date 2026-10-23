@@ -202,6 +202,21 @@ final class ToolsTab {
 		self::flag( 'index_pages', __( 'Pages', 'creative-search' ), __( 'Search the site’s pages too, shown apart from the products.', 'creative-search' ), $settings );
 		echo '</tbody></table><p class="description">' . esc_html__( 'A change to the product settings applies to products as they are next indexed; rebuild the index to apply it to all of them. Posts and pages are added or removed in the background as soon as you save.', 'creative-search' ) . '</p>';
 
+		echo '<h3>' . esc_html__( 'Results page', 'creative-search' ) . '</h3><table class="form-table" role="presentation"><tbody>';
+		self::flag( 'category_redirect', __( 'Categories', 'creative-search' ), __( 'Open a category when a search names it, such as “wheels”.', 'creative-search' ), $settings );
+		$attributes = function_exists( 'wc_get_attribute_taxonomies' ) ? wc_get_attribute_taxonomies() : array();
+		if ( array() !== $attributes ) {
+			$chosen = Cast::strings( $settings['filter_attributes'] ?? array() );
+			echo '<tr><th scope="row">' . esc_html__( 'Filters', 'creative-search' ) . '</th><td><fieldset aria-describedby="csearch-filter-attributes-help"><legend class="screen-reader-text">' . esc_html__( 'Filters', 'creative-search' ) . '</legend><input type="hidden" name="filter_attributes[]" value="">';
+			foreach ( $attributes as $attribute ) {
+				$taxonomy = wc_attribute_taxonomy_name( $attribute->attribute_name );
+				$id       = 'csearch-filter-' . $attribute->attribute_name;
+				echo '<label for="' . esc_attr( $id ) . '"><input type="checkbox" id="' . esc_attr( $id ) . '" name="filter_attributes[]" value="' . esc_attr( $taxonomy ) . '"' . checked( in_array( $taxonomy, $chosen, true ), true, false ) . '> ' . esc_html( $attribute->attribute_label ) . '</label><br>';
+			}
+			echo '<p class="description" id="csearch-filter-attributes-help">' . esc_html__( 'A search that names one of these attributes’ values, such as “deck 8.25”, shows the products with that filter applied, so the shopper can see it and remove it.', 'creative-search' ) . '</p></fieldset></td></tr>';
+		}
+		echo '</tbody></table>';
+
 		echo '<h3>' . esc_html__( 'Stop words', 'creative-search' ) . '</h3><p>' . esc_html__( 'Words a search ignores unless they are all it has, besides the built-in list. One per line or separated by commas.', 'creative-search' ) . '</p><table class="form-table" role="presentation"><tbody>';
 		$builtIn = new StopWords();
 		foreach ( $this->languages->codes() as $code ) {

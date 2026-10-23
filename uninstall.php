@@ -34,7 +34,7 @@ function csearch_uninstall_site(): void {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . 'csearch_' . $table ) );
 	}
-	foreach ( array( 'csearch_settings', 'csearch_db_version', 'csearch_index_state', 'csearch_upgrade_lock', 'csearch_reindex_cancel', 'csearch_rebuild_owed', 'csearch_analysis_version' ) as $option ) {
+	foreach ( array( 'csearch_settings', 'csearch_db_version', 'csearch_index_state', 'csearch_upgrade_lock', 'csearch_reindex_cancel', 'csearch_rebuild_owed', 'csearch_analysis_version', 'csearch_attribute_terms', 'csearch_category_stems' ) as $option ) {
 		delete_option( $option );
 	}
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching

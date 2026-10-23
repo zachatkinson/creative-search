@@ -80,6 +80,18 @@ final class Options {
 	public const ANALYSIS_VERSION = 'csearch_analysis_version';
 
 	/**
+	 * The values of the attributes the shop filters by, a folded word to its attribute and term slug, for the
+	 * results page (`Index\AttributeTerms`, D-101). Autoloaded, so a search page reads nothing for it.
+	 */
+	public const ATTRIBUTE_TERMS = 'csearch_attribute_terms';
+
+	/**
+	 * Each category name's stems by language, for the results page (`Search\QueryRoutes`, D-102). Autoloaded, so a
+	 * search page reads nothing for it; deleted when a category changes or a rebuild goes live.
+	 */
+	public const CATEGORY_STEMS = 'csearch_category_stems';
+
+	/**
 	 * Object-cache group for answers and rate-limit counters.
 	 */
 	public const CACHE_GROUP = 'csearch';
@@ -95,7 +107,7 @@ final class Options {
 	 * @return string[]
 	 */
 	public static function names(): array {
-		return array( self::SETTINGS, self::DB_VERSION, self::INDEX_STATE, self::UPGRADE_LOCK, self::REINDEX_CANCEL, self::REBUILD_OWED, self::ANALYSIS_VERSION );
+		return array( self::SETTINGS, self::DB_VERSION, self::INDEX_STATE, self::UPGRADE_LOCK, self::REINDEX_CANCEL, self::REBUILD_OWED, self::ANALYSIS_VERSION, self::ATTRIBUTE_TERMS, self::CATEGORY_STEMS );
 	}
 
 	/**

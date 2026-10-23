@@ -14,6 +14,7 @@ use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Domain\Searcher;
+use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Domain\Synonyms;
 use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\ContentReader;
@@ -191,6 +192,27 @@ final class SearchService {
 	}
 
 	/**
+	 * The owner's synonyms in some languages, read once and kept with the answers (a synonym's change drops them).
+	 *
+	 * @param string[] $langs Language codes.
+	 */
+	public function synonymsFor( array $langs ): Synonyms {
+		$key  = Cache::key( 0, 'synonyms', $langs );
+		$rows = $this->cache->get( $key );
+		if ( null === $rows ) {
+			$rows = array_map( static fn( Synonym $s ): array => array( $s->lang, $s->word, $s->means, $s->bothWays ), $this->synonyms->forLanguages( $langs ) );
+			$this->cache->set( $key, $rows );
+		}
+		$list = array();
+		foreach ( $rows as $row ) {
+			if ( is_array( $row ) && 4 === count( $row ) ) {
+				$list[] = new Synonym( Cast::str( $row[0] ), Cast::str( $row[1] ), Cast::str( $row[2] ), true === $row[3] );
+			}
+		}
+		return new Synonyms( $list, $this->analyzers->tokenizer() );
+	}
+
+	/**
 	 * Run a search with some options against the live index.
 	 *
 	 * @param string        $query   Clean query.
@@ -202,7 +224,7 @@ final class SearchService {
 		$store    = $this->index->at( $this->index->generation() )->withTermRefs( array() !== $options->boostRules );
 		$store    = $explain ? $store->explaining() : $store;
 		$langs    = array_values( array_unique( array_filter( array( $lang, $options->fallbackLang ) ) ) );
-		$parser   = new QueryParser( $this->analyzers->tokenizer(), new Synonyms( $this->synonyms->forLanguages( $langs ), $this->analyzers->tokenizer() ) );
+		$parser   = new QueryParser( $this->analyzers->tokenizer(), $this->synonymsFor( $langs ) );
 		$searcher = new Searcher( $store, $this->analyzers->analyzer() );
 		return $searcher->search( $parser->parse( $query, $lang ), $options );
 	}

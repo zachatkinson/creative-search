@@ -48,6 +48,7 @@
 		"test:benchmark": "phpunit -c phpunit.xml.dist --testsuite unit --group benchmark",
 		"test:integration": "bash tools/integration.sh",
 		"test:integration:benchmark": "bash tools/integration.sh --group benchmark",
+		"test:skatehouse": "bash tools/integration.sh --group skatehouse",
 		"infection": [
 			"@infection:core",
 			"@infection:domain"
