@@ -110,6 +110,9 @@ export function installDom() {
 			pushState( state ) {
 				this.state = state;
 			},
+			replaceState( state ) {
+				this.state = state;
+			},
 			back() {
 				this.state = null;
 				dom.backs++;

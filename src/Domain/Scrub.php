@@ -64,7 +64,7 @@ final class Scrub {
 	 * @return string[]
 	 */
 	public static function sources(): array {
-		return array_map( static fn( string $pattern ): string => substr( $pattern, 1, (int) strrpos( $pattern, '/' ) - 1 ), self::PATTERNS );
+		return array_map( static fn( string $pattern ): string => implode( '/', array_slice( explode( '/', $pattern ), 1, -1 ) ), self::PATTERNS );
 	}
 
 	/**

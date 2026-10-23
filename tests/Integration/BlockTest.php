@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Tests\Integration;
 
+use CreativeBranding\Search\Block\FormOptions;
 use CreativeBranding\Search\Block\Shortcode;
 use CreativeBranding\Search\Block\Widget;
 use CreativeBranding\Search\Settings\Settings;
@@ -136,6 +137,36 @@ final class BlockTest extends IntegrationTestCase {
 		self::assertFalse( self::context( do_blocks( '<!-- wp:creative-search/search /-->' ) )['dialog'] );
 		self::assertStringContainsString( 'csearch-dialog', do_shortcode( '[creative_search mode="button"]' ), 'the shortcode too' );
 		self::assertStringNotContainsString( 'csearch-dialog', do_blocks( '<!-- wp:creative-search/search {"mode":"other"} /-->' ) );
+	}
+
+	public function test_the_page_dims_unless_the_form_says_not_to(): void {
+		// Field mode dims by default; the block and the shortcode can each turn it off, the filter has the last word (D-127).
+		self::assertStringContainsString( 'csearch-backdrop', do_blocks( '<!-- wp:creative-search/search /-->' ) );
+		self::assertStringContainsString( 'csearch-backdrop', do_blocks( '<!-- wp:creative-search/search {"dimPage":true} /-->' ) );
+		self::assertStringNotContainsString( 'csearch-backdrop', do_blocks( '<!-- wp:creative-search/search {"dimPage":false} /-->' ) );
+		self::assertStringNotContainsString( 'csearch-backdrop', do_shortcode( '[creative_search dim_page="no"]' ) );
+		self::assertStringContainsString( 'csearch-backdrop', do_shortcode( '[creative_search]' ) );
+		self::assertTrue( FormOptions::fromSettings()->dimPage );
+
+		$seen = array();
+		$spy  = static function ( bool $dim ) use ( &$seen ): bool {
+			$seen[] = $dim;
+			return true;
+		};
+		add_filter( 'csearch_dim_page', $spy );
+		$forced = do_blocks( '<!-- wp:creative-search/search {"dimPage":false} /-->' );
+		remove_filter( 'csearch_dim_page', $spy );
+		self::assertSame( array( false ), $seen, 'the filter hears the block\'s choice' );
+		self::assertStringContainsString( 'csearch-backdrop', $forced, 'and has the last word' );
+	}
+
+	public function test_the_panel_can_be_capped_by_the_script(): void {
+		// The script caps the panel in a pinned header or on a touch screen (D-126); the server starts it uncapped.
+		$html    = do_blocks( '<!-- wp:creative-search/search /-->' );
+		$context = self::context( $html );
+		self::assertFalse( $context['capped'] );
+		self::assertSame( '', $context['panelMax'] );
+		self::assertStringContainsString( 'data-wp-class--is-capped="context.capped" data-wp-style--max-height="context.panelMax"', $html );
 	}
 
 	public function test_the_render_is_the_same_for_every_visitor_and_holds_no_nonce(): void {

@@ -117,7 +117,7 @@ final class SearchForm {
 			. '</button>';
 		$html .= '</div>';
 		$html .= '<div class="csearch-live csearch-sr" aria-live="polite" aria-atomic="true" data-wp-text="context.live"></div>';
-		$html .= '<div class="csearch-panel" hidden data-wp-bind--hidden="!context.panel" data-wp-class--is-above="context.above">';
+		$html .= '<div class="csearch-panel" hidden data-wp-bind--hidden="!context.panel" data-wp-class--is-above="context.above" data-wp-class--is-capped="context.capped" data-wp-style--max-height="context.panelMax">';
 		$html .= '<p class="csearch-status" hidden data-wp-bind--hidden="!context.searching">' . esc_html__( 'Searching…', 'creative-search' ) . '</p>';
 		$html .= '<p class="csearch-status" hidden data-wp-bind--hidden="!context.empty">' . esc_html__( 'No suggestions', 'creative-search' ) . '</p>';
 		$html .= '<p class="csearch-status csearch-corrected" hidden data-wp-bind--hidden="!context.corrected" data-wp-text="context.corrected"></p>';
@@ -138,10 +138,11 @@ final class SearchForm {
 		 * for a theme whose header makes the backdrop sit in the wrong place.
 		 *
 		 * @since 1.1.0
+		 * @since 1.4.0 Receives the block's own "Dim the page behind the suggestions" choice (D-127).
 		 *
-		 * @param bool $dim Default true.
+		 * @param bool $dim The form's `dimPage`, true by default.
 		 */
-		if ( ! $dialog && (bool) apply_filters( 'csearch_dim_page', true ) ) {
+		if ( ! $dialog && (bool) apply_filters( 'csearch_dim_page', $options->dimPage ) ) {
 			$html .= '<div class="csearch-backdrop" aria-hidden="true" hidden data-wp-bind--hidden="!context.panel" data-wp-on--pointerdown="actions.dismiss"></div>';
 		}
 		$html .= '</div>';
@@ -308,6 +309,8 @@ final class SearchForm {
 			'empty'     => false,
 			'answered'  => '',
 			'above'     => Settings::PANEL_ABOVE === $options->panelPosition,
+			'capped'    => false,
+			'panelMax'  => '',
 			'dialog'    => FormOptions::BUTTON === $options->mode,
 			'scope'     => null === $scope ? '' : $scope->slug,
 			'scoped'    => null !== $scope,

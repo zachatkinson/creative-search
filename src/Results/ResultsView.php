@@ -238,6 +238,53 @@ final class ResultsView {
 	}
 
 	/**
+	 * Whether this is a product search the plugin answers that found no product: then its no-results state is the
+	 * page's one result message, and WooCommerce's "No products were found matching your selection." is left out
+	 * (D-122).
+	 */
+	public function answersEmpty(): bool {
+		$answer = $this->products->answer();
+		return null !== $answer && '' !== $answer['query'] && 0 === $this->products->shown();
+	}
+
+	/**
+	 * Whether this is a product search the plugin answers, listed in Relevance order (no `orderby`, or
+	 * `orderby=relevance`): WooCommerce's result count then says so (D-123).
+	 */
+	public function inRelevanceOrder(): bool {
+		$answer = $this->products->answer();
+		return null !== $answer && '' !== $answer['query'] && ! ProductSearch::sorted();
+	}
+
+	/**
+	 * `woocommerce_catalog_orderedby`: the result count's "Sorted by relevance", on a search in Relevance order
+	 * (WooCommerce's messages have none, D-123).
+	 *
+	 * @param mixed $messages Messages by `orderby` value.
+	 * @return mixed
+	 */
+	public function orderedBy( $messages ) {
+		if ( ! is_array( $messages ) || ! $this->inRelevanceOrder() ) {
+			return $messages;
+		}
+		$messages['relevance'] = _x( 'Sorted by relevance', 'the result count on search results', 'creative-search' );
+		return $messages;
+	}
+
+	/**
+	 * `woocommerce_default_catalog_orderby`: relevance on a search in Relevance order, so the result count reads
+	 * the order the products are in, not the shop's default sort (D-123). WooCommerce's sort menu already drops
+	 * "Default sorting" and offers Relevance on a search, and its ordering arguments already use relevance for a
+	 * search with words, so neither changes.
+	 *
+	 * @param mixed $orderby The shop's default sort.
+	 * @return mixed
+	 */
+	public function defaultOrderby( $orderby ) {
+		return $this->inRelevanceOrder() ? 'relevance' : $orderby;
+	}
+
+	/**
 	 * Whether the search found no product but found a post or page: then the page leads, and WooCommerce's bare
 	 * "No products were found" is left out (Skatehouse handoff item 7).
 	 */

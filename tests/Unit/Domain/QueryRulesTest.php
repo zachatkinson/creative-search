@@ -69,4 +69,23 @@ final class QueryRulesTest extends TestCase {
 		self::assertSame( '', $rules->key( 'the a', 'en' ) );
 		self::assertSame( 'size guide', $rules->key( 'The Size-Guide', 'en' ) );
 	}
+
+	public function test_rule_keys_are_worked_out_once_per_language(): void {
+		$rules = new QueryRules();
+		self::assertSame(
+			array(
+				3  => 'size guide',
+				7  => 'grip tape',
+				9  => 'grip tape',
+				11 => '',
+			),
+			$rules->keys( self::RULES, 'en-CA' ),
+			'by the rule\'s place; another language\'s rule left out; read with the query\'s stop words'
+		);
+		self::assertSame( array( 3, 9, 11, 12 ), array_keys( $rules->keys( self::RULES, 'fr_CA' ) ) );
+		self::assertSame( 7, QueryRules::find( $rules->keys( self::RULES, 'en' ), 'grip tape' ), 'the first' );
+		self::assertNull( QueryRules::find( array( 11 => '' ), '' ), 'an empty key matches nothing, not a rule of stop words' );
+		self::assertNull( QueryRules::find( array( 3 => 'size guide' ), 'size' ) );
+		self::assertSame( 0, QueryRules::find( array( 0 => 'size guide' ), 'size guide' ), 'the first place is a place' );
+	}
 }

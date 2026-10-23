@@ -102,6 +102,10 @@ final class CustomFieldsTest extends IndexTestCase {
 			self::assertStringStartsNotWith( '_', $key, 'WooCommerce\'s own keys are not offered' );
 			self::assertNotSame( 'total_sales', $key );
 		}
+		global $wpdb;
+		$before = $wpdb->num_queries;
+		self::assertSame( $keys, $this->service( MetaKeyRepository::class )->productKeys( 10 ) );
+		self::assertSame( $before, $wpdb->num_queries, 'the second visit reads the object cache (1.3 review M8)' );
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		ob_start();
 		$this->service( ToolsTab::class )->render();

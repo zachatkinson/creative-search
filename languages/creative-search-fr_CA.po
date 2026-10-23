@@ -124,7 +124,8 @@ msgid "The product is queued for the search index; it is searchable as it is now
 msgstr "Le produit est en file d’attente pour l’index de recherche; il sera trouvable tel qu’il est maintenant dans un instant."
 
 #. translators: %s: the SKUs or ids not found
-#: src/Admin/Actions.php:515
+#: src/Admin/Actions.php:503
+#: src/Cli/RulesCommand.php:139
 #, php-format
 msgid "No product has the SKU or ID %s."
 msgstr "Aucun produit n’a l’UGS ou l’ID %s."
@@ -1000,91 +1001,91 @@ msgstr "Remplacer le formulaire de recherche du thème par cette barre de recher
 msgid "Save settings"
 msgstr "Enregistrer les réglages"
 
-#: src/Block/SearchForm.php:67
+#: src/Block/SearchForm.php:68
 msgid "Search products"
 msgstr "Rechercher des produits"
 
-#: src/Block/SearchForm.php:71
+#: src/Block/SearchForm.php:72
 msgctxt "the search field placeholder"
 msgid "Search products…"
 msgstr "Rechercher des produits…"
 
-#: src/Block/SearchForm.php:110
+#: src/Block/SearchForm.php:111
 msgid "Clear search"
 msgstr "Effacer la recherche"
 
-#: src/Block/SearchForm.php:114
+#: src/Block/SearchForm.php:115
 msgctxt "the submit button"
 msgid "Search"
 msgstr "Rechercher"
 
-#: src/Block/SearchForm.php:120
+#: src/Block/SearchForm.php:121
 msgid "Searching…"
 msgstr "Recherche en cours…"
 
-#: src/Block/SearchForm.php:121
-#: src/Block/SearchForm.php:229
+#: src/Block/SearchForm.php:122
+#: src/Block/SearchForm.php:231
 msgid "No suggestions"
 msgstr "Aucune suggestion"
 
 #: src/Admin/ToolsTab.php:270
-#: src/Block/SearchForm.php:123
+#: src/Block/SearchForm.php:124
 #: build/block/editor.js:1
 msgid "Suggestions"
 msgstr "Suggestions"
 
 #. translators: used between the parts of a suggestion's accessible name (name, price, stock); there is a space after the comma
-#: src/Block/SearchForm.php:212
-#: src/Block/SearchForm.php:274
+#: src/Block/SearchForm.php:214
+#: src/Block/SearchForm.php:278
 msgctxt "between the parts of a suggestion name"
 msgid ", "
 msgstr ", "
 
 #. translators: %s: number of suggestions in the panel
-#: src/Block/SearchForm.php:231
+#: src/Block/SearchForm.php:233
 #, php-format
 msgid "%s suggestion"
 msgid_plural "%s suggestions"
 msgstr[0] "%s suggestion"
 msgstr[1] "%s suggestions"
 
-#: src/Block/SearchForm.php:236
+#: src/Block/SearchForm.php:238
 msgid "No recent searches"
 msgstr "Aucune recherche récente"
 
 #. translators: %s: number of recent searches shown
-#: src/Block/SearchForm.php:238
+#: src/Block/SearchForm.php:240
 #, php-format
 msgid "%s recent search"
 msgid_plural "%s recent searches"
 msgstr[0] "%s recherche récente"
 msgstr[1] "%s recherches récentes"
 
-#: src/Block/SearchForm.php:269
+#: src/Block/SearchForm.php:273
 msgid "In stock"
 msgstr "En stock"
 
-#: src/Block/SearchForm.php:270
+#: src/Block/SearchForm.php:274
 msgid "Out of stock"
 msgstr "En rupture de stock"
 
 #. translators: 1: a category, tag or brand name, 2: "Category", "Tag" or "Brand", 3: the number of products in it
-#: src/Block/SearchForm.php:276
+#: src/Block/SearchForm.php:280
 #, php-format
 msgid "%1$s, %2$s (%3$s)"
 msgstr "%1$s, %2$s (%3$s)"
 
-#: src/Block/SearchForm.php:278
+#: src/Block/SearchForm.php:282
 msgctxt "a suggestion row"
 msgid "Category"
 msgstr "Catégorie"
 
-#: src/Block/SearchForm.php:279
+#: src/Block/SearchForm.php:283
 msgctxt "a suggestion row"
 msgid "Tag"
 msgstr "Étiquette"
 
-#: src/Block/SearchForm.php:280
+#: src/Block/SearchForm.php:284
 msgctxt "a suggestion row"
 msgid "Brand"
 msgstr "Marque"
@@ -1329,11 +1330,11 @@ msgstr[1] "%1$s résultats pour « %2$s »"
 msgid "Showing results for %1$s; search instead for %2$s"
 msgstr "Résultats pour %1$s; chercher plutôt %2$s"
 
-#: src/Results/ResultsView.php:377
+#: src/Results/ResultsView.php:424
 msgid "Try one of these categories:"
 msgstr "Essayez une de ces catégories :"
 
-#: src/Results/ResultsView.php:395
+#: src/Results/ResultsView.php:442
 msgid "You might like"
 msgstr "Vous aimerez peut-être"
 
@@ -1384,8 +1385,8 @@ msgid "suggestions"
 msgstr "suggestions"
 
 #. translators: 1: number of results, 2: the query typed
-#: src/Block/SearchForm.php:265
-#: src/Block/SearchForm.php:267
+#: src/Block/SearchForm.php:269
+#: src/Block/SearchForm.php:271
 #, php-format
 msgid "See %1$s result for %2$s"
 msgid_plural "See all %1$s results for %2$s"
@@ -1482,7 +1483,7 @@ msgid "Leave the wording empty to use the default shown."
 msgstr "Laissez le libellé vide pour utiliser celui affiché par défaut."
 
 #: src/Admin/ToolsTab.php:211
-#: src/Results/ResultsView.php:271
+#: src/Results/ResultsView.php:318
 msgid "Posts"
 msgstr "Articles"
 
@@ -1491,7 +1492,7 @@ msgid "Search the blog’s posts too, shown apart from the products."
 msgstr "Chercher aussi dans les articles du blogue, affichés à part des produits."
 
 #: src/Admin/ToolsTab.php:212
-#: src/Results/ResultsView.php:269
+#: src/Results/ResultsView.php:316
 msgid "Pages"
 msgstr "Pages"
 
@@ -1503,32 +1504,32 @@ msgstr "Chercher aussi dans les pages du site, affichées à part des produits."
 msgid "A change to the product settings applies to products as they are next indexed; rebuild the index to apply it to all of them. Posts and pages are added or removed in the background as soon as you save."
 msgstr "Un changement aux réglages des produits s’applique aux produits à leur prochaine indexation; reconstruisez l’index pour l’appliquer à tous. Les articles et les pages sont ajoutés ou retirés en arrière-plan dès l’enregistrement."
 
-#: src/Block/SearchForm.php:163
+#: src/Block/SearchForm.php:165
 msgctxt "the button that opens the search"
 msgid "Search"
 msgstr "Rechercher"
 
-#: src/Block/SearchForm.php:164
+#: src/Block/SearchForm.php:166
 msgctxt "the search dialog"
 msgid "Search"
 msgstr "Recherche"
 
-#: src/Block/SearchForm.php:166
+#: src/Block/SearchForm.php:168
 msgid "Close search"
 msgstr "Fermer la recherche"
 
 #. translators: %1$s: the query the suggestions are for, after a word that matched nothing was left out or a typo was corrected
-#: src/Block/SearchForm.php:272
+#: src/Block/SearchForm.php:276
 #, php-format
 msgid "Showing results for %1$s"
 msgstr "Résultats pour %1$s"
 
-#: src/Block/SearchForm.php:291
+#: src/Block/SearchForm.php:295
 msgctxt "a suggestion row"
 msgid "Post"
 msgstr "Article"
 
-#: src/Block/SearchForm.php:292
+#: src/Block/SearchForm.php:296
 msgctxt "a suggestion row"
 msgid "Page"
 msgstr "Page"
@@ -1553,30 +1554,30 @@ msgid_plural "%1$d of %2$d ids indexed."
 msgstr[0] "%1$d identifiant sur %2$d indexé."
 msgstr[1] "%1$d identifiants sur %2$d indexés."
 
-#: src/Results/ResultsView.php:271
+#: src/Results/ResultsView.php:318
 msgid "Pages and posts"
 msgstr "Pages et articles"
 
-#: src/Results/ResultsView.php:280
+#: src/Results/ResultsView.php:327
 msgid "Can’t find what you need? Contact us"
 msgstr "Vous ne trouvez pas ce qu’il vous faut? Écrivez-nous"
 
-#: src/Results/ResultsView.php:280
+#: src/Results/ResultsView.php:327
 msgid "Need help choosing? Read our guides"
 msgstr "Besoin d’aide pour choisir? Lisez nos guides"
 
 #. translators: %s: the search query
-#: src/Results/ResultsView.php:366
+#: src/Results/ResultsView.php:413
 #, php-format
 msgid "No products match “%s”, but these do:"
 msgstr "Aucun produit ne correspond à « %s », mais ceci oui :"
 
-#: src/Results/ResultsView.php:433
+#: src/Results/ResultsView.php:480
 msgid "Try one word:"
 msgstr "Essayez un seul mot :"
 
 #. translators: 1: a word of the shopper's query, 2: how many products it finds alone
-#: src/Results/ResultsView.php:445
+#: src/Results/ResultsView.php:492
 #, php-format
 msgid "%1$s (%2$s result)"
 msgid_plural "%1$s (%2$s results)"
@@ -1673,7 +1674,7 @@ msgstr[0] "%1$s résultat pour « %2$s » dans %3$s"
 msgstr[1] "%1$s résultats pour « %2$s » dans %3$s"
 
 #. translators: %s: the category the shopper is in, such as Decks
-#: src/Block/SearchForm.php:96
+#: src/Block/SearchForm.php:97
 #, php-format
 msgid "Only in %s"
 msgstr "Seulement dans %s"
@@ -1803,20 +1804,20 @@ msgstr "Enregistrer les redirections et les épinglages"
 msgid "Every language"
 msgstr "Toutes les langues"
 
-#: src/Search/OwnerRules.php:131
+#: src/Search/OwnerRules.php:132
 msgid "A redirect goes to a page of this site: enter its address, or a path such as /size-guide/."
 msgstr "Une redirection mène à une page de ce site : entrez son adresse, ou un chemin comme /guide-des-tailles/."
 
-#: src/Search/OwnerRules.php:147
+#: src/Search/OwnerRules.php:148
 msgid "Choose at least one product to pin."
 msgstr "Choisissez au moins un produit à épingler."
 
-#: src/Search/OwnerRules.php:182
+#: src/Search/OwnerRules.php:210
 msgid "Enter the words of the search, not only short words such as “the”."
 msgstr "Entrez les mots de la recherche, pas seulement des mots courts comme « le »."
 
 #. translators: %s: the most rules of one kind
-#: src/Search/OwnerRules.php:212
+#: src/Search/OwnerRules.php:240
 #, php-format
 msgid "There are already %s rules of this kind; remove one first."
 msgstr "Il y a déjà %s règles de ce type; retirez-en une d’abord."
@@ -1825,12 +1826,12 @@ msgstr "Il y a déjà %s règles de ce type; retirez-en une d’abord."
 msgid "Redirect saved."
 msgstr "Redirection enregistrée."
 
-#: src/Cli/RulesCommand.php:141
+#: src/Cli/RulesCommand.php:146
 msgid "Products pinned."
 msgstr "Produits épinglés."
 
 #. translators: %s: number of rules
-#: src/Cli/RulesCommand.php:179
+#: src/Cli/RulesCommand.php:206
 #, php-format
 msgid "%s rule removed."
 msgid_plural "%s rules removed."
@@ -1854,34 +1855,34 @@ msgid "Words"
 msgstr "Mots"
 
 #. translators: %1$s: a product's name
-#: src/Block/SearchForm.php:287
+#: src/Block/SearchForm.php:291
 #, php-format
 msgid "%1$s added to your cart."
 msgstr "%1$s ajouté à votre panier."
 
 #. translators: %1$s: a product's name
-#: src/Block/SearchForm.php:289
+#: src/Block/SearchForm.php:293
 #, php-format
 msgid "Could not add %1$s to your cart."
 msgstr "Impossible d’ajouter %1$s à votre panier."
 
 #. translators: 1: the query typed, 2: a category, as in "kazumi in Decks"
-#: src/Block/SearchForm.php:284
+#: src/Block/SearchForm.php:288
 #, php-format
 msgctxt "a search within a category"
 msgid "%1$s in %2$s"
 msgstr "%1$s dans %2$s"
 
-#: src/Block/SearchForm.php:285
+#: src/Block/SearchForm.php:289
 msgctxt "a suggestion row"
 msgid "Suggested search"
 msgstr "Recherche suggérée"
 
-#: src/Block/SearchForm.php:128
+#: src/Block/SearchForm.php:129
 msgid "Shift+Enter adds it to the cart."
 msgstr "Maj+Entrée l’ajoute au panier."
 
-#: src/Block/SearchForm.php:200
+#: src/Block/SearchForm.php:202
 msgctxt "adds a suggested product to the cart"
 msgid "Add"
 msgstr "Ajouter"
@@ -1939,3 +1940,22 @@ msgstr "Résultats pour \"%s\"."
 #, php-format
 msgid "Showing results for %s"
 msgstr "Résultats pour %s"
+
+#. translators: %s: what was typed
+#: src/Cli/RulesCommand.php:189
+#, php-format
+msgid "%s is not an index from the list."
+msgstr "%s n’est pas un index de la liste."
+
+#: src/Cli/RulesCommand.php:203
+msgid "No rule has that index."
+msgstr "Aucune règle n’a cet index."
+
+#: src/Results/ResultsView.php:270
+msgctxt "the result count on search results"
+msgid "Sorted by relevance"
+msgstr "Triés par pertinence"
+
+#: build/block/editor.js:1
+msgid "Dim the page behind the suggestions"
+msgstr "Assombrir la page derrière les suggestions"

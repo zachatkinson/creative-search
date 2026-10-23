@@ -354,7 +354,7 @@ final class ContentTest extends IndexTestCase {
 		$html = $view->noResults();
 		self::assertStringContainsString( 'No products match “returns”, but these do:', $html );
 		self::assertLessThan( strpos( $html, 'csearch-no-results-categories' ) ?: PHP_INT_MAX, strpos( $html, 'Shipping &amp; returns' ) );
-		$this->service( ResultsHooks::class )->leadWithContent();
+		$this->service( ResultsHooks::class )->oneNoResultsMessage();
 		self::assertFalse( has_action( 'woocommerce_no_products_found', 'wc_no_products_found' ), 'WooCommerce\'s bare notice goes' );
 		$this->service( ResultsHooks::class )->reset();
 		self::assertNotFalse( has_action( 'woocommerce_no_products_found', 'wc_no_products_found' ) );

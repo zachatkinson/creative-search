@@ -287,3 +287,7 @@ Short source keys used in the last column (all opened 2026-10-21):
 - **No licence, no phoning home.** There is no per-site fee, no Freemius and no outbound request at all. FiboSearch Pro Personal costs $59 and then $50.15 a year per site, capped at 10,000 products.
 - **Open interfaces.** A versioned REST API with schemas (`suggest`, `search`, `status`), WP-CLI for every admin action, and documented hooks.
 
+
+## v1.4.0
+
+From 1.4.0 the cold `/suggest` and the `/search` timings keep the fastest of three per query (D-129); the budgets are unchanged. On this Mac, 300 products: cold `/suggest` p95 12.2 ms, warm 0.6 ms, `/search` 8.7 ms, memory 0.51 MB, with the log seeded and 200 redirects and 200 pins loaded (measured before D-129, single timings). 1.4.0 changed no server code on the search path.

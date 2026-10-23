@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,11 +46,22 @@ It is an ARIA combobox built to the WAI-ARIA Authoring Practices list-autocomple
 
 The plugin's repository (docs/BENCHMARK.md) has a feature-by-feature comparison with FiboSearch free and Pro, built from FiboSearch's own documentation. A measured run against FiboSearch free on a generated catalogue is there too; it is interim until it is repeated on a real shop's catalogue.
 
+= How do I change the search bar's colours? =
+
+Set any of these CSS custom properties, on `:root`, your header or the block (Appearance → Editor → Styles → Additional CSS, or your theme's stylesheet). Each falls back to the block's own look when unset:
+
+`--csearch-field-bg` and `--csearch-field-fg` (the field), `--csearch-panel-bg` and `--csearch-panel-fg` (the suggestions), `--csearch-submit-bg` and `--csearch-submit-fg` (the search button), and `--csearch-focus-ring` (the focus outline).
+
+For example: `.site-header { --csearch-field-bg: #111; --csearch-field-fg: #fff; --csearch-focus-ring: #f5c400; }`
+
 = How do I see why a product ranks where it does? =
 
 WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi deck"`.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+The search field holds its own look inside a theme's header, and its suggestions keep to the screen in a sticky header and above a phone's keyboard. No settings change; to stop the page dimming behind the suggestions, untick it on the block.
 
 = 1.3.0 =
 Adds a table for each product's variations and SKUs, so the index is rebuilt once in the background after the update. Searches keep working meanwhile; the variation photos and "Matches" lines appear once it is done.
@@ -65,6 +76,12 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.4.0 =
+* The search field keeps its own look inside a theme's header: no second box from the theme's input styles, one focus ring, and no zoom on iPhone.
+* In a sticky header, and on phones, the suggestions keep to the screen above the keyboard; on a very short screen they scroll inside themselves.
+* "Dim the page behind the suggestions" can be switched off on each block, and the dimming covers the page inside sticky headers that slide away.
+* Colour the field, the suggestions, the search button and the focus ring with seven CSS custom properties (see the FAQ).
 
 = 1.3.0 =
 * A search that names one design, colour or size of a product shows that variation's photo and opens the product with it chosen.

@@ -46,7 +46,17 @@ for ( const theme of [ 'twentytwentyfive', 'storefront' ] ) {
 
 		test( 'a suggested search leads, and a scope follows the products', async ( {
 			page,
+			isMobile,
 		} ) => {
+			// The panel keeps to the screen and drops its last rows first (D-092): on a desktop as short as
+			// 720 px the field sits low enough on this page that the scope would go. A phone's budget is smaller.
+			const size = page.viewportSize();
+			if ( ! isMobile && size && size.height < 1000 ) {
+				await page.setViewportSize( {
+					width: size.width,
+					height: 1000,
+				} );
+			}
 			await page.goto( '/search-block/' );
 			const input = await typeInto( page, 'kazumi' );
 			const listbox = page.getByRole( 'listbox' );
@@ -104,7 +114,8 @@ for ( const theme of [ 'twentytwentyfive', 'storefront' ] ) {
 					);
 				}
 			} );
-			const input = await typeInto( page, 'orbit classic' );
+			// A simple product in stock: a variable one needs a choice first, so it has no way to the cart (D-106).
+			const input = await typeInto( page, 'mainline griptape' );
 			const product = page
 				.getByRole( 'listbox' )
 				.locator( '.csearch-option-product' )
@@ -138,15 +149,38 @@ for ( const theme of [ 'twentytwentyfive', 'storefront' ] ) {
 				'.wp-block-creative-search-search, .csearch-form'
 			);
 
+			// No-results is told once, for the search sent, never for each prefix typed (1.3 review, blocker 1).
+			await page.evaluate( () => {
+				( window as any ).csearchHold = ( event: Event ) =>
+					event.preventDefault();
+				window.addEventListener(
+					'submit',
+					( window as any ).csearchHold,
+					true
+				);
+			} );
 			await input.fill( '' );
+			const answered = page.waitForResponse( /suggest\?q=zzzqqq/ );
 			await input.pressSequentially( 'zzzqqq', { delay: 30 } );
-			await expect
-				.poll( () =>
-					page.evaluate( () =>
-						( window as any ).dataLayer.map( ( e: any ) => e.event )
-					)
+			await answered;
+			const told = () =>
+				page.evaluate( () =>
+					( window as any ).dataLayer
+						.filter(
+							( e: any ) => e.event === 'csearch_no_results'
+						)
+						.map( ( e: any ) => e.search_term )
+				);
+			expect( await told() ).toEqual( [] );
+			await input.press( 'Enter' );
+			await expect.poll( told ).toEqual( [ 'zzzqqq' ] );
+			await page.evaluate( () =>
+				window.removeEventListener(
+					'submit',
+					( window as any ).csearchHold,
+					true
 				)
-				.toContain( 'csearch_no_results' );
+			);
 			await input.fill( 'orbit' );
 			await input.press( 'Enter' );
 			await expect( page ).toHaveURL( /[?&]s=orbit/ );

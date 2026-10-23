@@ -187,6 +187,36 @@ test.describe( 'button mode', () => {
 		await expect( open ).toBeFocused();
 	} );
 
+	test( 'Back then Forward stays on the page: the dialog’s step keeps the Interactivity API’s key', async ( {
+		page,
+	} ) => {
+		await page.goto( '/search-button/' );
+		await page.evaluate( () => {
+			( window as unknown as Record< string, unknown > ).csearchMarker =
+				'still here';
+		} );
+		await page.locator( '.csearch-open' ).click();
+		const dialog = page.getByRole( 'dialog', { name: 'Search' } );
+		await expect( dialog ).toBeVisible();
+		expect(
+			await page.evaluate( () => window.history.state?.wpInteractivityId )
+		).toBeTruthy();
+		await page.goBack();
+		await expect( dialog ).toBeHidden();
+		await expect( page ).toHaveURL( /\/search-button\/$/ );
+		await page.goForward();
+		await expect( page ).toHaveURL( /\/search-button\/$/ );
+		// A reload would have cleared the marker: the runtime reloads on a step without its session's key.
+		await page.waitForTimeout( 500 );
+		expect(
+			await page.evaluate(
+				() =>
+					( window as unknown as Record< string, unknown > )
+						.csearchMarker
+			)
+		).toBe( 'still here' );
+	} );
+
 	test( 'the close button closes it, and a search from it lands on the results', async ( {
 		page,
 	} ) => {

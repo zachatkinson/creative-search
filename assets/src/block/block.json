@@ -2,7 +2,7 @@
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
 	"name": "creative-search/search",
-	"version": "1.1.0",
+	"version": "1.4.0",
 	"title": "Product Search",
 	"category": "woocommerce",
 	"icon": "search",
@@ -25,7 +25,8 @@
 			"type": "string",
 			"enum": [ "field", "button" ],
 			"default": "field"
-		}
+		},
+		"dimPage": { "type": "boolean", "default": true }
 	},
 	"supports": {
 		"html": false,

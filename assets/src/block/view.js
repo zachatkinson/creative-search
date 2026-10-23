@@ -15,6 +15,13 @@ import {
 	getElement,
 	withScope,
 } from '@wordpress/interactivity';
+import {
+	coverViewport,
+	pinnedIn,
+	place,
+	roomAround,
+	scrollToRow,
+} from './placement';
 
 const DEBOUNCE = 150;
 const SLOW = 400;
@@ -22,7 +29,8 @@ const CACHE = 20;
 const RECENT = 5;
 const RECENT_KEY = 'csearch_recent';
 const SPACE_FOR_PANEL = 240;
-// Baymard: at most 10 suggestions on a desktop, 4 to 8 on a phone, and never a scrollbar (D-092).
+// Baymard: at most 10 suggestions on a desktop, 4 to 8 on a phone, and no scrollbar where the page can scroll
+// (D-092); in a fixed or sticky header, or on a touch screen, the panel scrolls inside itself (D-126).
 const MOST = 10;
 const PHONE = '(max-width: 600px), (pointer: coarse)';
 const PHONE_PRODUCTS = 4;
@@ -47,7 +55,7 @@ const watched = new WeakSet();
 /**
  * Per-instance bookkeeping the context should not carry (timers, the abort controller, the cache).
  *
- * @type {Map<string, {seq: number, timer: number, slow: number, ctrl: AbortController|null, cache: Map<string, Object>, last: Object|null, adding: boolean, emptyFor: string|null, personal: RegExp[]|null, unsafe: boolean}>}
+ * @type {Map<string, {seq: number, timer: number, slow: number, ctrl: AbortController|null, cache: Map<string, Object>, last: Object|null, adding: boolean, emptyFor: string|null, personal: RegExp[]|null, unsafe: boolean, following: boolean}>}
  */
 const privates = new Map();
 
@@ -65,6 +73,7 @@ function priv( ctx ) {
 			emptyFor: null,
 			personal: null,
 			unsafe: false,
+			following: false,
 		};
 		privates.set( ctx.id, p );
 	}
@@ -191,11 +200,34 @@ function setActive( ctx, index ) {
 	ctx.active = index;
 	const row = ctx.rows[ index ];
 	ctx.activeId = ctx.open && row ? row.id : null;
-	if ( row ) {
-		document
-			.getElementById( row.id )
-			?.scrollIntoView( { block: 'nearest' } );
+	if ( ! row ) {
+		return;
 	}
+	const el = document.getElementById( row.id );
+	if ( ! keepInPanel( ctx, el ) ) {
+		el?.scrollIntoView( { block: 'nearest' } );
+	}
+}
+
+/**
+ * Bring a row into a capped panel by the panel's own scroll; the page stays where it is (D-126).
+ *
+ * @param {Object}           ctx The block's context.
+ * @param {HTMLElement|null} el  The row.
+ * @return {boolean} Whether the panel is capped and took care of it.
+ */
+function keepInPanel( ctx, el ) {
+	const panel = ctx.capped ? el?.closest?.( '.csearch-panel' ) : null;
+	if ( ! panel ) {
+		return false;
+	}
+	panel.scrollTop = scrollToRow(
+		panel.scrollTop,
+		panel.clientHeight,
+		el.offsetTop,
+		el.offsetHeight
+	);
+	return true;
 }
 
 /**
@@ -295,32 +327,124 @@ function closePanel( ctx ) {
 	setActive( ctx, -1 );
 }
 
+/**
+ * Where the panel opens and how tall it may be (D-126): in the dialog always under the field; in a fixed or
+ * sticky header, or on a touch screen, capped to the room left in the visible viewport and scrolling inside
+ * itself; elsewhere at its natural height.
+ *
+ * @param {Object}           ctx   The block's context.
+ * @param {HTMLElement|null} input The field.
+ */
 function placePanel( ctx, input ) {
+	ctx.capped = false;
+	ctx.panelMax = '';
 	if ( ctx.dialog ) {
 		ctx.above = false; // In the dialog the panel always sits under the field.
 		return;
 	}
-	if ( ctx.position !== 'auto' ) {
+	if ( ! input ) {
 		ctx.above = ctx.position === 'above';
 		return;
 	}
-	const coarse =
-		window.matchMedia && window.matchMedia( '(pointer: coarse)' ).matches;
-	if ( ! coarse || ! input ) {
-		ctx.above = false;
+	const block = input.closest?.( '.wp-block-creative-search-search' );
+	const styleOf = window.getComputedStyle
+		? ( el ) => window.getComputedStyle( el )
+		: null;
+	const field = input.closest?.( '.csearch-field' ) || input;
+	const spot = place( {
+		position: ctx.position,
+		coarse: Boolean( window.matchMedia?.( '(pointer: coarse)' ).matches ),
+		pinned: Boolean( block && styleOf && pinnedIn( block, styleOf ) ),
+		room: roomAround(
+			field.getBoundingClientRect(),
+			window.visualViewport || null,
+			window.innerHeight
+		),
+		needed: SPACE_FOR_PANEL,
+	} );
+	ctx.above = spot.above;
+	ctx.capped = spot.capped;
+	ctx.panelMax = spot.max;
+}
+
+/**
+ * Keep an open panel's placement and the dimming layer right while the visible viewport changes: the keyboard
+ * opening or closing, the page scrolling a header away. One listener set per block, at most one update a frame.
+ *
+ * @param {Object}      ctx   The block's context.
+ * @param {HTMLElement} input The field.
+ */
+function follow( ctx, input ) {
+	const p = priv( ctx );
+	if ( p.following || ctx.dialog || ! window.addEventListener ) {
 		return;
 	}
-	const viewport = window.visualViewport
-		? window.visualViewport.height
-		: window.innerHeight;
-	ctx.above =
-		viewport - input.getBoundingClientRect().bottom < SPACE_FOR_PANEL;
+	p.following = true;
+	let queued = false;
+	const update = withScope( () => {
+		queued = false;
+		if ( ctx.panel ) {
+			placePanel( ctx, input );
+			coverPage( ctx, 0 );
+		}
+	} );
+	const later = () => {
+		if ( ! queued ) {
+			queued = true;
+			window.requestAnimationFrame( update );
+		}
+	};
+	window.visualViewport?.addEventListener( 'resize', later );
+	window.visualViewport?.addEventListener( 'scroll', later );
+	window.addEventListener( 'resize', later );
+	window.addEventListener( 'scroll', later, { passive: true } );
+}
+
+/**
+ * Spread the dimming layer over the whole viewport even when a transformed ancestor (a header that slides away)
+ * has become its containing block (D-127). Waits a few frames for the layer to be shown.
+ *
+ * @param {Object} ctx   The block's context.
+ * @param {number} tries Frames left to wait.
+ */
+function coverPage( ctx, tries = FIT_TRIES ) {
+	const layer = document
+		.getElementById( `${ ctx.id }-input` )
+		?.closest?.( '.wp-block-creative-search-search' )
+		?.querySelector( ':scope > .csearch-backdrop' );
+	if ( ! layer || ! ctx.panel ) {
+		return;
+	}
+	if ( layer.hidden ) {
+		if ( tries > 0 ) {
+			window.requestAnimationFrame?.(
+				withScope( () => coverPage( ctx, tries - 1 ) )
+			);
+		}
+		return;
+	}
+	for ( const key of [ 'inset', 'top', 'left', 'width', 'height' ] ) {
+		layer.style.removeProperty( key );
+	}
+	const cover = coverViewport(
+		layer.getBoundingClientRect(),
+		document.documentElement.clientWidth,
+		window.innerHeight
+	);
+	if ( cover ) {
+		layer.style.inset = 'auto';
+		Object.assign( layer.style, cover );
+	}
 }
 
 function openPanel( ctx, input ) {
 	placePanel( ctx, input );
 	ctx.open = true;
 	ctx.panel = ctx.rows.length > 0 || ctx.empty || ctx.searching;
+	if ( input && ctx.panel ) {
+		follow( ctx, input );
+		coverPage( ctx );
+	}
 }
 
 function productRow( ctx, p, index ) {
@@ -470,7 +594,8 @@ function liveWords( ctx, count ) {
 
 /**
  * Drop the last suggestions until the open panel fits the visible viewport, so it never needs a scrollbar
- * (D-092). Runs after each render; "See all" always stays.
+ * (D-092); a capped panel, until its rows fit its cap, scrolling inside itself only when two suggestions and
+ * "See all" do not (D-126). Runs after each render; "See all" always stays.
  *
  * @param {Object} ctx   The block's context.
  * @param {number} tries Frames left to wait for the rows to render.
@@ -504,7 +629,15 @@ function fit( ctx, tries = FIT_TRIES ) {
 			const box = panel.getBoundingClientRect();
 			const top = window.visualViewport?.offsetTop || 0;
 			const height = window.visualViewport?.height || window.innerHeight;
-			if ( box.bottom <= top + height && box.top >= top ) {
+			const fits = ctx.capped
+				? panel.scrollHeight <= panel.clientHeight + 1
+				: box.bottom <= top + height && box.top >= top;
+			if ( fits ) {
+				// Rows dropped since the choice moved: the chosen one may have slid out of a capped panel.
+				const chosen = ctx.rows[ ctx.active ];
+				if ( chosen ) {
+					keepInPanel( ctx, document.getElementById( chosen.id ) );
+				}
 				return;
 			}
 			// The last row goes, but a suggested search before any product (D-112).
@@ -686,6 +819,24 @@ function refreshCart( data ) {
 		// No CustomEvent: the cart is right on the next page.
 	}
 }
+
+/**
+ * A page loaded (or reloaded) on a dialog's step has no dialog open: drop that stale key, and only that key,
+ * so the step keeps the Interactivity API's own (stamped when its module ran, before this one).
+ */
+function forgetStaleStep() {
+	try {
+		const current = window.history.state;
+		if ( current && typeof current === 'object' && 'csearch' in current ) {
+			const { csearch, ...rest } = current;
+			window.history.replaceState( rest, '' );
+		}
+	} catch {
+		// History unavailable (a sandboxed frame): nothing to clean.
+	}
+}
+
+forgetStaleStep();
 
 const { state, actions, callbacks } = store( 'creative-search/search', {
 	state: {
@@ -1113,8 +1264,13 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			}
 			dialog.showModal();
 			try {
-				// Back closes the dialog instead of leaving the page.
-				window.history.pushState( { csearch: ctx.id }, '' );
+				// Back closes the dialog instead of leaving the page. The step is built on the page's own state,
+				// so it keeps the Interactivity API's `wpInteractivityId`: without it the runtime reloads the
+				// page when Forward lands on this step.
+				window.history.pushState(
+					{ ...window.history.state, csearch: ctx.id },
+					''
+				);
 			} catch {
 				// History unavailable (a sandboxed frame): Escape and the close button still work.
 			}

@@ -172,5 +172,38 @@ final class SkatehouseTest extends IndexTestCase {
 		self::assertStringContainsString( 'csearch-no-results-guide', $empty, 'the size guides link' );
 		self::assertStringContainsString( 'Try one of these categories:', $empty, 'the nearest categories' );
 		self::assertStringContainsString( 'You might like', $empty, 'the fallback products' );
+		ob_start();
+		do_action( 'woocommerce_no_products_found' );
+		$page = (string) ob_get_clean();
+		self::assertStringNotContainsString( 'No products were found matching your selection.', $page, 'one result message on the demo (D-122)' );
+		self::assertSame( 1, substr_count( $page, 'role="status"' ) );
+
+		// The demo's shop sorts by latest; its search results say they are in Relevance order (D-123).
+		update_option( 'woocommerce_default_catalog_orderby', 'date' );
+		self::assertNull( $this->target( 'kazumi deck' ) );
+		self::assertStringContainsString( 'Sorted by relevance', self::resultCount() );
+		$_GET['orderby'] = 'price';
+		self::assertStringContainsString( 'Sorted by price: low to high', self::resultCount() );
+		unset( $_GET['orderby'] );
+		update_option( 'woocommerce_default_catalog_orderby', 'menu_order' );
+	}
+
+	/**
+	 * WooCommerce's result count on the page just visited.
+	 */
+	private static function resultCount(): string {
+		wc_setup_loop(
+			array(
+				'is_paginated' => true,
+				'total'        => max( 1, (int) $GLOBALS['wp_query']->found_posts ),
+				'per_page'     => 16,
+				'current_page' => 1,
+			)
+		);
+		ob_start();
+		woocommerce_result_count();
+		$html = (string) ob_get_clean();
+		wc_reset_loop();
+		return $html;
 	}
 }

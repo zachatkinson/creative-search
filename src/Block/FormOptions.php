@@ -56,6 +56,8 @@ final class FormOptions {
 	 * @param int    $minChars       Characters before the first request, after `csearch_min_chars`.
 	 * @param string $mode           `field` (the form in place) or `button` (an icon that opens the form in a
 	 *                               dialog, D-099); per form, not a setting.
+	 * @param bool   $dimPage        In Field mode, dim the page behind the open suggestions (D-127); per form,
+	 *                               not a setting.
 	 */
 	public function __construct(
 		public readonly bool $labelVisible,
@@ -67,7 +69,8 @@ final class FormOptions {
 		public readonly bool $recentSearches,
 		public readonly string $panelPosition,
 		public readonly int $minChars,
-		public readonly string $mode = self::FIELD
+		public readonly string $mode = self::FIELD,
+		public readonly bool $dimPage = true
 	) {
 	}
 
@@ -93,11 +96,14 @@ final class FormOptions {
 		if ( isset( $attributes['mode'] ) ) {
 			$values['mode'] = $attributes['mode'];
 		}
+		if ( isset( $attributes['dimPage'] ) ) {
+			$values['dim_page'] = $attributes['dimPage'];
+		}
 		return self::fromSettingKeys( $values );
 	}
 
 	/**
-	 * From values keyed like the settings (shortcode attributes, a widget instance), plus `mode`. Unknown keys
+	 * From values keyed like the settings (shortcode attributes, a widget instance), plus `mode` and `dim_page`. Unknown keys
 	 * are ignored, each value is coerced to its type and range, a missing key takes the owner's setting.
 	 *
 	 * @param array<string, mixed> $values Overrides.
@@ -144,7 +150,8 @@ final class FormOptions {
 			$flag( 'recent_searches' ),
 			$position,
 			Settings::clamp( Settings::toInt( $minChars, Settings::MIN_CHARS_DEFAULT ), Settings::MIN_CHARS_MIN, Settings::MIN_CHARS_MAX ),
-			self::BUTTON === Settings::toString( $values['mode'] ?? '' ) ? self::BUTTON : self::FIELD
+			self::BUTTON === Settings::toString( $values['mode'] ?? '' ) ? self::BUTTON : self::FIELD,
+			! array_key_exists( 'dim_page', $values ) || 'yes' === Settings::yesNo( $values['dim_page'] )
 		);
 	}
 

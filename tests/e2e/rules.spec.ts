@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { axe } from './support/axe';
+import { login } from './support/login';
 
 /**
  * 1.3: the owner's rules for single searches (D-108, D-110), made on the Redirects and pins tab by keyboard,
@@ -8,8 +9,6 @@ import { axe } from './support/axe';
  * results page.
  */
 
-const USER = process.env.WP_ADMIN_USER || 'admin';
-const PASS = process.env.WP_ADMIN_PASS || 'password';
 const TAB = '/wp-admin/admin.php?page=csearch&tab=rules';
 
 function wp( command: string ): string {
@@ -23,14 +22,6 @@ function clearRules() {
 	wp(
 		`eval "\\CreativeBranding\\Search\\Settings\\Settings::update( array( 'query_redirects' => array(), 'pinned_products' => array() ) ); \\CreativeBranding\\Search\\Search\\Cache::bump();"`
 	);
-}
-
-async function login( page: Page ) {
-	await page.goto( '/wp-login.php' );
-	await page.fill( '#user_login', USER );
-	await page.fill( '#user_pass', PASS );
-	await page.click( '#wp-submit' );
-	await page.waitForURL( /wp-admin/ );
 }
 
 test.describe.configure( { mode: 'serial' } );

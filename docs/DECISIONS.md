@@ -333,6 +333,8 @@ Answers are kept with `wp_cache_set()` under a key of the live generation, a sal
 
 **Spec deviation, flagged for Zach:** the spec's Compatibility line says "with and without a persistent object cache (transients fall back)". Without one, answers are not shared between requests and the rate limit does not hold. The rate limit's client key trusts a WooCommerce session cookie only when its HMAC verifies (a forged cookie per request would otherwise buy a new bucket each time), and `csearch_client_ip` lets a site behind a proxy supply the shopper's address.
 
+**Checked 2026-10-23 on Redis:** with Redis 7.4 and Redis Object Cache (Predis) on wp-env, a second `/suggest` was served from Redis (141 ms, then 46 ms, keyspace hits up); a reindex moved the answers to the new generation's keys (`g27-…` to `g28-…`); a synonym added through WP-CLI applied on the next request; the 31st request in ten seconds was answered 429 with `Retry-After`; and the shopper's browser tests (search block, panel, results, the handoff checks, the sticky header) passed with Redis on, 78 of 78. Redis and the plugin were removed after; nothing was added to the project.
+
 **Settled 2026-10-22 (Skatehouse handoff):** the open question is closed. Redis Object Cache is installed and connected on the Skatehouse demo (its comment closes every page, checked 22 October), so the answer is the persistent object cache, as Zach said; the spec's transient fallback does not come back. The demo has no page cache yet; one is on Skatehouse's go-live list, and the block's server render stays free of nonces and anything per user or time-limited so a page cached for days still searches (handoff item 4).
 
 ### D-052 · A click finds its log row by query, not by id · 2026-10-21
@@ -373,7 +375,7 @@ The milestone 3 review's fixes (the store interface, the container's hook list, 
 
 ### D-057 · How the results page is changed, in classic and block themes · 2026-10-21
 
-The plugin ranks the main query of a product search (`post_type=product`, WooCommerce's own search form and the block's) and nothing else. It hooks `pre_get_posts` at priority 20, after WooCommerce, sets `post__in` to the ranked ids (or `array( 0 )` when there are none) and removes the `posts_search` clause for that query. WooCommerce already makes "Relevance" the first entry and the default sort on a search; the plugin maps it to `post__in` order through `woocommerce_get_catalog_ordering_args`. The count and corrected lines print on `woocommerce_before_shop_loop` (priority 5) in classic templates and before the `woocommerce/product-results-count` block in block templates; the no-results state prints on `woocommerce_no_products_found` and after `woocommerce/product-collection-no-results`. A search that leaves exactly one product redirects to it, as WooCommerce does by default.
+The plugin ranks the main query of a product search (`post_type=product`, WooCommerce's own search form and the block's) and nothing else. It hooks `pre_get_posts` at priority 20, after WooCommerce, sets `post__in` to the ranked ids (or `array( 0 )` when there are none) and removes the `posts_search` clause for that query. WooCommerce already makes "Relevance" the first entry and the default sort on a search; the plugin maps it to `post__in` order through `woocommerce_get_catalog_ordering_args`. The count and corrected lines print on `woocommerce_before_shop_loop` (priority 5) in classic templates and before the `woocommerce/product-results-count` block in block templates; the no-results state prints on `woocommerce_no_products_found` (WooCommerce's own notice taken off it on such a search, D-122) and after `woocommerce/product-collection-no-results`. A search that leaves exactly one product redirects to it, as WooCommerce does by default.
 
 **Why:** The spec says "unchanged template" and names Kadence and Storefront (classic) while the shop may move to a block theme; hooking WooCommerce's own extension points serves both without a template override.
 
@@ -820,7 +822,9 @@ With `suggest_cart` on (off by default) a product row the index marks as addable
 
 With `analytics_events` on (the default) the panel dispatches `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` as bubbling `CustomEvent`s on its form, and, when the page has a Google Tag Manager `dataLayer`, pushes the matching GA4 events: `search` (`search_term`), `select_item` for a product (with `item_list_id` `csearch_suggestions` and the item), `select_content` for anything else (`content_type`, `content_id`), `add_to_cart` (currency and value when the price is known) and `csearch_no_results` (`search_term`, once per query). Every ecommerce push is preceded by `{ ecommerce: null }`, as Google's examples do. The plugin never creates `dataLayer` and makes no request of its own; a site using `gtag.js` alone forwards the DOM events itself or uses GTM.
 
-**Why:** owners want to know what the panel does for them without a second plugin. Pushing to a layer that already exists adds no tracking the owner did not install; the DOM events let any other tool listen.
+The search term in every event is redacted first (1.3 review, blocker 1): the form carries the search log's own patterns (`Scrub::sources()`), and a search that looks like an e-mail address, a phone number, a card number or a postal code is sent as `[redacted]`, as the log stores it. `no-results` fires once, when a search the panel found nothing for is submitted, not for every prefix the panel looked up while it was typed.
+
+**Why:** owners want to know what the panel does for them without a second plugin. Pushing to a layer that already exists adds no tracking the owner did not install; the DOM events let any other tool listen. What the plugin will not keep in its own log it does not hand to a tag manager either.
 
 ### D-117 · Search within the current category: a ticked box, a `product_cat` argument, a scoped ranking · 2026-10-22
 
@@ -861,3 +865,74 @@ Found while the four parts of 1.3 were put together and run in wp-env:
 - **The integration bootstrap** declares `WC_Unit_Tests_Bootstrap`, WooCommerce's own switch that stops it caching its visibility term ids for the process: the core suite deletes every term after each test class, so a later class read ids that no longer existed.
 
 **Why:** each was a fault the parts' own suites could not see, because they ran without WordPress; they are covered by the integration suite now.
+
+### D-122 · One result message on an empty search · 2026-10-22
+
+From the Skatehouse demo check on 22 October: a product search with no results showed WooCommerce's "No products were found matching your selection." (`wc_no_products_found` on `woocommerce_no_products_found`) and then the plugin's no-results state ("0 results for …" and the nearest categories). That is two status messages saying the same thing, and a screen reader announced both.
+
+On a product search the plugin answers that found nothing (`ResultsView::answersEmpty()`: a ranked main query with words and no products shown), `ResultsHooks::oneNoResultsMessage()` removes `wc_no_products_found`, and nothing else, on `wp`: after the main query has run and before the template, so before the action fires. The action still runs with every other callback on it; a listing that is not such a search (the shop, a category, a filter with no match, a search of posts) keeps WooCommerce's notice. This replaces 1.1's narrower removal (handoff item 7), which took the notice out only when a post or page led the no-results state.
+
+Block themes are not changed: their notice is the `woocommerce/product-collection-no-results` block, not `wc_no_products_found`, and is still left out only when a page leads.
+
+**Why:** one message per state. The plugin's state says the same thing and offers somewhere to go, so it is the one kept.
+
+### D-123 · "Sorted by relevance" on search results · 2026-10-22
+
+From the same check: WooCommerce's result count adds visually hidden "Sorted by …" text from the shop's default sort. `woocommerce_result_count()` does not look at whether the page is a search, and its `woocommerce_catalog_orderedby` messages have no entry for relevance, so a screen reader heard "Sorted by latest" while the sort menu showed Relevance and the products were in the plugin's order.
+
+On a search the plugin answers in Relevance order (no `orderby` in the URL, or `orderby=relevance`; `ResultsView::inRelevanceOrder()`):
+
+- `woocommerce_catalog_orderedby` gains `relevance` → "Sorted by relevance" (translatable, with context);
+- `woocommerce_default_catalog_orderby` answers `relevance`, so the result count reads it when the URL has no `orderby`.
+
+Checked against WooCommerce 11.2's code, and in `ResultsTest` by comparing with the filters removed: the sort menu is unchanged (on a search WooCommerce already drops "Default sorting", the only option the default decides, and selects Relevance), and so are WooCommerce's ordering arguments (for a search with words they already use relevance; the default is read only for a search without any). A search sorted another way (`orderby=price`) keeps WooCommerce's own line ("Sorted by price: low to high"), and category and shop pages are not touched.
+
+**Why:** the hidden text has to name the order the products are actually in.
+
+### D-124 · The dialog's history step keeps the Interactivity API's key · 2026-10-22
+
+From the Skatehouse header check on 22 October (the search dialog in Button mode, D-099): Forward after Back reloaded the page. Opening the dialog pushed a history step whose state was only `{ csearch: '<block id>' }`. WordPress's Interactivity API stamps the page's own step with `{ wpInteractivityId }` and, on `popstate`, reloads the page when the state it lands on is not null and lacks the current session's id. Back landed on the page's own step and was fine; Forward landed on the dialog's step and reloaded.
+
+The step is now built on the current state, `{ ...history.state, csearch: id }`, so it carries the runtime's key. That `pushState` is the only place the plugin writes history state (its other navigations are `location.replace`). A page loaded or reloaded on a dialog's step has no dialog open, so `view.js` removes the stale `csearch` key when it loads, keeping the rest of the state (the runtime's key among it, stamped before the plugin's module runs).
+
+**Why:** the plugin's step is an addition to the page's step, not a replacement for it; any key another script keeps there must survive.
+
+### D-125 · The field's input resists theme input styles · 2026-10-22
+
+From the Skatehouse header (Field mode in Kadence's sticky header): themes style `input[type="text"]` and `input:focus` more specifically than `.csearch-input`. Kadence adds a background, a 1px border, a 3px radius, padding and a focus box-shadow, and sites add their own `input:focus` outline, so the input drew a second box inside `.csearch-field` and focus showed stacked rings.
+
+In Field mode the input's rules are scoped as `.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input` (and its `:hover`, `:focus` and `:focus-visible`), specificity 0,4,0 to 0,5,0. That beats the usual theme selectors (`input[type="text"]` 0,1,1; `.site-header input[type="search"]:focus` 0,3,1) without `!important`. They reset background, border, radius, box-shadow, outline, padding, size, max-width and appearance. The one focus indicator is `.csearch-field:focus-within`. On a touch screen the input's font size is at least 16px (`max(16px, 1em)`), so iOS does not zoom the page on focus. Button mode's dialog is left as it was.
+
+**Why:** the block is often dropped into a header the theme styles; it has to look like itself there without the site writing overrides.
+
+### D-126 · A panel in a fixed or sticky header scrolls inside itself · 2026-10-22
+
+D-092 keeps the panel at its natural height and drops its last rows until it fits the screen, because the page can scroll. In a fixed or sticky header (Skatehouse's Kadence header, which shrinks, hides on scroll down and comes back on scroll up) the page scrolling cannot bring a row into view, and on a phone the keyboard covers the lower part of the screen.
+
+When the block has a fixed or sticky ancestor, or on a touch screen (`pointer: coarse`), the panel is capped to the room between the field and the bottom of `visualViewport`, or between the top and the field when it opens above. It scrolls inside itself with `overscroll-behavior: contain`, and keeps at least two rows (96px). The cap follows `visualViewport` resize and scroll (the keyboard opening and closing) and the page's scroll, at most once a frame. D-092's rule then applies within the cap: the last rows are dropped until the rest fit it, so with room for two suggestions and "See all" there is still no inner scrollbar. Only when even those do not fit (the keyboard open over a short screen) does the panel scroll. Arrowing to a row scrolls the panel, not the page (`scrollIntoView` is not used there), and once rows have been dropped the chosen one is brought back into view. With `panelPosition: auto` the panel opens above only when the room below is short (240px) and there is more room above than below. The arithmetic is in `assets/src/block/placement.js`, unit-tested on its own; the view only measures and applies.
+
+A desktop page that scrolls keeps D-092: natural height, no inner scrollbar.
+
+The first build of this scrolled the panel instead of dropping rows. The full browser run caught it on the phone projects: D-092's "no scrollbar" tests failed, and axe in Safari flagged the scrolling panel (`scrollable-region-focusable`; the rows are reached from the field through `aria-activedescendant`, which that rule cannot see). Dropping rows to the cap fixed both. The border is counted in the cap (`box-sizing: border-box`).
+
+**Why:** Baymard: every suggestion must be reachable. Where the page cannot scroll it into view, the panel has to.
+
+### D-127 · Dimming the page: a block setting, and inside a transformed header · 2026-10-22
+
+D-097's backdrop already renders in Field mode, on by default, and a click on it closes the suggestions; the `csearch_dim_page` filter was the only way to turn it off. The block now has a "Dim the page behind the suggestions" toggle (`dimPage`, on by default; `dim_page="no"` on the shortcode). Like `mode` it is set per form, with no site-wide setting, and the filter still has the last word.
+
+The backdrop is `position: fixed; inset: 0`. A header with a transform, as Kadence's sticky header has (`position: fixed` with `translateY` for hide on scroll), becomes the containing block of its fixed descendants, so the backdrop covered only the header. When the panel opens, and as the page scrolls, the view measures where the backdrop landed and, if it is not the viewport, moves it back over the viewport. It stays inside the header's stacking context: the header's own `z-index` keeps it above the page, and the form stays above the backdrop (`.is-dimmed > .csearch-form`).
+
+**Why:** Baymard recommends dimming the page behind desktop suggestions; it has to work in the sticky headers shops actually use, and an owner whose header still misbehaves can switch it off per block.
+
+### D-128 · Colour hooks for the field, the panel, the submit button and the focus ring · 2026-10-22
+
+Seven documented custom properties: `--csearch-field-bg`, `--csearch-field-fg`, `--csearch-panel-bg`, `--csearch-panel-fg`, `--csearch-submit-bg`, `--csearch-submit-fg` and `--csearch-focus-ring`. They are read where they are used, each falling back to today's value (`var(--csearch-field-bg, var(--csearch-bg))` and so on), and never declared by the plugin. A site can therefore set them on `:root`, a header or the block without a specificity contest. The panel's row tint and secondary text are mixed from the panel's colours, so a dark panel keeps readable rows. They apply in both modes; with nothing set, both look as before.
+
+**Why:** sites were targeting internal classes to colour the search bar, and those classes are not a contract.
+
+### D-129 · The cold budgets keep the fastest of three timings · 2026-10-23
+
+The catalogue benchmark times each golden query's cold `/suggest` and its `/search` three times, emptying the object cache before each, and keeps the fastest. The p95 is then taken over the 50 queries as before, and the budgets are unchanged (100 ms cold, 100 ms `/search`). The warm timing and the memory figure are still single measurements.
+
+**Why:** the merge of 1.2 failed CI on identical code. The 10,000-product job measured a cold p95 of 78.6 ms on the pull request, then 123.3 ms on `main` and 132.6 ms on the tag; `/search` went from 52.8 ms to 93.7 ms. A shared runner's noise only ever adds time, so the fastest of three is the code's cost, while a slow query still shows in the p95 across queries. The extra two timings add about 10 seconds at 10,000 products.

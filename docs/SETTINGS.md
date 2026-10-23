@@ -70,7 +70,7 @@ A block instance can override each of these but the last four (1.3), which apply
 | `suggest_cart` | `no` | yes/no | Add to cart from the panel for a simple product that is purchasable, in stock and needs no choice: a small "Add" at the row's end, and Shift+Enter on the chosen row (D-115). Uses WooCommerce's own add-to-cart endpoint; honours "Redirect to the cart page after successful addition". |
 | `analytics_events` | `yes` | yes/no | The `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` events on the form, and the matching Google Analytics events on the page's `dataLayer` when it has one (D-116). The search term in each is redacted first: a search that looks like an email address, a phone number, a card number or a postal code reads `[redacted]` (`Scrub::sources()`, the same patterns the search log uses). `csearch:no-results` fires once, when a search is submitted that the panel found nothing for, not for every prefix typed. Nothing is sent anywhere by the plugin. |
 
-A block or shortcode also takes `mode` (`field`, the default, or `button`: an icon that opens the same form in a modal dialog, full screen on a phone; D-099). It is set per instance, with no site-wide setting.
+A block or shortcode also takes `mode` (`field`, the default, or `button`: an icon that opens the same form in a modal dialog, full screen on a phone; D-099) and, in Field mode, whether the page dims behind the open suggestions (`dimPage` on the block, "Dim the page behind the suggestions"; `dim_page="no"` on the shortcode; on by default; D-127). Both are set per instance, with no site-wide setting; the `csearch_dim_page` filter has the last word on the second.
 
 ## Analytics
 

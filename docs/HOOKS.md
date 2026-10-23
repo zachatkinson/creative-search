@@ -365,7 +365,7 @@ add_filter( 'csearch_alternative_queries', static fn( array $found ): array => a
 
 - **Since:** 1.1.0
 - **Signature:** `apply_filters( 'csearch_dim_page', bool $dim ): bool`
-- **What it does:** whether the page dims behind the open suggestions (D-097); true by default. Return false for a theme whose header makes the backdrop sit in the wrong place. Button mode (D-099) has the dialog's own backdrop and ignores it.
+- **What it does:** whether the page dims behind the open suggestions (D-097); receives the block's own "Dim the page behind the suggestions" choice (`dimPage`, true by default, D-127). Return false for a theme whose header makes the backdrop sit in the wrong place. Button mode (D-099) has the dialog's own backdrop and ignores it.
 - **Where it runs:** `Block\SearchForm::render()`, once per form on the page.
 - **Example:**
 
@@ -502,3 +502,29 @@ After adding to the cart (D-115): jQuery's `added_to_cart` on `document.body` wh
 ```php
 add_filter( 'csearch_example', static fn( $value, $product ) => $value, 10, 2 );
 ```
+
+## 1.4: CSS custom properties (1.4.0)
+
+The block's colour hooks (D-128). Set them anywhere a CSS custom property inherits from: `:root`, a header, the block. The plugin never declares them, so nothing it ships overrides a value a site sets, and each falls back to the look the block has without it.
+
+| Property | Colours | Falls back to |
+| --- | --- | --- |
+| `--csearch-field-bg` | the field's background | the block's background (`--wp--preset--color--base`, else white) |
+| `--csearch-field-fg` | the field's text and icons | the block's text colour |
+| `--csearch-panel-bg` | the suggestions' background; the chosen row's tint is mixed from it | the block's background |
+| `--csearch-panel-fg` | the suggestions' text; the secondary text is mixed from it | the block's text colour (`--wp--preset--color--contrast`, else #1e1e1e) |
+| `--csearch-submit-bg` | the search button's background | transparent |
+| `--csearch-submit-fg` | the search button's icon | the field's text colour |
+| `--csearch-focus-ring` | the field's focus outline, and the clear and search buttons' | the current text colour |
+
+```css
+.site-header {
+	--csearch-field-bg: #111;
+	--csearch-field-fg: #fff;
+	--csearch-panel-bg: #111;
+	--csearch-panel-fg: #fff;
+	--csearch-focus-ring: #f5c400;
+}
+```
+
+Choose pairs with at least 4.5:1 contrast; the focus ring needs 3:1 against what surrounds the field.

@@ -9,8 +9,11 @@ import { installDom } from './support/dom.mjs';
 import { scope } from './support/interactivity.mjs';
 
 const dom = installDom();
+// The page was reloaded on a dialog's step: the runtime has stamped it with its session already.
+window.history.state = { wpInteractivityId: 'reloaded', csearch: 'csearch-0' };
 const { actions, state, callbacks, highlight } =
 	await import( '../../assets/src/block/view.js' );
+const afterLoad = window.history.state;
 
 let form = 0;
 
@@ -331,6 +334,37 @@ test( 'a slow answer says Searching after 400 ms', async () => {
 	vi.advanceTimersByTime( 400 );
 	assert.equal( scope.ctx.searching, true );
 	assert.equal( scope.ctx.panel, true );
+} );
+
+test( 'a capped panel scrolls the chosen row into itself and leaves the page where it is (D-126)', async () => {
+	type( 'kazumi' );
+	await settle();
+	const ctx = scope.ctx;
+	ctx.capped = true;
+	const panel = { scrollTop: 0, clientHeight: 100 };
+	let paged = 0;
+	for ( const [ i, row ] of ctx.rows.entries() ) {
+		const el = dom.element( row.id );
+		el.offsetTop = i * 60;
+		el.offsetHeight = 60;
+		el.closest = ( selector ) =>
+			selector === '.csearch-panel' ? panel : null;
+		el.scrollIntoView = () => paged++;
+	}
+	actions.keydown( key( 'ArrowDown' ) );
+	assert.equal( panel.scrollTop, 0, 'the first row already shows' );
+	actions.keydown( key( 'ArrowDown' ) );
+	assert.equal( panel.scrollTop, 20, 'the second row is brought in' );
+	actions.keydown( key( 'ArrowUp' ) );
+	assert.equal( panel.scrollTop, 0, 'and back' );
+	assert.equal( paged, 0, 'the page never scrolls' );
+	ctx.capped = false;
+	actions.keydown( key( 'ArrowDown' ) );
+	assert.equal(
+		paged,
+		1,
+		'an uncapped panel lets the page bring the row in'
+	);
 } );
 
 test( 'Down and Up move through the rows, write each into the field and wrap through what was typed', async () => {
@@ -697,6 +731,14 @@ test( 'the dialog opens with the field focused and a history entry, and Back clo
 	assert.deepEqual( window.history.state, { csearch: ctx.id } );
 	actions.openDialog();
 	assert.equal( dom.backs, 0, 'opening twice pushes once' );
+	dialog.open = false;
+	window.history.state = { wpInteractivityId: 'session' };
+	actions.openDialog();
+	assert.deepEqual(
+		window.history.state,
+		{ wpInteractivityId: 'session', csearch: ctx.id },
+		'the step keeps the runtime’s key, so Forward does not reload the page'
+	);
 
 	window.history.state = null; // Back.
 	actions.dialogBack();
@@ -708,6 +750,10 @@ test( 'the dialog opens with the field focused and a history entry, and Back clo
 		`${ ctx.id }-open`,
 		'focus returns to the button'
 	);
+} );
+
+test( 'a page loaded on a dialog’s step drops only that key', () => {
+	assert.deepEqual( afterLoad, { wpInteractivityId: 'reloaded' } );
 } );
 
 test( 'closing the dialog any other way leaves its history entry', () => {

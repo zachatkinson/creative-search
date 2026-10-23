@@ -6,7 +6,8 @@ import { axe } from './support/axe';
  * Milestone 5: the results page on `?s=` with two themes the spec names. The plugin's order on Relevance,
  * Relevance first in the sort menu, the count line, the corrected line with its "search instead" link, the
  * no-results state with categories and fallback products, a price filter narrowing the ranked set, and axe
- * on the results area.
+ * on the results area. Since 1.3: one result message when nothing is found (D-122), and the result count says
+ * "Sorted by relevance" on a search in Relevance order (D-123).
  */
 
 function wp( command: string ): string {
@@ -44,6 +45,10 @@ for ( const theme of [ 'storefront', 'kadence' ] ) {
 				'Relevance'
 			);
 			await expect( sort ).toHaveValue( 'relevance' );
+			// The result count reads the order the products are in (D-123).
+			await expect(
+				page.locator( '.woocommerce-result-count' ).first()
+			).toContainText( 'Sorted by relevance' );
 			await axe( page, `${ theme } results`, 'main, #main, #primary' );
 		} );
 
@@ -58,6 +63,9 @@ for ( const theme of [ 'storefront', 'kadence' ] ) {
 					)
 					.first()
 			).toHaveText( 'KAZUMI T-Shirt, Shop Logo' );
+			await expect(
+				page.locator( '.woocommerce-result-count' ).first()
+			).toContainText( 'Sorted by price: low to high' );
 			// One product left: WooCommerce sends the shopper straight to it.
 			await page.goto( '/?s=orbit&post_type=product&max_price=45' );
 			await expect( page ).toHaveURL(
@@ -92,7 +100,41 @@ for ( const theme of [ 'storefront', 'kadence' ] ) {
 			await expect( empty ).toContainText(
 				'Mainline Griptape, Perforated'
 			);
+			// One result message: WooCommerce's notice is left out (D-122).
+			await expect(
+				page.getByText(
+					'No products were found matching your selection.'
+				)
+			).toHaveCount( 0 );
+			await expect( page.locator( '.woocommerce-info' ) ).toHaveCount(
+				0
+			);
+			await expect( empty.locator( '[role="status"]' ) ).toHaveCount( 1 );
 			await axe( page, `${ theme } no results`, '.csearch-no-results' );
+		} );
+
+		test( "a category page keeps WooCommerce's sort line and notice", async ( {
+			page,
+		} ) => {
+			wp( 'option update woocommerce_default_catalog_orderby date' );
+			try {
+				await page.goto( '/product-category/decks/' );
+				const count = page
+					.locator( '.woocommerce-result-count' )
+					.first();
+				await expect( count ).toContainText( 'Sorted by latest' );
+				await expect( count ).not.toContainText( 'relevance' );
+				await page.goto( '/?post_type=product&min_price=99999' );
+				await expect(
+					page.getByText(
+						'No products were found matching your selection.'
+					)
+				).toHaveCount( 1 );
+			} finally {
+				wp(
+					'option update woocommerce_default_catalog_orderby menu_order'
+				);
+			}
 		} );
 	} );
 }

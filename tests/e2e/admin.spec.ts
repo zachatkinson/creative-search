@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { test, expect, Page } from '@playwright/test';
 import { axe } from './support/axe';
+import { login } from './support/login';
 
 /**
  * Milestone 7: WooCommerce → Search. Axe on every tab and on the product editor's Search panel, and the
@@ -8,8 +9,6 @@ import { axe } from './support/axe';
  * and delete a synonym, run a test search, choose an Analytics period, open the product's Search panel.
  */
 
-const USER = process.env.WP_ADMIN_USER || 'admin';
-const PASS = process.env.WP_ADMIN_PASS || 'password';
 const SCREEN = '/wp-admin/admin.php?page=csearch';
 const REGION = '.csearch-admin';
 
@@ -18,14 +17,6 @@ function wp( command: string ): string {
 		encoding: 'utf8',
 		stdio: [ 'ignore', 'pipe', 'ignore' ],
 	} );
-}
-
-async function login( page: Page ) {
-	await page.goto( '/wp-login.php' );
-	await page.fill( '#user_login', USER );
-	await page.fill( '#user_pass', PASS );
-	await page.click( '#wp-submit' );
-	await page.waitForURL( /wp-admin/ );
 }
 
 /**
