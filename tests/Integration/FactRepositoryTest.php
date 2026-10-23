@@ -34,7 +34,7 @@ final class FactRepositoryTest extends IndexTestCase {
 			self::DOCUMENT,
 			array(
 				5 => self::fact( 11, 'Design', 'Fire', 'MUM-FUR-FIRE', 7, "fire\tmum" ),
-				9 => self::fact( 12, $long, 'z' . $long, 'y' . $long, null, 'ice' ),
+				9 => self::fact( 12, $long, 'z' . $long, 'y' . $long, null, "ice\t\tcold\t" ),
 			)
 		);
 		$facts->write( self::OTHER, array( self::fact( 0, 'Width', '8.25', '8.25″', null, '825' ) ) );
@@ -52,7 +52,7 @@ final class FactRepositoryTest extends IndexTestCase {
 		self::assertSame( 'z' . str_repeat( 'é', 190 ), $second->value );
 		self::assertSame( 'y' . str_repeat( 'é', 190 ), $second->label );
 		self::assertNull( $second->imageId, 'no image is NULL, read back as null' );
-		self::assertSame( array( 'ice' ), $second->terms );
+		self::assertSame( array( 'ice', 'cold' ), $second->terms, 'empty pieces dropped, the list renumbered' );
 		self::assertSame( array(), $facts->of( array() ) );
 
 		global $wpdb;

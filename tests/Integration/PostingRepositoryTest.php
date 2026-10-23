@@ -57,6 +57,7 @@ final class PostingRepositoryTest extends IndexTestCase {
 		}
 		self::assertGreaterThan( 0, $postings->productCount( array( 'deck' ), $generation, 'en' ) );
 		self::assertSame( 0, $postings->productCount( array( 'deck' ), $generation, 'fr' ) );
+		self::assertSame( 0, $postings->productCount( array(), $generation, 'en' ), 'no words, no products' );
 
 		$keys = array();
 		foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT p.document_id, t.term FROM %i p INNER JOIN %i t ON t.id = p.term_id WHERE p.field = %d AND t.term LIKE %s', Tables::postings(), Tables::terms(), Fields::SKU, '=%' ), ARRAY_A ) as $row ) { // phpcs:ignore

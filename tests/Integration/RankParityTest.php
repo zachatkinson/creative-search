@@ -105,6 +105,7 @@ final class RankParityTest extends IndexTestCase {
 		);
 		$compared  = 0;
 		$different = array();
+		$phrased   = 0;
 		foreach ( $rounds as $name => $settings ) {
 			foreach ( $settings as $key => $value ) {
 				Settings::set( $key, $value );
@@ -113,12 +114,16 @@ final class RankParityTest extends IndexTestCase {
 				$sql = $search->run( $q, $lang, SearchService::MAX_IDS, 0 );
 				$php = $search->run( $q, $lang, SearchService::MAX_IDS, 0, true, true );
 				++$compared;
+				if ( str_contains( $q, '"' ) && array() !== $sql->products ) {
+					++$phrased;
+				}
 				if ( self::ranking( $sql->products ) !== self::ranking( $php->products ) || $sql->corrected !== $php->corrected ) {
 					$different[] = sprintf( '%s [%s, %s]: sql %s | php %s', $q, $lang, $name, implode( ' ', array_slice( self::ranking( $sql->products ), 0, 6 ) ), implode( ' ', array_slice( self::ranking( $php->products ), 0, 6 ) ) );
 				}
 			}
 		}
 		remove_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
+		self::assertGreaterThan( 0, $phrased, 'a quoted phrase finds products, so the phrase SQL is held' );
 		self::assertSame( array(), $different, "The statement and the Domain differ ({$compared} compared):\n" . implode( "\n", array_slice( $different, 0, 20 ) ) );
 	}
 
@@ -196,6 +201,16 @@ final class RankParityTest extends IndexTestCase {
 					$q = implode( ' ', array_slice( $w, 0, 4 ) );
 			}
 			$out[] = array( $q, $lang );
+		}
+		// Two quoted phrases in one query, from names of four words or more: each phrase has its own flag (D-088).
+		$two = 0;
+		foreach ( $specs as $spec ) {
+			$w = $words( (string) $spec['name'] );
+			if ( count( $w ) >= 4 && $two < 3 ) {
+				$out[] = array( "\"{$w[0]} {$w[1]}\" \"{$w[2]} {$w[3]}\"", 'en' );
+				$out[] = array( "\"{$w[0]} {$w[1]}\" \"{$w[3]} {$w[2]}\"", 'en' );
+				++$two;
+			}
 		}
 		// Every hidden product's SKU, so hidden-by-SKU is always exercised.
 		foreach ( $specs as $spec ) {
