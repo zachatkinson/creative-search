@@ -46,15 +46,6 @@
 	margin-block-end: calc(var(--csearch-gap) / 2);
 }
 
-/* "Only in Decks" above the field on a category page (D-117): a tap target of 44 px, the box beside its words. */
-.csearch-scope {
-	display: flex;
-	align-items: center;
-	gap: calc(var(--csearch-gap) / 2);
-	min-block-size: 44px;
-	cursor: pointer;
-}
-
 .csearch-field {
 	display: flex;
 	align-items: stretch;

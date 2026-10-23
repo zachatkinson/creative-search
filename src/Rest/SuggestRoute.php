@@ -64,6 +64,12 @@ final class SuggestRoute implements Route {
 							'pattern'     => '^[^\\s/?#]{1,200}$',
 							'required'    => false,
 						),
+						'here'  => array(
+							'description' => __( 'The product category the shopper is in: offered first as “kazumi in Decks” when it holds results (1.5).', 'creative-search' ),
+							'type'        => 'string',
+							'pattern'     => '^[^\\s/?#]{1,200}$',
+							'required'    => false,
+						),
 					),
 				),
 				'schema' => array( Schemas::class, 'suggest' ),
@@ -85,10 +91,11 @@ final class SuggestRoute implements Route {
 		$lang  = $this->search->language( Args::langOf( $request ) );
 		$limit = Cast::int( $request->get_param( 'limit' ), Settings::LIMIT_DEFAULT );
 		$scope = CategoryScope::ttIds( CategoryScope::bySlug( Cast::str( $request->get_param( 'cat' ) ) ) );
+		$here  = CategoryScope::bySlug( Cast::str( $request->get_param( 'here' ) ) );
 		return Responses::cacheable(
 			$request,
 			$this->search->index()->generation(),
-			fn(): array => $this->suggestions->answer( $query, $lang, $limit, $scope )
+			fn(): array => $this->suggestions->answer( $query, $lang, $limit, $scope, $here )
 		);
 	}
 }

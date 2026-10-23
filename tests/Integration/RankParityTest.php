@@ -45,6 +45,48 @@ final class RankParityTest extends IndexTestCase {
 	}
 
 	/**
+	 * D-132: the statement starts from the rarest word when that reads fewer rows, keeps the range scans when it
+	 * does not or for one word, and finds what the PHP ranking finds either way.
+	 *
+	 * @group sql-mutation
+	 */
+	public function test_the_statement_starts_from_the_rarest_word(): void {
+		$this->catalogue->load( ( new Catalogue() )->generate( 40 ) );
+		$this->service( IndexQueue::class )->clear();
+		self::assertTrue( $this->service( Reindex::class )->runInline() );
+		$search = $this->service( SearchService::class );
+		$seen   = array();
+		$watch  = static function ( string $query ) use ( &$seen ): string {
+			if ( str_starts_with( $query, 'WITH q AS' ) ) {
+				$seen[] = $query;
+			}
+			return $query;
+		};
+		add_filter( 'query', $watch );
+		$cases = array(
+			'kazumi deck' => 0,
+			'deck kazumi' => 1,
+			'skate deck'  => null,
+			'kazumi'      => null,
+		);
+		foreach ( $cases as $q => $lead ) {
+			$seen = array();
+			$sql  = $search->run( $q, 'en', SearchService::MAX_IDS, 0 );
+			self::assertCount( 1, $seen, $q );
+			if ( null === $lead ) {
+				self::assertStringNotContainsString( 'c AS (', $seen[0], "{$q}: every word is common, or there is one" );
+			} else {
+				self::assertStringContainsString( "WHERE q.tok = {$lead})", $seen[0], "{$q}: the rare word leads" );
+				self::assertStringContainsString( 'c STRAIGHT_JOIN q STRAIGHT_JOIN', $seen[0], $q );
+				self::assertStringContainsString( 'AND p.document_id = c.doc', $seen[0], "{$q}: each candidate looked up by the key" );
+			}
+			self::assertNotSame( array(), $sql->products, $q );
+			self::assertSame( self::ranking( $search->run( $q, 'en', SearchService::MAX_IDS, 0, true, true )->products ), self::ranking( $sql->products ), $q );
+		}
+		remove_filter( 'query', $watch );
+	}
+
+	/**
 	 * Load a catalogue, rank every query both ways in each settings round, and compare.
 	 *
 	 * @param int  $products  Catalogue size.
@@ -105,6 +147,7 @@ final class RankParityTest extends IndexTestCase {
 		);
 		$compared  = 0;
 		$different = array();
+		$phrased   = 0;
 		foreach ( $rounds as $name => $settings ) {
 			foreach ( $settings as $key => $value ) {
 				Settings::set( $key, $value );
@@ -113,12 +156,16 @@ final class RankParityTest extends IndexTestCase {
 				$sql = $search->run( $q, $lang, SearchService::MAX_IDS, 0 );
 				$php = $search->run( $q, $lang, SearchService::MAX_IDS, 0, true, true );
 				++$compared;
+				if ( str_contains( $q, '"' ) && array() !== $sql->products ) {
+					++$phrased;
+				}
 				if ( self::ranking( $sql->products ) !== self::ranking( $php->products ) || $sql->corrected !== $php->corrected ) {
 					$different[] = sprintf( '%s [%s, %s]: sql %s | php %s', $q, $lang, $name, implode( ' ', array_slice( self::ranking( $sql->products ), 0, 6 ) ), implode( ' ', array_slice( self::ranking( $php->products ), 0, 6 ) ) );
 				}
 			}
 		}
 		remove_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
+		self::assertGreaterThan( 0, $phrased, 'a quoted phrase finds products, so the phrase SQL is held' );
 		self::assertSame( array(), $different, "The statement and the Domain differ ({$compared} compared):\n" . implode( "\n", array_slice( $different, 0, 20 ) ) );
 	}
 
@@ -196,6 +243,16 @@ final class RankParityTest extends IndexTestCase {
 					$q = implode( ' ', array_slice( $w, 0, 4 ) );
 			}
 			$out[] = array( $q, $lang );
+		}
+		// Two quoted phrases in one query, from names of four words or more: each phrase has its own flag (D-088).
+		$two = 0;
+		foreach ( $specs as $spec ) {
+			$w = $words( (string) $spec['name'] );
+			if ( count( $w ) >= 4 && $two < 3 ) {
+				$out[] = array( "\"{$w[0]} {$w[1]}\" \"{$w[2]} {$w[3]}\"", 'en' );
+				$out[] = array( "\"{$w[0]} {$w[1]}\" \"{$w[3]} {$w[2]}\"", 'en' );
+				++$two;
+			}
 		}
 		// Every hidden product's SKU, so hidden-by-SKU is always exercised.
 		foreach ( $specs as $spec ) {

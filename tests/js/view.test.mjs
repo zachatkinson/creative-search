@@ -278,38 +278,26 @@ test( 'answers are cached for the page', async () => {
 	assert.equal( scope.ctx.rows.length, 4 );
 } );
 
-test( 'a form kept to a category asks for it, and unticked asks for the whole shop (D-117)', async () => {
-	scope.ctx = context( { scope: 'decks', scoped: true } );
+test( 'on a category page the form names it, so the answer offers it first (D-130)', async () => {
+	scope.ctx = context( { scope: 'decks' } );
 	type( 'kazumi' );
 	await settle();
 	assert.equal( calls.length, 1 );
+	const params = new URL( calls[ 0 ], 'http://x' ).searchParams;
+	assert.equal( params.get( 'here' ), 'decks' );
 	assert.equal(
-		new URL( calls[ 0 ], 'http://x' ).searchParams.get( 'cat' ),
-		'decks'
+		params.has( 'cat' ),
+		false,
+		'the panel still searches the shop'
 	);
-	actions.scope( { target: { checked: false } } );
-	await settle( 0 );
-	assert.equal( scope.ctx.scoped, false );
-	assert.equal( calls.length, 2, 'the shop has its own answer' );
-	assert.equal(
-		new URL( calls[ 1 ], 'http://x' ).searchParams.has( 'cat' ),
-		false
-	);
-	actions.scope( { target: { checked: true } } );
-	await settle( 0 );
-	assert.equal( calls.length, 2, "the category's answer was kept" );
-	type( 'k' );
-	actions.scope( { target: { checked: false } } );
-	await settle( 0 );
-	assert.equal( calls.length, 2, 'nothing asked below the minimum' );
 } );
 
-test( 'a form on no category page never sends one', async () => {
-	scope.ctx = context( { scope: '', scoped: false } );
+test( 'a form on no category page never names one', async () => {
+	scope.ctx = context( { scope: '' } );
 	type( 'kazumi' );
 	await settle();
 	assert.equal(
-		new URL( calls[ 0 ], 'http://x' ).searchParams.has( 'cat' ),
+		new URL( calls[ 0 ], 'http://x' ).searchParams.has( 'here' ),
 		false
 	);
 } );

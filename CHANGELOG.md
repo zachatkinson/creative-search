@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-23
+
+Search within a category without being kept in it, and a faster ranking.
+
+### Changed
+- On a category page, and on a search kept to one, the search form no longer shows 1.3's ticked "Only in Decks" box: the form searches the whole shop, and its panel offers "kazumi in Decks" first among the category rows whenever that category holds a match. The row leads to the search kept to the category, as before. `/suggest` takes `here`; `cat` still works (D-130, superseding D-117's box).
+
+### Performance
+- The ranking starts from the query's rarest word and reads the index once: at 10,000 products, the cold suggestions' p95 falls from 52.5 ms to 27.3 ms and the results page's from 54 ms to 23.4 ms, with the worst query from 148.5 ms to 27.7 ms; the ranking is unchanged (D-132).
+
+### Security
+- Development only (nothing in the zip changes): patched versions of `qs`, `serialize-javascript`, `postcss-selector-parser`, `js-yaml`, `smol-toml` and `katex` are forced under the WordPress build tools through npm `overrides`; the built assets are byte-identical (D-131).
+
+### Fixed before release (tests and CI)
+- The SQL builders' mutation score is complete (D-088): new tests for the facts table, adjacent and two-phrase queries in the ranking parity test, an empty product count, and the equivalent mutants ignored line by line with their reasons. The new ranking plan is held by a test that names which word leads and when (D-132).
+- The 10,000-product budget job, red on the v1.4.0 tag and on D-088's pull request by a few milliseconds, now has room (D-132).
+
 ## [1.4.0] - 2026-10-23
 
 Field mode in a sticky site header (the Skatehouse header moving from Button mode to an always-visible field).

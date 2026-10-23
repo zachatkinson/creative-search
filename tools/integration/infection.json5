@@ -33,7 +33,158 @@
 	},
 	"testFramework": "phpunit",
 	"testFrameworkOptions": "--group=sql-mutation",
+	// Equivalent mutants, each read one by one and grouped by reason in D-088: casts PHP or `%d` make anyway,
+	// numbers that only change a batch's size or a cap no field reaches, start indexes `implode()` ignores,
+	// early returns that skip a statement whose answer is empty anyway, memory and statistics calls, and the
+	// owner's rule references, which the settings sanitiser always writes well formed. Matched by line
+	// (Infection anchors each pattern to the whole removed line, hence the `.*`), so a new mutant on any
+	// other line is still run; four small methods' early returns are ignored by method.
+	// D-132's choice of the leading word (its frequency sums and the empty-token test) changes the plan, never
+	// the answer, so its lines are ignored too, as is a tie between two words' frequencies (`<` or `<=`);
+	// RankParityTest holds which word leads and when.
 	"mutators": {
-		"@default": true
+		"@default": true,
+		"CastInt": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$out\\[\\s*\\(int\\)\\s*\\$row\\['document_id'\\]\\s*\\]\\[\\]\\s*=\\s*.*",
+				".*=>\\s*\\(int\\)\\s*\\$row\\['(term_id|generation|n)'\\].*",
+				".*=>\\s*\\(string\\)\\s*\\$row\\['lang'\\].*",
+				".*\\$out\\[\\s*\\(string\\)\\s*\\$row\\['term'\\]\\s*\\].*",
+				".*\\$exact\\s*=\\s*\\$this->prepare\\(\\s*'\\(CASE\\s*WHEN\\s*d\\.name_key\\s*IN.*",
+				".*'AND\\s*s\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*",
+				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
+				".*\\$before\\s*=\\s*\\(int\\)\\s*\\$indexes\\[\\s*\\$k\\s*\\].*",
+				".*\\$index\\s*=\\s*\\(int\\)\\s*\\$index;.*",
+				".*END\\)\\s*AS\\s*q'\\s*\\.\\s*\\(int\\)\\s*\\$n.*",
+				".*0\\s*!==\\s*\\(int\\)\\s*\\$points.*",
+				".*\\$wanted\\[\\s*\\$byType\\[\\s*\\$type\\s*\\]\\s*\\.\\s*':'\\s*\\.\\s*\\(int\\)\\s*\\$termId\\s*\\]\\s*=\\s*\\(int\\)\\s*\\$points.*",
+				".*\\$key\\s*=\\s*\\(string\\)\\s*\\$row\\['taxonomy'\\]\\s*\\.\\s*':'\\s*\\.\\s*\\(int\\)\\s*\\$row\\['term_id'\\].*",
+				".*\\$out\\[\\s*\\(int\\)\\s*\\$row\\['term_taxonomy_id'\\]\\s*\\]\\s*=\\s*\\$wanted\\[\\s*\\$key\\s*\\].*",
+				".*\\$termId\\s*=\\s*\\$termIds\\[\\s*\\(string\\)\\s*\\$term\\s*\\]\\s*\\?\\?\\s*null.*",
+				".*return\\s*null\\s*===\\s*\\$value\\s*\\?\\s*null\\s*:\\s*\\(string\\)\\s*\\$value.*"
+			]
+		},
+		"CastString": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$out\\[\\s*\\(int\\)\\s*\\$row\\['document_id'\\]\\s*\\]\\[\\]\\s*=\\s*.*",
+				".*=>\\s*\\(int\\)\\s*\\$row\\['(term_id|generation|n)'\\].*",
+				".*=>\\s*\\(string\\)\\s*\\$row\\['lang'\\].*",
+				".*\\$out\\[\\s*\\(string\\)\\s*\\$row\\['term'\\]\\s*\\].*",
+				".*\\$exact\\s*=\\s*\\$this->prepare\\(\\s*'\\(CASE\\s*WHEN\\s*d\\.name_key\\s*IN.*",
+				".*'AND\\s*s\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*",
+				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
+				".*\\$before\\s*=\\s*\\(int\\)\\s*\\$indexes\\[\\s*\\$k\\s*\\].*",
+				".*\\$index\\s*=\\s*\\(int\\)\\s*\\$index;.*",
+				".*END\\)\\s*AS\\s*q'\\s*\\.\\s*\\(int\\)\\s*\\$n.*",
+				".*0\\s*!==\\s*\\(int\\)\\s*\\$points.*",
+				".*\\$wanted\\[\\s*\\$byType\\[\\s*\\$type\\s*\\]\\s*\\.\\s*':'\\s*\\.\\s*\\(int\\)\\s*\\$termId\\s*\\]\\s*=\\s*\\(int\\)\\s*\\$points.*",
+				".*\\$key\\s*=\\s*\\(string\\)\\s*\\$row\\['taxonomy'\\]\\s*\\.\\s*':'\\s*\\.\\s*\\(int\\)\\s*\\$row\\['term_id'\\].*",
+				".*\\$out\\[\\s*\\(int\\)\\s*\\$row\\['term_taxonomy_id'\\]\\s*\\]\\s*=\\s*\\$wanted\\[\\s*\\$key\\s*\\].*",
+				".*\\$termId\\s*=\\s*\\$termIds\\[\\s*\\(string\\)\\s*\\$term\\s*\\]\\s*\\?\\?\\s*null.*",
+				".*return\\s*null\\s*===\\s*\\$value\\s*\\?\\s*null\\s*:\\s*\\(string\\)\\s*\\$value.*"
+			]
+		},
+		"IncrementInteger": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*",
+				".*min\\(\\s*\\$(tf|position),\\s*65535\\s*\\).*",
+				".*mb_substr\\(\\s*\\$fact\\['(attribute|name|value|label)'\\],\\s*0,\\s*191,\\s*'UTF-8'\\s*\\).*",
+				".*array_fill\\(\\s*0,\\s*count\\(\\s*\\$chunk\\s*\\).*",
+				".*array_fill\\(\\s*0,\\s*max\\(\\s*1,\\s*\\$n\\s*\\).*",
+				".*return\\s*is_int\\(\\s*\\$result\\s*\\)\\s*\\?\\s*\\$result\\s*:\\s*0.*",
+				".*array_chunk\\(\\s*\\$termIds,\\s*1000\\s*\\).*",
+				".*Tokenizer::MAX_LENGTH\\s*-\\s*1.*",
+				".*\\$plan->hiddenBySku\\s*\\?\\s*1\\s*:\\s*0.*",
+				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
+				".*array_pad\\(\\s*explode\\(\\s*':',\\s*\\(string\\)\\s*\\$ref,\\s*2\\s*\\),\\s*2,\\s*''\\s*\\).*",
+				".*0\\s*!==\\s*\\(int\\)\\s*\\$points.*"
+			]
+		},
+		"DecrementInteger": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$lead\\s*=\\s*0;.*",
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*",
+				".*0\\s*===\\s*\\$dfs\\[\\s*\\$i\\s*\\].*",
+				".*min\\(\\s*\\$(tf|position),\\s*65535\\s*\\).*",
+				".*mb_substr\\(\\s*\\$fact\\['(attribute|name|value|label)'\\],\\s*0,\\s*191,\\s*'UTF-8'\\s*\\).*",
+				".*array_fill\\(\\s*0,\\s*count\\(\\s*\\$chunk\\s*\\).*",
+				".*array_fill\\(\\s*0,\\s*max\\(\\s*1,\\s*\\$n\\s*\\).*",
+				".*return\\s*is_int\\(\\s*\\$result\\s*\\)\\s*\\?\\s*\\$result\\s*:\\s*0.*",
+				".*array_chunk\\(\\s*\\$termIds,\\s*1000\\s*\\).*",
+				".*Tokenizer::MAX_LENGTH\\s*-\\s*1.*",
+				".*\\$plan->hiddenBySku\\s*\\?\\s*1\\s*:\\s*0.*",
+				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
+				".*array_pad\\(\\s*explode\\(\\s*':',\\s*\\(string\\)\\s*\\$ref,\\s*2\\s*\\),\\s*2,\\s*''\\s*\\).*",
+				".*0\\s*!==\\s*\\(int\\)\\s*\\$points.*"
+			]
+		},
+		"Assignment": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*"
+			]
+		},
+		"PlusEqual": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*"
+			]
+		},
+		"LessThan": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*<\\s*\\(\\s*\\$dfs\\[\\s*\\$lead\\s*\\].*",
+				".*\\$led\\s*=\\s*count\\(\\s*\\$dfs\\s*\\)\\s*>=\\s*2.*"
+			]
+		},
+		"Minus": {
+			"ignoreSourceCodeByRegex": [
+				".*Tokenizer::MAX_LENGTH\\s*-\\s*1.*"
+			]
+		},
+		"MBString": {
+			"ignoreSourceCodeByRegex": [
+				".*Tokenizer::MAX_LENGTH\\s*-\\s*1.*"
+			]
+		},
+		"ConcatOperandRemoval": {
+			"ignoreSourceCodeByRegex": [
+				".*'AND\\s*s\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*"
+			]
+		},
+		"LogicalAnd": {
+			"ignoreSourceCodeByRegex": [
+				".*isset\\(\\s*\\$byType\\[\\s*\\$type\\s*\\]\\s*\\)\\s*&&\\s*0\\s*!==\\s*\\(int\\)\\s*\\$points.*"
+			]
+		},
+		"UnwrapArrayPad": {
+			"ignoreSourceCodeByRegex": [
+				".*array_pad\\(\\s*explode\\(\\s*':',\\s*\\(string\\)\\s*\\$ref,\\s*2\\s*\\),\\s*2,\\s*''\\s*\\).*"
+			]
+		},
+		"UnwrapArrayMap": {
+			"ignoreSourceCodeByRegex": [
+				".*implode\\(\\s*',',\\s*array_map\\(\\s*'intval',\\s*\\$ids\\s*\\)\\s*\\).*"
+			]
+		},
+		"UnwrapArrayValues": {
+			"ignoreSourceCodeByRegex": [
+				".*array_merge\\(\\s*array\\(\\s*\\$generation,\\s*\\$lang(,\\s*\\$kind)?\\s*\\),\\s*array_values\\(\\s*\\$terms\\s*\\)\\s*\\).*"
+			]
+		},
+		"MethodCallRemoval": {
+			"ignoreSourceCodeByRegex": [
+				".*'ANALYZE\\s*TABLE\\s*%i'.*",
+				".*\\$wpdb->flush\\(\\);.*"
+			]
+		},
+		"ReturnRemoval": {
+			"ignoreSourceCodeByRegex": [
+				".*return\\s*array\\(\\);\\s*//\\s*A\\s*token\\s*with\\s*no\\s*term.*"
+			],
+			"ignore": [
+				"CreativeBranding\\Search\\Repository\\FactRepository::of",
+				"CreativeBranding\\Search\\Repository\\FactRepository::deleteFor",
+				"CreativeBranding\\Search\\Repository\\PostingRepository::skuKeysOf",
+				"CreativeBranding\\Search\\Repository\\RankRepository::rulePoints"
+			]
+		}
 	}
 }

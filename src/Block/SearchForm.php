@@ -86,19 +86,6 @@ final class SearchForm {
 		}
 		$html .= '<form role="search" class="csearch-form" method="get" action="' . esc_url( home_url( '/' ) ) . '" data-wp-on--submit="actions.submit">';
 		$html .= '<label class="' . esc_attr( $labelClass ) . '" for="' . esc_attr( $input ) . '">' . esc_html( $label ) . '</label>';
-		if ( null !== $scope ) {
-			// On a category page, or a search already kept to one: the search stays in it unless the shopper unticks
-			// the box (D-117). An unticked box sends nothing, so the search covers every product. Above the field, so
-			// the suggestions open right under it.
-			$html .= '<label class="csearch-scope" for="' . esc_attr( $id . '-scope' ) . '"><input type="checkbox" id="' . esc_attr( $id . '-scope' ) . '" name="' . esc_attr( CategoryScope::ARG ) . '" value="' . esc_attr( $scope->slug ) . '" checked data-wp-bind--checked="context.scoped" data-wp-on--change="actions.scope"> '
-				. esc_html(
-					sprintf(
-						/* translators: %s: the category the shopper is in, such as Decks */
-						__( 'Only in %s', 'creative-search' ),
-						$scope->name
-					)
-				) . '</label>';
-		}
 		$html .= '<div class="csearch-field">';
 		$html .= '<input id="' . esc_attr( $input ) . '" class="csearch-input" type="text" name="s" value="' . esc_attr( $current ) . '"'
 			. ' placeholder="' . esc_attr( $placeholder ) . '"'
@@ -221,7 +208,7 @@ final class SearchForm {
 	 * @param string       $id      The instance id the row ids build on.
 	 * @param FormOptions  $options The resolved options.
 	 * @param string       $current The query the page answers, kept in the field.
-	 * @param WP_Term|null $scope   The category the form offers to search in (D-117), or null.
+	 * @param WP_Term|null $scope   The category the shopper is in, offered first as a suggestion (D-130), or null.
 	 * @return array<string, mixed>
 	 */
 	private function context( string $id, FormOptions $options, string $current, ?WP_Term $scope = null ): array {
@@ -313,7 +300,6 @@ final class SearchForm {
 			'panelMax'  => '',
 			'dialog'    => FormOptions::BUTTON === $options->mode,
 			'scope'     => null === $scope ? '' : $scope->slug,
-			'scoped'    => null !== $scope,
 		);
 	}
 
