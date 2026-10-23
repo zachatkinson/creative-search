@@ -100,6 +100,7 @@ final class CustomFieldsTest extends IndexTestCase {
 		self::assertContains( 'notes', $keys );
 		foreach ( $keys as $key ) {
 			self::assertStringStartsNotWith( '_', $key, 'WooCommerce\'s own keys are not offered' );
+			self::assertNotSame( 'total_sales', $key );
 		}
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		ob_start();

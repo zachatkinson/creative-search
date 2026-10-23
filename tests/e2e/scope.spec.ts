@@ -136,8 +136,8 @@ test.describe( 'The form on a category page', () => {
 		const form = page.locator( '.widget .csearch-form' ).first();
 		await form.getByRole( 'checkbox', { name: 'Only in Decks' } ).uncheck();
 		await form.getByRole( 'combobox' ).fill( 'kazumi' );
-		await form.getByRole( 'combobox' ).press( 'Escape' );
-		await form.locator( '.csearch-submit' ).click();
+		// Enter with no row chosen sends the form (Escape on a closed panel would clear the field).
+		await form.getByRole( 'combobox' ).press( 'Enter' );
 		await expect( page ).not.toHaveURL( /product_cat=/ );
 		await expect( page.locator( '.csearch-results-summary' ) ).toHaveText(
 			/^\d+ results for “kazumi”$/
