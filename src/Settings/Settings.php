@@ -36,6 +36,15 @@ final class Settings {
 	public const BOOST_MIN     = -10;
 	public const BOOST_MAX     = 10;
 
+	/**
+	 * The owner's rules for single queries (D-108, D-110): rules of each kind at most, products pinned to one
+	 * query at most, and the longest query a rule names (a query's own cap).
+	 */
+	public const QUERY_RULES_MAX = 200;
+	public const PINS_MAX        = 5;
+	public const RULE_QUERY_MAX  = 200;
+	public const RULE_URL_MAX    = 2048;
+
 	public const LIMIT_DEFAULT     = 6;
 	public const TERMS_DEFAULT     = 3;
 	public const MIN_CHARS_DEFAULT = 2;
@@ -97,6 +106,9 @@ final class Settings {
 			// whether a query that names a category opens it.
 			'filter_attributes'            => array(),
 			'category_redirect'            => 'yes',
+			// The owner's rules for single queries (D-108, D-110): a query sent to a page, products pinned to a query.
+			'query_redirects'              => array(),
+			'pinned_products'              => array(),
 			// The suggestion panel's defaults (a block instance can override each).
 			'suggest_limit'                => self::LIMIT_DEFAULT,
 			'suggest_terms'                => self::TERMS_DEFAULT,
@@ -250,6 +262,12 @@ final class Settings {
 		if ( isset( $input['filter_attributes'] ) && is_array( $input['filter_attributes'] ) ) {
 			$out['filter_attributes'] = self::sanitizeTaxonomies( $input['filter_attributes'] );
 		}
+		if ( isset( $input['query_redirects'] ) && is_array( $input['query_redirects'] ) ) {
+			$out['query_redirects'] = self::sanitizeRedirects( $input['query_redirects'] );
+		}
+		if ( isset( $input['pinned_products'] ) && is_array( $input['pinned_products'] ) ) {
+			$out['pinned_products'] = self::sanitizePins( $input['pinned_products'] );
+		}
 		foreach ( array( 'help', 'guide' ) as $link ) {
 			if ( isset( $input[ $link . '_page' ] ) ) {
 				$out[ $link . '_page' ] = max( 0, self::toInt( $input[ $link . '_page' ], 0 ) );
@@ -343,6 +361,65 @@ final class Settings {
 			);
 		}
 		return $out;
+	}
+
+	/**
+	 * Query redirects (D-108): each a query, a language (empty for every one) and an address, 200 at most. Whether
+	 * the address is one of the shop's own is checked where it is used ({@see \CreativeBranding\Search\Search\OwnerRules}).
+	 *
+	 * @param array<mixed, mixed> $input Raw rules.
+	 * @return array<int, array{query: string, lang: string, url: string}>
+	 */
+	public static function sanitizeRedirects( array $input ): array {
+		$out = array();
+		foreach ( $input as $rule ) {
+			$base = is_array( $rule ) ? self::ruleBase( $rule ) : null;
+			$url  = is_array( $rule ) ? mb_substr( esc_url_raw( trim( self::toString( $rule['url'] ?? '' ) ) ), 0, self::RULE_URL_MAX, 'UTF-8' ) : '';
+			if ( null === $base || '' === $url || count( $out ) === self::QUERY_RULES_MAX ) {
+				continue;
+			}
+			$out[] = $base + array( 'url' => $url );
+		}
+		return $out;
+	}
+
+	/**
+	 * Pinned products (D-110): each a query, a language (empty for every one) and one to five product ids in the
+	 * owner's order, 200 at most.
+	 *
+	 * @param array<mixed, mixed> $input Raw rules.
+	 * @return array<int, array{query: string, lang: string, ids: int[]}>
+	 */
+	public static function sanitizePins( array $input ): array {
+		$out = array();
+		foreach ( $input as $rule ) {
+			$base = is_array( $rule ) ? self::ruleBase( $rule ) : null;
+			$ids  = is_array( $rule ) && isset( $rule['ids'] ) && is_array( $rule['ids'] ) ? array_slice( self::sanitizeIds( $rule['ids'] ), 0, self::PINS_MAX ) : array();
+			if ( null === $base || array() === $ids || count( $out ) === self::QUERY_RULES_MAX ) {
+				continue;
+			}
+			$out[] = $base + array( 'ids' => $ids );
+		}
+		return $out;
+	}
+
+	/**
+	 * A rule's query (plain text, 200 characters) and language (a code, or empty for every one); null without a
+	 * query.
+	 *
+	 * @param array<mixed, mixed> $rule Raw rule.
+	 * @return array{query: string, lang: string}|null
+	 */
+	private static function ruleBase( array $rule ): ?array {
+		$query = mb_substr( trim( sanitize_text_field( self::toString( $rule['query'] ?? '' ) ) ), 0, self::RULE_QUERY_MAX, 'UTF-8' );
+		if ( '' === $query ) {
+			return null;
+		}
+		$lang = self::sanitizeLanguages( array( self::toString( $rule['lang'] ?? '' ) ) );
+		return array(
+			'query' => $query,
+			'lang'  => $lang[0] ?? '',
+		);
 	}
 
 	/**

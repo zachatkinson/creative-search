@@ -12,9 +12,11 @@ namespace CreativeBranding\Search\Domain;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The owner's synonyms, applied to queries: each adds alternative terms to the typed token and never replaces
- * it (spec: Matching → Parsing). A `word` is one token; a `means` of several words adds each of them as an
- * alternative (D-029). Both-ways rows also map every word of `means` back to `word`.
+ * The owner's synonyms, applied to queries: each adds to what the typed words find and never replaces them
+ * (spec: Matching → Parsing). A word for a word adds an alternative term to the typed token (D-029). A row with
+ * more than one word on either side is a phrase rule (D-109): where the query holds the `word`'s words side by
+ * side, the query is also searched with the `means` in their place (`ss bearings` also as `stainless steel
+ * bearings`). Both-ways rows also work from `means` back to `word`.
  */
 final class Synonyms {
 
@@ -24,6 +26,14 @@ final class Synonyms {
 	 * @var array<string, array<string, array<string, string>>>
 	 */
 	private array $map = array();
+
+	/**
+	 * Phrase rules by language, then by the words they find and the words they put in (each once): the folded
+	 * words to find, side by side, and the tokens that take their place.
+	 *
+	 * @var array<string, array<string, array<string, array{from: string[], to: Token[]}>>>
+	 */
+	private array $phrases = array();
 
 	/**
 	 * Constructor.
@@ -51,10 +61,43 @@ final class Synonyms {
 	}
 
 	/**
+	 * The phrase rules of a language: grouped by the words they find, in the order those were first added.
+	 *
+	 * @param string $lang Language code.
+	 * @return array<int, array{from: string[], to: Token[]}>
+	 */
+	public function phrases( string $lang ): array {
+		$out = array();
+		foreach ( $this->phrases[ StopWords::code( $lang ) ] ?? array() as $rules ) {
+			foreach ( $rules as $rule ) {
+				$out[] = $rule;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Where a run of words first appears, side by side, in a list of words.
+	 *
+	 * @param string[] $texts The words, in order.
+	 * @param string[] $run   The run to find.
+	 * @return int|null The index of its first word, or null.
+	 */
+	public static function find( array $texts, array $run ): ?int {
+		// array_slice() counts places, not keys; a slice that runs past the end is shorter than the run.
+		foreach ( array_keys( array_values( $texts ) ) as $at ) {
+			if ( array_slice( $texts, $at, count( $run ) ) === $run ) {
+				return $at;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Whether any synonym is defined.
 	 */
 	public function isEmpty(): bool {
-		return array() === $this->map;
+		return array() === $this->map && array() === $this->phrases;
 	}
 
 	/**
@@ -64,31 +107,55 @@ final class Synonyms {
 	 */
 	private function add( Synonym $row ): void {
 		$lang  = StopWords::code( $row->lang );
-		$words = $this->terms( $row->word, $lang );
-		$means = $this->terms( $row->means, $lang );
-		if ( 1 !== count( $words ) || array() === $means ) {
+		$words = $this->tokens( $row->word, $lang );
+		$means = $this->tokens( $row->means, $lang );
+		$from  = self::texts( $words );
+		$to    = self::texts( $means );
+		if ( array() === $from || array() === $to || $from === $to ) {
 			return;
 		}
-		foreach ( $means as $term ) {
-			$this->map[ $lang ][ $words[0] ][ $term ] = $term;
+		if ( 1 === count( $from ) && 1 === count( $to ) ) {
+			$this->map[ $lang ][ $from[0] ][ $to[0] ] = $to[0];
 			if ( $row->bothWays ) {
-				$this->map[ $lang ][ $term ][ $words[0] ] = $words[0];
+				$this->map[ $lang ][ $to[0] ][ $from[0] ] = $from[0];
 			}
+			return;
+		}
+		$this->phrases[ $lang ][ implode( ' ', $from ) ][ implode( ' ', $to ) ] = array(
+			'from' => $from,
+			'to'   => $means,
+		);
+		if ( $row->bothWays ) {
+			$this->phrases[ $lang ][ implode( ' ', $to ) ][ implode( ' ', $from ) ] = array(
+				'from' => $to,
+				'to'   => $words,
+			);
 		}
 	}
 
 	/**
-	 * The distinct folded terms of a phrase, stop words out.
+	 * The tokens of a text, one per position (the first spelling), stop words out; keyed by position, which counts
+	 * the kept tokens from 0.
 	 *
-	 * @param string $phrase Text.
-	 * @param string $lang   Language code.
+	 * @param string $text Text.
+	 * @param string $lang Language code.
+	 * @return Token[]
+	 */
+	private function tokens( string $text, string $lang ): array {
+		$tokens = array();
+		foreach ( $this->tokenizer->tokenize( $text, $lang ) as $token ) {
+			$tokens[ $token->position ] ??= $token;
+		}
+		return $tokens;
+	}
+
+	/**
+	 * The folded texts of some tokens.
+	 *
+	 * @param Token[] $tokens Tokens.
 	 * @return string[]
 	 */
-	private function terms( string $phrase, string $lang ): array {
-		$terms = array();
-		foreach ( $this->tokenizer->tokenize( $phrase, $lang ) as $token ) {
-			$terms[ $token->text ] = $token->text;
-		}
-		return array_values( $terms );
+	private static function texts( array $tokens ): array {
+		return array_map( static fn( Token $t ): string => $t->text, $tokens );
 	}
 }

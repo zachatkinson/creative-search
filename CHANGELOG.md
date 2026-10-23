@@ -24,6 +24,17 @@ All notable changes to this project are documented here. The format follows [Kee
 - Schema 3: the `facts` table and the documents' `cart` column. A site on schema 2 upgrades in place and owes a rebuild; until it is done, the live index is read as before and no variation or reason is shown (D-107).
 - `csearch_document` gains `cart` and `facts`; `csearch_suggestion_classes` receives the image the row shows, the variation's when one is named.
 
+## [1.3.0] - unreleased
+
+### Added
+- Query redirects: the owner sends a search's words to a page of this site instead of the results ("size guide" to the size guides), on the new Redirects and pins tab or with `wp csearch redirect add|list|remove`. Same-site only; checked before categories and filters; the search is still logged with what it would have found. Setting `query_redirects`, filter `csearch_query_redirect` (D-108, D-111).
+- Synonyms of more than one word on either side: "ss" means "stainless steel", "skate shoes" means "sneakers". A search holding the words side by side also searches what they mean, as a whole, and each product is ranked once at its better score (D-109).
+- Pinned products: up to five products, by SKU or ID, first for a search's words in the panel, on the results page and in `/search`, on the Redirects and pins tab or with `wp csearch pin add|list|remove`. Hidden and unpublished products are still left out; a pinned search is not sent to a category. Setting `pinned_products`, filter `csearch_pinned_products` (D-110, D-111).
+
+### Changed
+- A synonym whose meaning is several words now means that phrase as a whole, not each of its words: "deck" meaning "skateboard deck" no longer makes "skateboard" alone match "deck" (D-109, superseding D-029).
+- The Synonyms tab's test box is "Test a search" and takes several words.
+
 ## [1.2.0] - 2026-10-22
 
 Items 9 to 11 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md).

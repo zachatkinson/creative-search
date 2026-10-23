@@ -52,7 +52,9 @@ final class SettingsTest extends TestCase {
 		self::assertSame( 'yes', $d['category_redirect'], 'a category name opens the category (D-102)' );
 		self::assertSame( array(), $d['filter_attributes'], 'no attribute filters until the owner ticks one (D-101)' );
 		self::assertSame( array(), $d['custom_fields'], 'no custom fields until the owner picks one (D-119)' );
-		self::assertCount( 31, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertSame( array(), $d['query_redirects'], 'no redirect until the owner adds one (D-108)' );
+		self::assertSame( array(), $d['pinned_products'], 'no pins until the owner adds some (D-110)' );
+		self::assertCount( 33, $d, 'every key is documented in docs/SETTINGS.md' );
 	}
 
 	public function test_the_filter_attributes_are_attribute_taxonomies(): void {
@@ -261,6 +263,52 @@ final class SettingsTest extends TestCase {
 			$out
 		);
 		self::assertSame( $out, Settings::sanitize( array( 'boost_rules' => array( array( 'taxonomy' => 'product_cat', 'term_id' => '12', 'boost' => 50 ), array( 'taxonomy' => 'Product Brand!', 'term_id' => 3, 'boost' => -40 ), array( 'taxonomy' => 'product_tag', 'term_id' => 9, 'boost' => '2' ) ) ) )['boost_rules'] );
+	}
+
+	public function test_redirects_need_a_query_and_an_address(): void {
+		$out = Settings::sanitizeRedirects(
+			array(
+				array( 'query' => ' Size <b>guide</b> ', 'lang' => 'EN', 'url' => ' https://shop.test/size-guide/ ' ),
+				array( 'query' => 'returns', 'url' => '/returns/' ),
+				array( 'query' => '', 'url' => '/x/' ),
+				array( 'query' => 'bad', 'url' => 'javascript:alert(1)' ),
+				array( 'query' => 'none' ),
+				array( 'query' => 'odd lang', 'lang' => '-x', 'url' => '/y/' ),
+				'junk',
+				array( 'query' => str_repeat( 'a', 250 ), 'lang' => array( 'fr' ), 'url' => '/' . str_repeat( 'b', 3000 ) ),
+			)
+		);
+		self::assertSame( array( 'query' => 'Size guide', 'lang' => 'en', 'url' => 'https://shop.test/size-guide/' ), $out[0] );
+		self::assertSame( array( 'query' => 'returns', 'lang' => '', 'url' => '/returns/' ), $out[1], 'no language is every language' );
+		self::assertSame( array( 'query' => 'odd lang', 'lang' => '', 'url' => '/y/' ), $out[2] );
+		self::assertSame( 200, mb_strlen( $out[3]['query'] ) );
+		self::assertSame( '', $out[3]['lang'] );
+		self::assertSame( Settings::RULE_URL_MAX, strlen( $out[3]['url'] ) );
+		self::assertCount( 4, $out );
+		$many = array_fill( 0, 205, array( 'query' => 'q', 'url' => '/q/' ) );
+		self::assertCount( Settings::QUERY_RULES_MAX, Settings::sanitizeRedirects( $many ), 'two hundred at most' );
+		self::assertSame( array( $out[1] ), Settings::sanitize( array( 'query_redirects' => array( array( 'query' => 'returns', 'url' => '/returns/' ) ) ) )['query_redirects'] );
+		self::assertSame( array(), Settings::sanitize( array( 'query_redirects' => 'x' ) )['query_redirects'] );
+		self::assertSame( array(), Settings::defaults()['query_redirects'] );
+	}
+
+	public function test_pins_need_a_query_and_up_to_five_products(): void {
+		$out = Settings::sanitizePins(
+			array(
+				array( 'query' => 'grip tape', 'lang' => 'fr', 'ids' => array( '9', 3, 9, 0, 4, 5, 6, 7, 8 ) ),
+				array( 'query' => 'none', 'ids' => array() ),
+				array( 'query' => 'no list', 'ids' => '5' ),
+				array( 'query' => '  ', 'ids' => array( 1 ) ),
+				array( 'ids' => array( 1 ) ),
+				'junk',
+			)
+		);
+		self::assertSame( array( array( 'query' => 'grip tape', 'lang' => 'fr', 'ids' => array( 9, 3, 4, 5, 6 ) ) ), $out, 'in order, without repeats, five at most' );
+		$many = array_fill( 0, 201, array( 'query' => 'q', 'ids' => array( 1 ) ) );
+		self::assertCount( Settings::QUERY_RULES_MAX, Settings::sanitizePins( $many ) );
+		self::assertSame( $out, Settings::sanitize( array( 'pinned_products' => array( array( 'query' => 'grip tape', 'lang' => 'fr', 'ids' => array( 9, 3, 4, 5, 6 ) ) ) ) )['pinned_products'] );
+		self::assertSame( array(), Settings::sanitize( array( 'pinned_products' => 'x' ) )['pinned_products'] );
+		self::assertSame( array(), Settings::defaults()['pinned_products'] );
 	}
 
 	public function test_ids_are_positive_unique_integers_in_order(): void {

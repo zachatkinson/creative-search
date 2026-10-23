@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Settings\Settings;
@@ -70,11 +71,13 @@ final class Suggestions {
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
-			$answer = array(
-				'products'  => $this->products( array_slice( $result->products, 0, $limit ), $result ),
+			// A panel limited to a category leaves out the pins: one may sit outside it (D-110, D-117).
+			$products = $this->pinnedFirst( $result->products, array() === $scope ? $this->search->rules()->pins( $query, $lang ) : array(), $result->lang );
+			$answer   = array(
+				'products'  => $this->products( array_slice( $products, 0, $limit ), $result ),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
-				'total'     => count( $result->products ),
+				'total'     => count( $products ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
@@ -86,32 +89,57 @@ final class Suggestions {
 	}
 
 	/**
+	 * The ranked products' documents with the owner's pinned products first, in the pins' order (D-110): a pinned
+	 * product that is ranked moves up, one that is not is added, one hidden from search or not in the index in the
+	 * answer's language is left out.
+	 *
+	 * @param Hit[]  $hits Ranked products.
+	 * @param int[]  $pins Pinned product ids.
+	 * @param string $lang The language whose documents answered.
+	 * @return Document[]
+	 */
+	private function pinnedFirst( array $hits, array $pins, string $lang ): array {
+		$documents = array_map( static fn( Hit $h ): Document => $h->document, $hits );
+		if ( array() === $pins ) {
+			return $documents;
+		}
+		$pinned = array();
+		foreach ( $this->search->index()->productDocuments( $lang, $pins ) as $document ) {
+			if ( $document->visible ) {
+				$pinned[ $document->objectId ] = $document;
+			}
+		}
+		$rest = array_filter( $documents, static fn( Document $d ): bool => ! isset( $pinned[ $d->objectId ] ) );
+		return array_merge( array_values( $pinned ), array_values( $rest ) );
+	}
+
+	/**
 	 * Product rows: a variation the query named shows its own image and opens with it chosen (D-104), and a match
 	 * the row does not show says what it was (D-105).
 	 *
-	 * @param Hit[]        $hits   Ranked products.
-	 * @param SearchResult $result The search they came from.
+	 * @param Document[]   $documents Products, in order.
+	 * @param SearchResult $result    The search they came from.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $hits, SearchResult $result ): array {
-		$ids     = array_map( static fn( Hit $h ): int => $h->document->id, $hits );
+	private function products( array $documents, SearchResult $result ): array {
+		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
 		$rows    = $this->search->index()->rows( $ids );
 		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
 		$out     = array();
-		foreach ( $hits as $hit ) {
-			$row = $rows[ $hit->document->id ] ?? null;
+		foreach ( $documents as $document ) {
+			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {
 				continue;
 			}
-			$detail     = $details[ $hit->document->id ] ?? null;
+			$detail     = $details[ $document->id ] ?? null;
 			$imageId    = $detail->imageId ?? Cast::int( $row['image_id'] );
 			$suggestion = array(
-				'id'         => $hit->document->objectId,
-				'name'       => $hit->document->title,
+				'id'         => $document->objectId,
+				'name'       => $document->title,
 				'url'        => null === $detail ? Cast::str( $row['url'] ) : MatchDetails::url( Cast::str( $row['url'] ), $detail ),
 				'image'      => self::image( $imageId ),
 				'price_html' => self::price( $row['price_min'], $row['price_max'] ),
-				'in_stock'   => $hit->document->inStock,
+				'in_stock'   => $document->inStock,
 				'type'       => 'product',
 				'matched'    => null === $detail ? '' : MatchDetails::line( $detail ),
 			);
@@ -127,7 +155,7 @@ final class Suggestions {
 			 * @param int|null             $imageId   The image the row shows (since 1.3.0 a variation's the query named), or null.
 			 * @param array<string, mixed> $row       The suggestion as the panel receives it.
 			 */
-			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $hit->document->objectId, $imageId > 0 ? $imageId : null, $suggestion );
+			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $document->objectId, $imageId > 0 ? $imageId : null, $suggestion );
 			$suggestion['classes'] = self::classes( $classes );
 			$out[]                 = $suggestion;
 		}

@@ -48,6 +48,15 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 		return trim( $str );
 	}
 }
+if ( ! function_exists( 'esc_url_raw' ) ) {
+	/**
+	 * An address with a scheme WordPress allows, or a path; anything else empty (as core answers them).
+	 */
+	function esc_url_raw( string $url ): string {
+		$url = (string) preg_replace( '/[\s<>"]/', '', $url );
+		return 1 === preg_match( '#^(https?://[^/]|/)#i', $url ) ? $url : '';
+	}
+}
 if ( ! function_exists( 'sanitize_key' ) ) {
 	function sanitize_key( string $key ): string {
 		return (string) preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $key ) );

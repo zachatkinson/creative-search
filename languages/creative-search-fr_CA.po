@@ -1713,3 +1713,135 @@ msgstr "Correspond à %1$s : %2$s"
 #: src/Search/MatchDetails.php:142
 msgid "Matches the description"
 msgstr "Correspond à la description"
+
+#: src/Admin/AdminPage.php:62
+msgid "Redirects and pins"
+msgstr "Redirections et épinglages"
+
+#: src/Admin/RulesTab.php:39
+msgid "A rule answers a search for exactly its words. Capitals, accents, punctuation and short words such as “the” do not matter; the order of the words does."
+msgstr "Une règle répond à une recherche de ses mots exacts. Les majuscules, les accents, la ponctuation et les mots courts comme « le » ne comptent pas; l’ordre des mots, si."
+
+#: src/Admin/RulesTab.php:41
+msgid "Redirects"
+msgstr "Redirections"
+
+#: src/Admin/RulesTab.php:42
+msgid "Send a search straight to a page of this site, such as “size guide” to your size guides, instead of showing results."
+msgstr "Envoyez une recherche directement vers une page de ce site, comme « guide des tailles » vers vos guides des tailles, au lieu d’afficher des résultats."
+
+#: src/Admin/RulesTab.php:43 src/Admin/RulesTab.php:57
+msgid "Goes to"
+msgstr "Mène à"
+
+#: src/Admin/RulesTab.php:46
+msgid "No redirects yet."
+msgstr "Aucune redirection pour l’instant."
+
+#. translators: %s: the words of a search
+#: src/Admin/RulesTab.php:51
+#, php-format
+msgid "Remove the redirect for “%s”"
+msgstr "Retirer la redirection de « %s »"
+
+#: src/Admin/RulesTab.php:54
+msgid "Add a redirect"
+msgstr "Ajouter une redirection"
+
+#: src/Admin/RulesTab.php:58
+msgid "An address on this site, or a path such as /size-guide/. Adding a search that already has a redirect changes it."
+msgstr "Une adresse de ce site, ou un chemin comme /guide-des-tailles/. Ajouter une recherche qui a déjà une redirection la modifie."
+
+#: src/Admin/RulesTab.php:60
+msgid "Pinned products"
+msgstr "Produits épinglés"
+
+#. translators: %s: how many products can be pinned, such as 5
+#: src/Admin/RulesTab.php:64
+#, php-format
+msgid "Show up to %s products first for a search, in the order given, in the suggestions and on the results page. A product that is not published, or is hidden from search, is still left out."
+msgstr "Affichez jusqu’à %s produits en premier pour une recherche, dans l’ordre donné, dans les suggestions et sur la page de résultats. Un produit non publié, ou masqué de la recherche, reste exclu."
+
+#: src/Admin/RulesTab.php:68
+msgid "Products, in order"
+msgstr "Produits, dans l’ordre"
+
+#: src/Admin/RulesTab.php:71
+msgid "No pinned products yet."
+msgstr "Aucun produit épinglé pour l’instant."
+
+#. translators: %s: the words of a search
+#: src/Admin/RulesTab.php:85
+#, php-format
+msgid "Remove the products pinned to “%s”"
+msgstr "Retirer les produits épinglés à « %s »"
+
+#: src/Admin/RulesTab.php:88
+msgid "Pin products"
+msgstr "Épingler des produits"
+
+#: src/Admin/RulesTab.php:91
+msgid "Products by SKU or ID"
+msgstr "Produits par UGS ou ID"
+
+#: src/Admin/RulesTab.php:92
+msgid "Separate several with commas, first first. Pinning products to a search that already has some replaces them."
+msgstr "Séparez-en plusieurs par des virgules, le premier d’abord. Épingler des produits à une recherche qui en a déjà les remplace."
+
+#: src/Admin/RulesTab.php:94
+msgid "Save redirects and pins"
+msgstr "Enregistrer les redirections et les épinglages"
+
+#: src/Admin/RulesTab.php:104 src/Admin/RulesTab.php:126
+msgid "Every language"
+msgstr "Toutes les langues"
+
+#: src/Search/OwnerRules.php:131
+msgid "A redirect goes to a page of this site: enter its address, or a path such as /size-guide/."
+msgstr "Une redirection mène à une page de ce site : entrez son adresse, ou un chemin comme /guide-des-tailles/."
+
+#: src/Search/OwnerRules.php:147
+msgid "Choose at least one product to pin."
+msgstr "Choisissez au moins un produit à épingler."
+
+#: src/Search/OwnerRules.php:182
+msgid "Enter the words of the search, not only short words such as “the”."
+msgstr "Entrez les mots de la recherche, pas seulement des mots courts comme « le »."
+
+#. translators: %s: the most rules of one kind, such as 200
+#: src/Search/OwnerRules.php:212
+#, php-format
+msgid "There are already %s rules of this kind; remove one first."
+msgstr "Il y a déjà %s règles de ce type; retirez-en une d’abord."
+
+#: src/Cli/RulesCommand.php:84
+msgid "Redirect saved."
+msgstr "Redirection enregistrée."
+
+#: src/Cli/RulesCommand.php:141
+msgid "Products pinned."
+msgstr "Produits épinglés."
+
+#. translators: %s: how many rules were removed
+#: src/Cli/RulesCommand.php:179
+#, php-format
+msgid "%s rule removed."
+msgid_plural "%s rules removed."
+msgstr[0] "%s règle retirée."
+msgstr[1] "%s règles retirées."
+
+#: src/Admin/Actions.php:330
+msgid "Redirects and pins saved. Searches use them now."
+msgstr "Redirections et épinglages enregistrés. Les recherches les utilisent maintenant."
+
+#: src/Admin/SynonymsTab.php:81
+msgid "Either side can be a few words: “ss” can mean “stainless steel”, and “skate shoes” can mean “sneakers”. A search holding those words side by side also finds what they mean, as a whole: “stainless steel”, not “steel” alone."
+msgstr "Chaque côté peut compter quelques mots : « ss » peut signifier « acier inoxydable », et « souliers de skate » peut signifier « espadrilles ». Une recherche qui contient ces mots côte à côte trouve aussi ce qu’ils signifient, en entier : « acier inoxydable », pas « acier » seul."
+
+#: src/Admin/SynonymsTab.php:144
+msgid "Test a search"
+msgstr "Tester une recherche"
+
+#: src/Admin/SynonymsTab.php:146
+msgid "Words"
+msgstr "Mots"

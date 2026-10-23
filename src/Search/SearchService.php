@@ -63,6 +63,7 @@ final class SearchService {
 	 * @param Languages         $languages The indexed languages.
 	 * @param Cache             $cache     Answers.
 	 * @param SearchLog         $log       The log writer.
+	 * @param OwnerRules        $rules     The owner's pinned products (D-110).
 	 */
 	public function __construct(
 		private IndexRepository $index,
@@ -70,7 +71,8 @@ final class SearchService {
 		private SynonymRepository $synonyms,
 		private Languages $languages,
 		private Cache $cache,
-		private SearchLog $log
+		private SearchLog $log,
+		private OwnerRules $rules
 	) {
 	}
 
@@ -271,8 +273,11 @@ final class SearchService {
 			foreach ( $result->products as $hit ) {
 				$docs[ $hit->document->objectId ] = $hit->document->id;
 			}
+			// The owner's pinned products first, in their order (D-110); WooCommerce's query still leaves out one
+			// that is not published or is hidden from search.
+			$pins   = $this->rules->pins( $query, $lang );
 			$cached = array(
-				'ids'       => $result->productIds(),
+				'ids'       => array_slice( array_values( array_unique( array_merge( $pins, $result->productIds() ) ) ), 0, self::MAX_IDS ),
 				'corrected' => $result->corrected,
 				'docs'      => $docs,
 				'tokens'    => $result->tokens,
@@ -378,7 +383,14 @@ final class SearchService {
 	 * @return array<int, mixed>
 	 */
 	public function settingsKey(): array {
-		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ) );
+		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ), Settings::get( OwnerRules::PINS ) );
+	}
+
+	/**
+	 * The owner's rules for single queries.
+	 */
+	public function rules(): OwnerRules {
+		return $this->rules;
 	}
 
 	/**

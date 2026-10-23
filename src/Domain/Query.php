@@ -13,12 +13,18 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * A query after parsing: its tokens in order (stop words already dropped, unless every token was one), the
- * minus words, the quoted phrases, within the caps (spec: Matching → Parsing).
+ * minus words, the quoted phrases, within the caps (spec: Matching → Parsing), and the other forms the owner's
+ * phrase synonyms give it (D-109), searched beside it.
  */
 final class Query {
 
 	public const MAX_CHARS  = 200;
 	public const MAX_TOKENS = 8;
+
+	/**
+	 * Other forms of one query at most: each is one more ranking.
+	 */
+	public const MAX_ALTERNATIVES = 3;
 
 	/**
 	 * Constructor.
@@ -28,13 +34,15 @@ final class Query {
 	 * @param QueryToken[] $tokens       The tokens to match, in order.
 	 * @param QueryToken[] $excluded     The minus words.
 	 * @param bool         $allStopWords Whether every token was a stop word (they are kept, and the query runs).
+	 * @param Query[]      $alternatives The query with a phrase synonym in place of the words it rewrites.
 	 */
 	public function __construct(
 		public readonly string $text,
 		public readonly string $lang,
 		public readonly array $tokens,
 		public readonly array $excluded = array(),
-		public readonly bool $allStopWords = false
+		public readonly bool $allStopWords = false,
+		public readonly array $alternatives = array()
 	) {
 	}
 
@@ -69,7 +77,7 @@ final class Query {
 
 	/**
 	 * The query with one token dropped (the retry after AND found too little), its text rewritten so the
-	 * suggestions can say "showing results for …".
+	 * suggestions can say "showing results for …". The retry searches this form alone.
 	 *
 	 * @param int $index Index into {@see Query::$tokens}.
 	 */

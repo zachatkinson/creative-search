@@ -209,6 +209,7 @@ test.describe( 'the admin in French', () => {
 		[ 'analytics', 'Résumé' ],
 		[ 'synonyms', 'Ajouter un synonyme' ],
 		[ 'boosts', 'Règles de promotion' ],
+		[ 'rules', 'Redirections' ],
 		[ 'tools', 'Index' ],
 	] ) {
 		test( `the ${ tab } tab in French`, async ( { page } ) => {

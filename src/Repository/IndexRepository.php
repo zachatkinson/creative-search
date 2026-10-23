@@ -369,6 +369,27 @@ final class IndexRepository implements IndexStore {
 	}
 
 	/**
+	 * The live generation's documents of some products in one language, in the order of the ids given (the
+	 * owner's pinned products, D-110); a product not in the index in that language is left out.
+	 *
+	 * @param string $lang       Language code.
+	 * @param int[]  $productIds Product ids.
+	 * @return Document[]
+	 */
+	public function productDocuments( string $lang, array $productIds ): array {
+		$ids       = $this->documents->productDocumentIds( $this->generation(), $lang, $productIds );
+		$documents = $this->documents( array_values( $ids ) );
+		$out       = array();
+		foreach ( $productIds as $productId ) {
+			$document = $documents[ $ids[ $productId ] ?? 0 ] ?? null;
+			if ( null !== $document ) {
+				$out[] = $document;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * The suggestion rows of some documents (url, image, prices), for milestone 4's renderer.
 	 *
 	 * @param int[] $ids Document ids.
