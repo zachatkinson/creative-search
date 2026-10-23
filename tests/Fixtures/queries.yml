@@ -9,7 +9,7 @@
 #   products   SKUs that must be among the product suggestions (default limit 6)
 #   absent     SKUs that must not appear
 #   terms      category, tag or brand names that must appear among the term suggestions
-#   corrected  the query after a dropped token, when one must be dropped
+#   corrected  the query the results are for: after a dropped token, or with a typo read as its closest term (D-114)
 #   zero       true when the query must return nothing
 #   hidden_only true when the top is a hidden product reachable only by exact SKU with hidden_by_sku on
 
@@ -91,12 +91,12 @@ queries:
     expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [KAZUMI] }
   - q: "dekc"
     kind: typo
-    why: a transposition counts as one edit
-    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [Decks] }
+    why: a transposition counts as one edit; the shopper is told the results are for "deck"
+    expect: { top: KAZ-DEA-00001, products: [KAZ-DEA-00001], terms: [Decks], corrected: "deck" }
   - q: "horor party"
     kind: typo
     why: a deletion in horror
-    expect: { top: PHL-HPR-00003, products: [PHL-HPR-00003] }
+    expect: { top: PHL-HPR-00003, products: [PHL-HPR-00003], corrected: "horror party" }
   - q: "bearrings"
     kind: typo
     why: an insertion at nine characters allows two edits
@@ -104,7 +104,7 @@ queries:
   - q: "griptape perforrated"
     kind: typo
     why: typo on a long word with an exact first token
-    expect: { top: MNL-PER-00016, products: [MNL-PER-00016] }
+    expect: { top: MNL-PER-00016, products: [MNL-PER-00016], corrected: "griptape perforated" }
   - q: "dek"
     kind: typo
     why: three characters are never fuzzed and dek is no prefix of anything, so nothing is found (dck would be a SKU prefix, D-032)

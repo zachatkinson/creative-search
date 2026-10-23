@@ -244,7 +244,7 @@ final class SearchService {
 	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
 	 * @param int[]       $scope  Products of these term-taxonomy ids only: a category and its subcategories (D-117).
 	 * @param bool        $strong The strong matches only, when any (D-118): a sort other than Relevance.
-	 * @return array{ids: int[], corrected: string|null, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}
+	 * @return array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}
 	 */
 	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false, array $scope = array(), bool $strong = false ): array {
 		$query = self::clean( $raw );
@@ -253,6 +253,7 @@ final class SearchService {
 			return array(
 				'ids'       => array(),
 				'corrected' => null,
+				'dropped'   => false,
 				'query'     => '',
 				'lang'      => $lang,
 				'docs'      => array(),
@@ -285,6 +286,7 @@ final class SearchService {
 			$cached = array(
 				'ids'       => array_slice( array_values( array_unique( array_merge( $pins, $result->productIds() ) ) ), 0, self::MAX_IDS ),
 				'corrected' => $result->corrected,
+				'dropped'   => $result->dropped,
 				'docs'      => $docs,
 				'tokens'    => $result->tokens,
 				'key'       => $result->key,
@@ -299,6 +301,7 @@ final class SearchService {
 		return array(
 			'ids'       => $ids,
 			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
+			'dropped'   => true === ( $cached['dropped'] ?? false ),
 			'query'     => $query,
 			'lang'      => $lang,
 			'docs'      => self::documentsOf( $cached['docs'] ?? null ),

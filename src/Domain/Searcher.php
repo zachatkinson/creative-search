@@ -17,7 +17,8 @@ defined( 'ABSPATH' ) || exit;
  * D-033); AND across tokens; minus words excluded; quoted phrases enforced; the least-matched token dropped once
  * when no product matches (D-034); hidden products only for their exact SKU; every product scored and sorted;
  * the query's other forms from the owner's phrase synonyms ranked too and merged, each product at its best (D-109);
- * the categories, tags and brands any token names, scored by name; the fallback language when nothing is found.
+ * the categories, tags and brands any token names, scored by name; the fallback language when nothing is found;
+ * the query the results are for when a token was dropped or a typo read as its closest term (D-114).
  * A search of the posts and pages (1.1) runs the same way over their own postings and counts (D-093).
  */
 final class Searcher {
@@ -73,19 +74,24 @@ final class Searcher {
 			$forms[]  = array( $alternative, $widened );
 			$products = self::merge( $products, $this->index->rank( RankPlan::of( $alternative, $widened, $lang, $n, $excluded, $options ) ), $options->limit );
 		}
-		$corrected = null;
-		$answered  = $query;
-		$used      = $widenings;
+		$typos    = self::typos( $widenings );
+		$drop     = null;
+		$answered = $query;
+		$used     = $widenings;
 		if ( array() === $products && $options->retry && count( $widenings ) >= 2 ) {
 			$drop     = $this->leastMatched( $widenings, $lang, $kind );
 			$reduced  = $query->without( $drop );
 			$kept     = array_values( array_filter( $widenings, static fn( int $i ): bool => $i !== $drop, ARRAY_FILTER_USE_KEY ) );
 			$products = $this->index->rank( RankPlan::of( $reduced, $kept, $lang, $n, $excluded, $options ) );
 			if ( array() !== $products ) {
-				$corrected = $reduced->text;
-				$answered  = $reduced;
-				$used      = $kept;
+				$answered = $reduced;
+				$used     = $kept;
 			}
+		}
+		// What the results are for, when it is not what was typed: a word left out, a typo read as its closest term.
+		$corrected = null;
+		if ( array() !== $products && ( null !== $drop || array() !== $typos ) ) {
+			$corrected = $query->rewritten( $typos, $drop );
 		}
 
 		$terms = array();
@@ -99,7 +105,7 @@ final class Searcher {
 		}
 		$terms = array_slice( self::best( $terms, 'compareTerms' ), 0, $options->termLimit );
 
-		return new SearchResult( $products, $terms, $lang, $corrected, array_map( static fn( TokenWidening $w ): array => self::termsOf( $w->matches ), $used ), $answered->key() );
+		return new SearchResult( $products, $terms, $lang, $corrected, array_map( static fn( TokenWidening $w ): array => self::termsOf( $w->matches ), $used ), $answered->key(), null !== $corrected && null !== $drop );
 	}
 
 	/**
@@ -146,6 +152,25 @@ final class Searcher {
 			$best[ $hit->document->id ] ??= $hit;
 		}
 		return $best;
+	}
+
+	/**
+	 * The tokens that matched only through a typo, each with the term it was read as: the closest, the one sharing
+	 * most trigrams on a tie (D-033's order), as indexed, so folded (D-114).
+	 *
+	 * @param array<int, TokenWidening> $widenings One per token.
+	 * @return array<int, string> Token index to term.
+	 */
+	private static function typos( array $widenings ): array {
+		$out = array();
+		foreach ( $widenings as $i => $widening ) {
+			$first = $widening->matches[ array_key_first( $widening->matches ) ?? '' ] ?? null;
+			// A widening holds one level only: typo candidates are tried when nothing nearer was found.
+			if ( null !== $first && in_array( $first->kind, array( TermMatch::TYPO1, TermMatch::TYPO2 ), true ) ) {
+				$out[ $i ] = $first->term;
+			}
+		}
+		return $out;
 	}
 
 	/**

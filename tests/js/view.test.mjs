@@ -52,7 +52,15 @@ function context( overrides = {} ) {
 			corrected: 'Showing results for %1$s',
 			content: 'Pages',
 			types: { post: 'Post', page: 'Page' },
+			scope: '%1$s in %2$s',
+			search: 'Suggested search',
+			added: '%1$s added to your cart.',
+			notAdded: 'Could not add %1$s to your cart.',
 		},
+		cart: '',
+		cartPage: '',
+		currency: 'CAD',
+		events: false,
 		query: '',
 		typed: '',
 		corrected: '',
@@ -120,6 +128,11 @@ beforeEach( () => {
 	dom.focused = null;
 	window.history.state = null;
 	window.localStorage.clear();
+	dom.events.length = 0;
+	dom.bodyEvents.length = 0;
+	dom.submitted = false;
+	delete window.dataLayer;
+	delete window.jQuery;
 	form++;
 	input = dom.element( `csearch-${ form }-input` );
 	scope.ctx = context();
@@ -890,4 +903,597 @@ test( 'a dropped row never leaves the field pointing at an id that is gone', asy
 	window.innerHeight = 800;
 	delete window.requestAnimationFrame;
 	delete window.ResizeObserver;
+} );
+
+const PANEL = {
+	...ANSWER,
+	queries: [ 'kazumi deck', 'kazumi dealer' ],
+	products: [
+		{ ...ANSWER.products[ 0 ], price: 84.99, cart: true },
+		{ ...ANSWER.products[ 1 ], price: null, cart: false },
+	],
+	scopes: [
+		{
+			id: 31,
+			name: 'Decks',
+			url: '/?s=kazumi&post_type=product&product_cat=decks',
+		},
+	],
+};
+
+test( 'suggested searches come first, a search within a category after the products', async () => {
+	dom.fetch = () => respond( PANEL );
+	type( 'kazumi' );
+	await settle();
+	const ctx = scope.ctx;
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[
+			'qkazumi deck',
+			'qkazumi dealer',
+			'p11',
+			'p12',
+			's31',
+			'tbrandKAZUMI',
+			'all',
+		]
+	);
+	assert.equal( ctx.rows[ 0 ].label, 'kazumi deck' );
+	assert.equal(
+		ctx.rows[ 0 ].type,
+		'Suggested search',
+		'read after its words'
+	);
+	assert.equal( ctx.rows[ 0 ].meta, true );
+	assert.equal( ctx.rows[ 4 ].name, 'kazumi in Decks' );
+	assert.equal( ctx.rows[ 4 ].label, 'kazumi in Decks' );
+	assert.equal( ctx.rows[ 4 ].cid, 31 );
+	assert.equal( ctx.rows[ 4 ].meta, false );
+} );
+
+test( 'arrowing writes a suggested search, and a search within a category writes its words', async () => {
+	dom.fetch = () => respond( PANEL );
+	type( 'kazumi' );
+	await settle();
+	const ctx = scope.ctx;
+	actions.keydown( key( 'ArrowDown' ) );
+	assert.equal( ctx.query, 'kazumi deck' );
+	for ( let i = 0; i < 4; i++ ) {
+		actions.keydown( key( 'ArrowDown' ) );
+	}
+	assert.equal( ctx.rows[ ctx.active ].scope, true );
+	assert.equal( ctx.query, 'kazumi', 'not "kazumi in Decks"' );
+	actions.keydown( key( 'ArrowUp' ) );
+	assert.equal(
+		ctx.query,
+		'KAZUMI Skate Deck, Ghost Tiger',
+		'a product writes its name'
+	);
+} );
+
+test( 'choosing a suggested search searches it; a search within a category opens it without a beacon', async () => {
+	dom.fetch = () => respond( PANEL );
+	type( 'kazumi' );
+	await settle();
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'Enter' ) );
+	assert.equal( dom.submitted, true );
+	assert.equal( input.value, 'kazumi deck' );
+	assert.equal( scope.ctx.typed, 'kazumi deck' );
+	assert.equal( scope.ctx.open, false );
+
+	scope.ctx = context( { recent: true } );
+	type( 'kazumi' );
+	await settle();
+	for ( let i = 0; i < 5; i++ ) {
+		actions.keydown( key( 'ArrowDown' ) );
+	}
+	assert.equal( scope.ctx.rows[ scope.ctx.active ].scope, true );
+	actions.keydown( key( 'Enter' ) );
+	assert.deepEqual( dom.assigned, [ PANEL.scopes[ 0 ].url ] );
+	assert.equal( dom.beacons.length, 0, 'no product or term was chosen' );
+	assert.deepEqual(
+		JSON.parse( window.localStorage.getItem( 'csearch_recent' ) ),
+		[ 'kazumi' ],
+		'the words searched are remembered, not "kazumi in Decks"'
+	);
+} );
+
+test( 'a phone shows two suggested searches; a desktop three, before the products', async () => {
+	const many = { ...PANEL, queries: [ 'a1', 'a2', 'a3', 'a4' ] };
+	dom.fetch = () => respond( many );
+	scope.ctx = context( { limit: 10 } );
+	type( 'kazumi' );
+	await settle();
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.query ).length, 3 );
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.product ).length, 2 );
+
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 10 } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.query ).length, 2 );
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.scope ).length,
+		1,
+		'the scope first'
+	);
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.term ).length,
+		1,
+		'then a term, two in all'
+	);
+} );
+
+test( 'searches within a category take the room terms have, and need products', async () => {
+	const full = {
+		...PANEL,
+		queries: [ 'q1', 'q2', 'q3' ],
+		products: Array.from( { length: 6 }, ( _, i ) => ( {
+			...PANEL.products[ 1 ],
+			id: 200 + i,
+		} ) ),
+		scopes: [
+			{ id: 1, name: 'A', url: '/a' },
+			{ id: 2, name: 'B', url: '/b' },
+			{ id: 3, name: 'C', url: '/c' },
+		],
+	};
+	dom.fetch = () => respond( full );
+	type( 'kazumi' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.scope ).length,
+		1,
+		'three searches, six products: one row left'
+	);
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.term ).length, 0 );
+
+	dom.fetch = () =>
+		respond( {
+			...full,
+			queries: [],
+			products: full.products.slice( 0, 2 ),
+		} );
+	type( 'kazumi d' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.scope ).length,
+		2,
+		'two at most'
+	);
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.term ).length, 1 );
+
+	dom.fetch = () => respond( { ...full, queries: [], products: [] } );
+	type( 'kazumi de' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.scope ).length,
+		0,
+		'nothing to search within'
+	);
+
+	scope.ctx = context( { terms: false } );
+	dom.fetch = () =>
+		respond( {
+			...full,
+			queries: [],
+			products: full.products.slice( 0, 2 ),
+		} );
+	type( 'kazumi dec' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.scope ).length,
+		2,
+		'they are not terms'
+	);
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.term ).length, 0 );
+
+	dom.fetch = () => respond( { ...ANSWER, scopes: 'x', queries: 'y' } );
+	type( 'kazumi deck' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'p11', 'p12', 'all' ],
+		'malformed lists are ignored'
+	);
+} );
+
+test( 'a product goes into the cart with Shift+Enter, only when the shop offers it', async () => {
+	const posts = [];
+	dom.fetch = ( url, init ) => {
+		if ( init?.method === 'POST' ) {
+			posts.push( { url, init } );
+			return respond( { fragments: {}, cart_hash: 'h' } );
+		}
+		return respond( PANEL );
+	};
+	type( 'kazumi' );
+	await settle();
+	assert.equal( scope.ctx.rows[ 2 ].cart, false, 'no endpoint: no cart' );
+	assert.equal( scope.ctx.rows[ 2 ].hint, null );
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'Enter', { shiftKey: true } ) );
+	assert.deepEqual( dom.assigned, [ '/p/11' ], 'Shift+Enter opens it' );
+	assert.equal( posts.length, 0 );
+	dom.assigned.length = 0;
+
+	scope.ctx = context( { cart: '/?wc-ajax=add_to_cart', events: true } );
+	window.dataLayer = [];
+	type( 'kazumi' );
+	await settle();
+	const ctx = scope.ctx;
+	const row = ctx.rows[ 2 ];
+	assert.equal( row.cart, true );
+	assert.equal( row.hint, `${ ctx.id }-cart-hint` );
+	assert.equal( row.price, 84.99 );
+	assert.equal(
+		ctx.rows[ 3 ].cart,
+		false,
+		'the second product needs a choice'
+	);
+	assert.equal( ctx.rows[ 3 ].price, null );
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'ArrowDown' ) );
+	const enter = key( 'Enter', { shiftKey: true } );
+	actions.keydown( enter );
+	assert.equal( enter.prevented, true );
+	await settle( 0 );
+	assert.equal( posts.length, 1 );
+	assert.equal( posts[ 0 ].url, '/?wc-ajax=add_to_cart' );
+	assert.equal( posts[ 0 ].init.method, 'POST' );
+	assert.equal( posts[ 0 ].init.credentials, 'same-origin' );
+	assert.equal(
+		posts[ 0 ].init.headers[ 'Content-Type' ],
+		'application/x-www-form-urlencoded; charset=UTF-8'
+	);
+	assert.equal( posts[ 0 ].init.headers.Accept, 'application/json' );
+	assert.equal( posts[ 0 ].init.body, 'product_id=11&quantity=1' );
+	assert.equal( ctx.live, 'KAZUMI Skate Deck, Dealer added to your cart.' );
+	assert.equal( ctx.open, true, 'the panel stays' );
+	assert.equal( dom.assigned.length, 0, 'the page stays' );
+	assert.equal(
+		dom.bodyEvents[ 0 ].type,
+		'wc-blocks_added_to_cart',
+		'no jQuery: the Mini-Cart block hears it'
+	);
+	assert.equal( dom.bodyEvents[ 0 ].bubbles, true );
+	assert.deepEqual( window.dataLayer.slice( -2 ), [
+		{ ecommerce: null },
+		{
+			event: 'add_to_cart',
+			ecommerce: {
+				items: [
+					{
+						item_id: '11',
+						item_name: 'KAZUMI Skate Deck, Dealer',
+						price: 84.99,
+						quantity: 1,
+					},
+				],
+				currency: 'CAD',
+				value: 84.99,
+			},
+		},
+	] );
+	assert.equal( dom.events.at( -1 ).type, 'csearch:add-to-cart' );
+	assert.deepEqual( dom.events.at( -1 ).detail, {
+		id: 11,
+		name: 'KAZUMI Skate Deck, Dealer',
+		quantity: 1,
+	} );
+
+	await actions.cart( { ...row, price: null } );
+	assert.deepEqual(
+		window.dataLayer.at( -1 ).ecommerce,
+		{
+			items: [
+				{
+					item_id: '11',
+					item_name: 'KAZUMI Skate Deck, Dealer',
+					quantity: 1,
+				},
+			],
+		},
+		'no price: no value'
+	);
+	ctx.currency = '';
+	await actions.cart( row );
+	assert.equal(
+		window.dataLayer.at( -1 ).ecommerce.value,
+		undefined,
+		'no currency: no value'
+	);
+
+	// Shift+Enter on a row that needs a choice opens it, as Enter does.
+	actions.keydown( key( 'ArrowDown' ) );
+	actions.keydown( key( 'Enter', { shiftKey: true } ) );
+	assert.deepEqual( dom.assigned, [ '/p/12' ] );
+} );
+
+test( 'a failed add says so, jQuery hears a success, and the cart page follows when the shop asks', async () => {
+	let answer = { error: true, product_url: '/p/11' };
+	dom.fetch = ( url, init ) =>
+		init?.method === 'POST' ? respond( answer ) : respond( PANEL );
+	scope.ctx = context( { cart: '/cart-endpoint' } );
+	type( 'kazumi' );
+	await settle();
+	const ctx = scope.ctx;
+	const row = ctx.rows[ 2 ];
+	await actions.cart( row );
+	assert.equal(
+		ctx.live,
+		'Could not add KAZUMI Skate Deck, Dealer to your cart.'
+	);
+	assert.equal( dom.bodyEvents.length, 0 );
+
+	ctx.live = '';
+	dom.fetch = ( url, init ) =>
+		init?.method === 'POST' ? respond( {}, false ) : respond( PANEL );
+	await actions.cart( row );
+	assert.equal(
+		ctx.live,
+		'Could not add KAZUMI Skate Deck, Dealer to your cart.',
+		'an error status'
+	);
+
+	ctx.live = '';
+	dom.fetch = () => Promise.reject( new Error( 'offline' ) );
+	await actions.cart( row );
+	assert.equal(
+		ctx.live,
+		'Could not add KAZUMI Skate Deck, Dealer to your cart.',
+		'no network'
+	);
+
+	answer = { fragments: { a: 1 }, cart_hash: 'h' };
+	dom.fetch = ( url, init ) =>
+		init?.method === 'POST' ? respond( answer ) : respond( PANEL );
+	const triggered = [];
+	window.jQuery = ( el ) => ( {
+		trigger: ( name, args ) => triggered.push( { el, name, args } ),
+	} );
+	ctx.cartPage = '/cart/';
+	await actions.cart( row );
+	assert.equal( triggered[ 0 ].el, document.body );
+	assert.equal( triggered[ 0 ].name, 'added_to_cart' );
+	assert.deepEqual( triggered[ 0 ].args, [ { a: 1 }, 'h', null ] );
+	assert.equal( dom.bodyEvents.length, 0, 'jQuery passes it on itself' );
+	assert.deepEqual( dom.assigned, [ '/cart/' ] );
+	assert.equal( dom.events.length, 0, 'events off: nothing told' );
+
+	const busy = actions.cart( row );
+	await actions.cart( row );
+	await busy;
+	assert.equal(
+		dom.assigned.length,
+		2,
+		'a second add while one is on its way is ignored'
+	);
+	await actions.cart( row );
+	assert.equal( dom.assigned.length, 3, 'and allowed once it is back' );
+	await actions.cart( { ...row, cart: false } );
+	await actions.cart( null );
+	assert.equal( dom.assigned.length, 3 );
+	ctx.cart = '';
+	await actions.cart( row );
+	assert.equal( dom.assigned.length, 3, 'no endpoint, no add' );
+} );
+
+test( 'the cart affordance takes the click from its row', async () => {
+	let posted = 0;
+	dom.fetch = ( url, init ) => {
+		posted += init?.method === 'POST' ? 1 : 0;
+		return respond( init?.method === 'POST' ? { fragments: {} } : PANEL );
+	};
+	scope.ctx = context( { cart: '/cart-endpoint' } );
+	type( 'kazumi' );
+	await settle();
+	scope.ctx.row = scope.ctx.rows[ 2 ];
+	const click = { stopped: false, prevented: false };
+	click.stopPropagation = () => ( click.stopped = true );
+	click.preventDefault = () => ( click.prevented = true );
+	actions.cartClick( click );
+	await settle( 0 );
+	assert.equal( click.stopped, true );
+	assert.equal( click.prevented, true );
+	assert.equal( posted, 1 );
+	assert.equal( dom.assigned.length, 0 );
+} );
+
+test( 'the page hears searches, choices and an empty panel when the shop asks', async () => {
+	window.dataLayer = [];
+	dom.fetch = () => respond( PANEL );
+	scope.ctx = context( { events: true } );
+	type( 'kazumi' );
+	await settle();
+	actions.submit( {} );
+	assert.equal( dom.events[ 0 ].type, 'csearch:search' );
+	assert.deepEqual( dom.events[ 0 ].detail, { query: 'kazumi' } );
+	assert.equal( dom.events[ 0 ].bubbles, true );
+	assert.deepEqual( window.dataLayer[ 0 ], {
+		event: 'search',
+		search_term: 'kazumi',
+	} );
+
+	type( 'kazumi' );
+	await settle();
+	actions.pick( scope.ctx.rows[ 2 ], input );
+	assert.equal( dom.events.at( -1 ).type, 'csearch:select' );
+	assert.deepEqual( dom.events.at( -1 ).detail, {
+		query: 'kazumi',
+		type: 'product',
+		id: 11,
+		name: 'KAZUMI Skate Deck, Dealer',
+		url: '/p/11',
+		position: 2,
+	} );
+	assert.deepEqual( window.dataLayer.slice( -2 ), [
+		{ ecommerce: null },
+		{
+			event: 'select_item',
+			ecommerce: {
+				item_list_id: 'csearch_suggestions',
+				item_list_name: 'Search suggestions',
+				items: [
+					{
+						item_id: '11',
+						item_name: 'KAZUMI Skate Deck, Dealer',
+						price: 84.99,
+						index: 2,
+					},
+				],
+			},
+		},
+	] );
+
+	type( 'kazumi' );
+	await settle();
+	actions.pick( scope.ctx.rows[ 5 ], input );
+	assert.deepEqual( window.dataLayer.at( -1 ), {
+		event: 'select_content',
+		content_type: 'brand',
+		content_id: '5',
+	} );
+	type( 'kazumi' );
+	await settle();
+	actions.pick( scope.ctx.rows[ 4 ], input );
+	assert.deepEqual( window.dataLayer.at( -1 ), {
+		event: 'select_content',
+		content_type: 'scope',
+		content_id: '31',
+	} );
+	assert.equal( dom.events.at( -1 ).detail.type, 'scope' );
+	assert.equal( dom.events.at( -1 ).detail.id, 31 );
+	type( 'kazumi' );
+	await settle();
+	actions.pick( scope.ctx.rows[ 3 ], input );
+	assert.deepEqual( window.dataLayer.at( -1 ).ecommerce.items[ 0 ], {
+		item_id: '12',
+		item_name: 'KAZUMI Skate Deck, Ghost Tiger',
+		index: 3,
+	} );
+
+	dom.fetch = () =>
+		respond( {
+			...ANSWER,
+			products: [],
+			terms: [],
+			total: 0,
+			query: 'zzzz',
+		} );
+	type( 'zzzz' );
+	await settle();
+	assert.equal( dom.events.at( -1 ).type, 'csearch:no-results' );
+	assert.deepEqual( dom.events.at( -1 ).detail, { query: 'zzzz' } );
+	assert.deepEqual( window.dataLayer.at( -1 ), {
+		event: 'csearch_no_results',
+		search_term: 'zzzz',
+	} );
+	const told = dom.events.length;
+	type( 'zzz' );
+	type( 'zzzz' );
+	await settle();
+	assert.equal(
+		dom.events.length,
+		told,
+		'the same empty answer is told once'
+	);
+
+	actions.clear();
+	actions.submit( {} );
+	assert.equal( dom.events.length, told, 'an empty field is no search' );
+} );
+
+test( 'with the setting off, or no dataLayer, the page hears only what it asked for', async () => {
+	dom.fetch = () => respond( PANEL );
+	type( 'kazumi' );
+	await settle();
+	actions.submit( {} );
+	actions.pick( scope.ctx.rows[ 2 ] || {}, input );
+	assert.equal( dom.events.length, 0 );
+	assert.equal( window.dataLayer, undefined );
+
+	scope.ctx = context( { events: true } );
+	window.dataLayer = { push: () => assert.fail( 'not an array' ) };
+	type( 'kazumi' );
+	await settle();
+	actions.submit( {} );
+	assert.equal( dom.events.length, 1, 'the form event still fires' );
+
+	const CustomEvent = window.CustomEvent;
+	window.CustomEvent = undefined;
+	window.dataLayer = [];
+	actions.submit( {} );
+	window.CustomEvent = CustomEvent;
+	assert.equal(
+		window.dataLayer.length,
+		1,
+		'a browser without CustomEvent still tells the dataLayer'
+	);
+	assert.equal( dom.events.length, 1 );
+} );
+
+test( 'to fit, a suggested search gives way before any product', async () => {
+	window.innerHeight = 290;
+	dom.fetch = () => respond( { ...PANEL, scopes: [], terms: [] } );
+	type( 'kazumi' );
+	const ctx = scope.ctx;
+	const { panel, run } = measuredPanel( ctx );
+	panel.hidden = false;
+	panel.shown = true;
+	await settle();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'p11', 'p12', 'all' ],
+		'both searches gave way, the last first'
+	);
+	dom.fetch = () => respond( { ...PANEL, scopes: [] } );
+	window.innerHeight = 410;
+	type( 'kazumi ' );
+	await settle();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'qkazumi deck', 'qkazumi dealer', 'p11', 'p12', 'all' ],
+		'the brand went before any search'
+	);
+	window.innerHeight = 800;
+	delete window.requestAnimationFrame;
+	delete window.ResizeObserver;
+} );
+
+test( 'a suggested search and a search within a category mark what they add', () => {
+	scope.ctx = context( {
+		answered: 'kaz',
+		row: { query: true, name: 'kazumi deck' },
+	} );
+	const ref = {
+		replaceChildren: ( ...nodes ) => ( ref.nodes = nodes ),
+	};
+	scope.ref = ref;
+	document.createTextNode = ( text ) => ( { text } );
+	const create = document.createElement;
+	document.createElement = ( tag ) => ( { tag, textContent: '' } );
+	callbacks.name();
+	assert.deepEqual(
+		ref.nodes.map( ( n ) => n.text ?? `<${ n.textContent }>` ),
+		[ 'kaz', '<umi>', ' ', '<deck>' ]
+	);
+	scope.ctx.row = { scope: true, name: 'kazumi in Decks' };
+	scope.ctx.answered = 'kazumi';
+	callbacks.name();
+	assert.deepEqual(
+		ref.nodes.map( ( n ) => n.text ?? `<${ n.textContent }>` ),
+		[ 'kazumi ', '<in>', ' ', '<Decks>' ]
+	);
+	document.createElement = create;
 } );

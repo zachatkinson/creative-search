@@ -6,6 +6,8 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 
 **Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` the suggestion panel's defaults, `category_redirect` and `filter_attributes`; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`) and `hidden_by_sku`; the Redirects and pins tab sets `query_redirects` and `pinned_products` (also `wp csearch redirect` and `wp csearch pin`). `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
 
+**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` the suggestion panel's defaults, `category_redirect` and `filter_attributes`, and (under "Suggestions", for every search bar) `suggest_queries`, `suggest_scopes`, `suggest_cart` and `analytics_events`; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`) and `hidden_by_sku`. `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
+
 ## What to index
 
 | Key | Default | Range | Meaning |
@@ -50,7 +52,7 @@ Both on the Tools tab, under "Results page".
 
 ## The suggestion panel's defaults
 
-A block instance can override each of these; they are the defaults for new blocks, the shortcode and the widget.
+A block instance can override each of these but the last four (1.3), which apply to every search bar; they are the defaults for new blocks, the shortcode and the widget.
 
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
@@ -65,6 +67,10 @@ A block instance can override each of these; they are the defaults for new block
 | `panel_position` | `auto` | auto, below, above | `auto` opens below, and above on a phone when the keyboard would cover it. |
 | `recent_searches` | `no` | yes/no | The shopper's last 5 searches, in their browser only. Off by default for privacy (D-004). |
 | `theme_form_takeover` | `no` | yes/no | Replace a classic theme's `get_search_form()` with the block's form. |
+| `suggest_queries` | `yes` | yes/no | Up to 3 searches other shoppers made above the products (2 on a phone), from the search log: each made 3 times or more in the retention window, from the results page or with a suggestion chosen, that found products, starts with what is typed (3 characters or more), and has every word in the index (D-112). Filter: `csearch_suggested_searches`. |
+| `suggest_scopes` | `yes` | yes/no | Up to 2 "kazumi in Decks" rows after the products: the categories holding at least 2 of the first 10 ranked products, each a link to the search with WooCommerce's `product_cat` parameter (D-113). |
+| `suggest_cart` | `no` | yes/no | Add to cart from the panel for a simple product that is purchasable, in stock and needs no choice: a small "Add" at the row's end, and Shift+Enter on the chosen row (D-115). Uses WooCommerce's own add-to-cart endpoint; honours "Redirect to the cart page after successful addition". |
+| `analytics_events` | `yes` | yes/no | The `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` events on the form, and the matching Google Analytics events on the page's `dataLayer` when it has one (D-116). Nothing is sent anywhere by the plugin. |
 
 A block or shortcode also takes `mode` (`field`, the default, or `button`: an icon that opens the same form in a modal dialog, full screen on a phone; D-099). It is set per instance, with no site-wide setting.
 

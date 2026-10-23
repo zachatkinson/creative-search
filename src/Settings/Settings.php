@@ -121,6 +121,12 @@ final class Settings {
 			'panel_position'               => self::PANEL_AUTO,
 			'recent_searches'              => 'no',
 			'theme_form_takeover'          => 'no',
+			// The panel's extras (1.3): suggested searches (D-112), categories to search within (D-113), add to cart
+			// (D-115, off: a shop chooses it), and the browser events an analytics tag can listen to (D-116).
+			'suggest_queries'              => 'yes',
+			'suggest_scopes'               => 'yes',
+			'suggest_cart'                 => 'no',
+			'analytics_events'             => 'yes',
 			// Analytics.
 			'retention_days'               => self::RETENTION_DEFAULT,
 			'stats'                        => array(),
@@ -238,7 +244,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}

@@ -35,6 +35,19 @@ All notable changes to this project are documented here. The format follows [Kee
 - A synonym whose meaning is several words now means that phrase as a whole, not each of its words: "deck" meaning "skateboard deck" no longer makes "skateboard" alone match "deck" (D-109, superseding D-029).
 - The Synonyms tab's test box is "Test a search" and takes several words.
 
+## [1.3.0] - unreleased
+
+### Added
+- Suggested searches in the panel: up to three past searches that start with what is typed, each searched at least three times, found something and every word still in the catalogue (two on a phone). Setting `suggest_queries` (on), filter `csearch_suggested_searches` (D-112).
+- Category scopes in the panel: "kazumi in Decks", up to two categories holding most of the first ten products, each the search within that category (`product_cat`). Setting `suggest_scopes` (on) (D-113).
+- Add to cart from the panel for products that need no choice: a pointer "Add" on the row and Shift+Enter from the keyboard, through WooCommerce's own `wc-ajax=add_to_cart`. Setting `suggest_cart` (off) (D-115).
+- Analytics events: `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` on the form, and the GA4 `search`, `select_item`, `select_content`, `add_to_cart` and `csearch_no_results` on an existing `dataLayer`. Setting `analytics_events` (on) (D-116).
+- The suggest answer carries `queries`, `scopes`, and each product's `price` and `cart`.
+- A "Suggestions" section on the Tools tab for the four settings.
+
+### Changed
+- A search found through a typo says "Showing results for “kazumi dealer”." on the results page, in the panel, on the Tools tab and in `wp csearch search`, with no "search instead" link unless a word was also left out. `SearchResult` gains `dropped` (D-114).
+
 ## [1.2.0] - 2026-10-22
 
 Items 9 to 11 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md).

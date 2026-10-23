@@ -13,8 +13,9 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The ranked products, the categories, tags and brands that match, the corrected query when a token was
- * dropped, the language that answered (spec: The search API), and the terms each kept token reached with the
- * query's key, so a result can say which of its variations and values matched (D-104, D-105).
+ * dropped or a typo was read as the word it is closest to, the language that answered (spec: The search API), and
+ * the terms each kept token reached with the query's key, so a result can say which of its variations and values
+ * matched (D-104, D-105).
  */
 final class SearchResult {
 
@@ -24,9 +25,12 @@ final class SearchResult {
 	 * @param Hit[]                $products  Products in rank order.
 	 * @param Hit[]                $terms     Categories, tags and brands in rank order.
 	 * @param string               $lang      The language whose documents answered.
-	 * @param string|null          $corrected The query the results are for when a token was dropped, else null.
-	 * @param array<int, string[]> $tokens The terms each token the results answer reached, by token index.
-	 * @param string               $key    The folded tokens of the query the results answer, joined by a space.
+	 * @param string|null          $corrected The query the results are for when a token was dropped or a typo
+	 *                                        corrected, else null.
+	 * @param array<int, string[]> $tokens    The terms each token the results answer reached, by token index.
+	 * @param string               $key       The folded tokens of the query the results answer, joined by a space.
+	 * @param bool                 $dropped   Whether a token was dropped: only then do the shopper's exact words
+	 *                                        find something else ("search instead for", D-114).
 	 */
 	public function __construct(
 		public readonly array $products,
@@ -34,7 +38,8 @@ final class SearchResult {
 		public readonly string $lang,
 		public readonly ?string $corrected = null,
 		public readonly array $tokens = array(),
-		public readonly string $key = ''
+		public readonly string $key = '',
+		public readonly bool $dropped = false
 	) {
 	}
 

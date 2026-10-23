@@ -259,6 +259,20 @@ final class DocumentRepository extends Repository {
 	}
 
 	/**
+	 * The categories of some products, as assigned (category-scope suggestions, D-113).
+	 *
+	 * @param int[] $productIds Product ids.
+	 * @return array<int, int[]> Product id to category ids.
+	 */
+	public function categoriesOf( array $productIds ): array {
+		$out = array();
+		foreach ( $this->termRefs( $productIds, array( 'product_cat' => Document::CATEGORY ) ) as $productId => $refs ) {
+			$out[ $productId ] = array_map( static fn( string $ref ): int => (int) substr( $ref, strlen( Document::CATEGORY ) + 1 ), $refs );
+		}
+		return $out;
+	}
+
+	/**
 	 * Refresh the table's index statistics after a reindex has rewritten it (D-089).
 	 */
 	public function analyze(): void {
