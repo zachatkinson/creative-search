@@ -60,6 +60,13 @@ tests_add_filter(
 	}
 );
 
+// WooCommerce keeps its product visibility term ids in a static unless its own test bootstrap is loaded. The core
+// suite deletes every term after each test class, so a later class would read ids that no longer exist and show a
+// product hidden from search. Declaring the class turns that cache off, as WooCommerce's own suite does.
+if ( ! class_exists( 'WC_Unit_Tests_Bootstrap' ) ) {
+	final class WC_Unit_Tests_Bootstrap {} // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound, Squiz.Classes.ClassFileName.NoMatch, Generic.Classes.OpeningBraceSameLine.ContentAfterBrace
+}
+
 tests_add_filter(
 	'setup_theme',
 	static function (): void {

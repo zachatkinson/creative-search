@@ -1,6 +1,11 @@
 /*
  * The search block. Every colour, radius and length is a custom property that inherits the theme's
  * presets, so a dark theme and a right-to-left site need no override; logical properties throughout.
+ *
+ * Colour hooks a site may set anywhere (on :root, a header, the block), each falling back to today's look
+ * (D-128): --csearch-field-bg, --csearch-field-fg, --csearch-panel-bg, --csearch-panel-fg,
+ * --csearch-submit-bg, --csearch-submit-fg and --csearch-focus-ring. They are read where they are used,
+ * never declared here, so a value set on an ancestor is not overridden.
  */
 .wp-block-creative-search-search {
 	--csearch-bg: var(--wp--preset--color--base, #fff);
@@ -41,16 +46,27 @@
 	margin-block-end: calc(var(--csearch-gap) / 2);
 }
 
+/* "Only in Decks" above the field on a category page (D-117): a tap target of 44 px, the box beside its words. */
+.csearch-scope {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--csearch-gap) / 2);
+	min-block-size: 44px;
+	cursor: pointer;
+}
+
 .csearch-field {
 	display: flex;
 	align-items: stretch;
-	background: var(--csearch-bg);
+	color: var(--csearch-field-fg, inherit);
+	background: var(--csearch-field-bg, var(--csearch-bg));
 	border: 1px solid var(--csearch-border);
 	border-radius: var(--csearch-radius);
 }
 
+/* The field's one focus indicator: the input itself draws none (D-125). */
 .csearch-field:focus-within {
-	outline: 2px solid currentcolor;
+	outline: 2px solid var(--csearch-focus-ring, currentcolor);
 	outline-offset: 1px;
 }
 
@@ -72,6 +88,41 @@
 	outline: none;
 }
 
+/*
+ * Themes style input[type="text"] and input:focus more specifically than one class (Kadence: a background, a
+ * border, a radius, padding and a focus shadow), which drew a second box inside the field and stacked focus
+ * rings. Scoped under the block and its field, these win over such selectors without !important (D-125).
+ * Field mode only; the dialog's field is unchanged.
+ */
+.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input,
+.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input:hover,
+.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input:focus,
+.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input:focus-visible {
+	inline-size: auto;
+	max-inline-size: none;
+	block-size: auto;
+	min-block-size: var(--csearch-row);
+	margin: 0;
+	padding-block: 0;
+	padding-inline: var(--csearch-gap);
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	outline: none;
+	box-shadow: none;
+	appearance: none;
+}
+
+/* At least 16px on a touch screen, so iOS does not zoom the page when the field takes focus. */
+@media (pointer: coarse) {
+
+	.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input {
+		font-size: max(16px, 1em);
+	}
+}
+
 .csearch-clear,
 .csearch-submit {
 	display: inline-flex;
@@ -89,9 +140,14 @@
 	border-radius: var(--csearch-radius);
 }
 
+.csearch-submit {
+	color: var(--csearch-submit-fg, inherit);
+	background: var(--csearch-submit-bg, transparent);
+}
+
 .csearch-clear:focus-visible,
 .csearch-submit:focus-visible {
-	outline: 2px solid currentcolor;
+	outline: 2px solid var(--csearch-focus-ring, currentcolor);
 	outline-offset: -4px;
 }
 
@@ -100,16 +156,30 @@
 }
 
 .csearch-panel {
+
+	/* The panel's own tints follow its colour hooks, so a dark panel keeps readable rows. */
+	--csearch-highlight: color-mix(in srgb, var(--csearch-panel-fg, var(--csearch-fg)) 9%, var(--csearch-panel-bg, var(--csearch-bg)));
+	--csearch-muted: color-mix(in srgb, var(--csearch-panel-fg, var(--csearch-fg)) 65%, var(--csearch-panel-bg, var(--csearch-bg)));
 	position: absolute;
 	inset-inline: 0;
 	inset-block-start: 100%;
 	z-index: 50;
 	margin-block-start: calc(var(--csearch-gap) / 2);
-	color: var(--csearch-fg);
-	background: var(--csearch-bg);
+	color: var(--csearch-panel-fg, var(--csearch-fg));
+	background: var(--csearch-panel-bg, var(--csearch-bg));
 	border: 1px solid var(--csearch-border);
 	border-radius: var(--csearch-radius);
 	box-shadow: var(--csearch-shadow);
+}
+
+/*
+ * In a fixed or sticky header, or on a touch screen, the panel is capped to the room left in the visible
+ * viewport (its max-height set by the view) and scrolls inside itself, never the page behind it (D-126).
+ */
+.csearch-panel.is-capped {
+	box-sizing: border-box; /* The cap is the room measured, border included (D-126). */
+	overflow-y: auto;
+	overscroll-behavior: contain;
 }
 
 .csearch-panel.is-above {
@@ -159,6 +229,9 @@
 }
 
 .csearch-option.is-active {
+
+	/* The tint costs the secondary text contrast: 65 % falls to 4.34:1 on it with the default colours. */
+	--csearch-muted: color-mix(in srgb, var(--csearch-panel-fg, var(--csearch-fg)) 78%, var(--csearch-panel-bg, var(--csearch-bg)));
 	background: var(--csearch-highlight);
 	border-inline-start-color: currentcolor;
 }
@@ -204,6 +277,15 @@
 	color: var(--csearch-muted);
 }
 
+/* What matched when the row does not show it (D-105): one muted line under the name. */
+.csearch-matched {
+	overflow: hidden;
+	font-size: 0.875em;
+	color: var(--csearch-muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .csearch-stock::before {
 	display: inline-block;
 	inline-size: 0.5em;
@@ -235,6 +317,44 @@
 
 .csearch-corrected {
 	font-style: italic;
+}
+
+/* Suggested searches (D-112) and searches within a category (D-113): a search icon before the words. */
+.csearch-option-query::before,
+.csearch-option-scope::before {
+	flex: none;
+	inline-size: 1.25em;
+	block-size: 1.25em;
+	content: "";
+	background-color: var(--csearch-muted);
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 3a7 7 0 1 0 4.2 12.6l5.6 5.6 1.4-1.4-5.6-5.6A7 7 0 0 0 10 3Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z'/%3E%3C/svg%3E")
+		center / contain no-repeat;
+}
+
+/* Add to cart, for a pointer (D-115): at the row's end, a target as tall as the row. */
+.csearch-cart {
+	display: inline-flex;
+	flex: none;
+	gap: 0.25em;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: 44px;
+	min-block-size: 44px;
+	margin-inline-start: auto;
+	padding-inline: var(--csearch-gap);
+	font-size: 0.875em;
+	color: var(--csearch-fg);
+	cursor: pointer;
+	border: 1px solid var(--csearch-border);
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-cart:hover {
+	background: var(--csearch-highlight);
+}
+
+.csearch-cart[hidden] {
+	display: none;
 }
 
 /* The page dims behind the open panel (D-097); the form sits above it. */

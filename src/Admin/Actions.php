@@ -15,6 +15,7 @@ use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\Languages;
 use CreativeBranding\Search\Index\Reindex;
 use CreativeBranding\Search\Search\Cache;
+use CreativeBranding\Search\Search\OwnerRules;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Clock;
@@ -39,6 +40,7 @@ final class Actions {
 	public const SYNONYM_EXPORT   = 'csearch_synonym_export';
 	public const ANALYTICS_EXPORT = 'csearch_analytics_export';
 	public const BOOSTS_SAVE      = 'csearch_boosts_save';
+	public const RULES_SAVE       = 'csearch_rules_save';
 	public const TOOLS_SAVE       = 'csearch_tools_save';
 	public const REINDEX          = 'csearch_reindex';
 	public const REINDEX_CANCEL   = 'csearch_reindex_cancel';
@@ -57,7 +59,7 @@ final class Actions {
 	/**
 	 * Settings the Tools tab saves: yes/no flags, then numbers and text.
 	 */
-	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect' );
+	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events' );
 	public const TOOLS_VALUES = array( 'retention_days', 'suggest_limit', 'suggest_terms', 'min_chars', 'placeholder', 'panel_position', 'filter_attributes' );
 
 	/**
@@ -74,6 +76,7 @@ final class Actions {
 	 * @param IndexQueue      $queue     One product's reindex.
 	 * @param Languages       $languages The indexed languages.
 	 * @param AnalyzerFactory $analyzers The analyzer, rebuilt when stop words change.
+	 * @param OwnerRules      $rules     Redirects and pinned products.
 	 */
 	public function __construct(
 		private SynonymService $synonyms,
@@ -81,7 +84,8 @@ final class Actions {
 		private Reindex $reindex,
 		private IndexQueue $queue,
 		private Languages $languages,
-		private AnalyzerFactory $analyzers
+		private AnalyzerFactory $analyzers,
+		private OwnerRules $rules
 	) {
 	}
 
@@ -98,6 +102,7 @@ final class Actions {
 			self::SYNONYM_EXPORT   => 'exportSynonyms',
 			self::ANALYTICS_EXPORT => 'exportLog',
 			self::BOOSTS_SAVE      => 'saveBoosts',
+			self::RULES_SAVE       => 'saveRules',
 			self::TOOLS_SAVE       => 'saveTools',
 			self::REINDEX          => 'rebuild',
 			self::REINDEX_CANCEL   => 'cancel',
@@ -302,6 +307,53 @@ final class Actions {
 	}
 
 	/**
+	 * Save the Redirects and pins tab: the rules ticked for removal go, then the new redirect and the new pins are
+	 * added, each when its search is filled in (D-108, D-110).
+	 *
+	 * @param array<string, mixed> $input The form.
+	 */
+	public function saveRules( array $input ): string {
+		$this->rules->remove( OwnerRules::REDIRECTS, self::indexes( $input['redirect_remove'] ?? null ) );
+		$this->rules->remove( OwnerRules::PINS, self::indexes( $input['pin_remove'] ?? null ) );
+		try {
+			if ( '' !== trim( Cast::str( $input['redirect_query'] ?? '' ) ) ) {
+				$this->rules->addRedirect( Cast::str( $input['redirect_query'] ), Cast::str( $input['redirect_lang'] ?? '' ), Cast::str( $input['redirect_url'] ?? '' ) );
+			}
+			if ( '' !== trim( Cast::str( $input['pin_query'] ?? '' ) ) ) {
+				$this->rules->addPins( Cast::str( $input['pin_query'] ), Cast::str( $input['pin_lang'] ?? '' ), self::products( Cast::str( $input['pin_products'] ?? '' ) ) );
+			}
+		} catch ( PluginException $e ) {
+			Notices::flash( 'error', $e->getMessage() . ( '' !== self::$warning ? ' ' . self::$warning : '' ) );
+			self::$warning = '';
+			return AdminPage::url( 'rules' );
+		}
+		$message = __( 'Redirects and pins saved. Searches use them now.', 'creative-search' );
+		if ( '' !== self::$warning ) {
+			Notices::flash( 'warning', $message . ' ' . self::$warning );
+			self::$warning = '';
+			return AdminPage::url( 'rules' );
+		}
+		Notices::flash( 'success', $message );
+		return AdminPage::url( 'rules' );
+	}
+
+	/**
+	 * Places in a list from a form, the first being 0; anything else dropped.
+	 *
+	 * @param mixed $raw The field.
+	 * @return int[]
+	 */
+	private static function indexes( mixed $raw ): array {
+		$out = array();
+		foreach ( is_array( $raw ) ? $raw : array() as $index ) {
+			if ( is_string( $index ) && ctype_digit( $index ) ) {
+				$out[] = (int) $index;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Save the Tools tab's settings and stop words.
 	 *
 	 * @param array<string, mixed> $input The form.
@@ -317,6 +369,9 @@ final class Actions {
 				$changes[ $key ] = $input[ $key ];
 			}
 		}
+		if ( isset( $input['custom_fields'] ) || isset( $input['custom_fields_other'] ) ) {
+			$changes['custom_fields'] = self::metaKeys( $input['custom_fields'] ?? array(), $input['custom_fields_other'] ?? '' );
+		}
 		$after = Settings::update( $changes );
 		foreach ( $this->languages->codes() as $lang ) {
 			if ( isset( $input['stopwords'] ) && is_array( $input['stopwords'] ) && array_key_exists( $lang, $input['stopwords'] ) ) {
@@ -329,6 +384,7 @@ final class Actions {
 		foreach ( self::INDEX_FLAGS as $flag ) {
 			$rebuild = $rebuild || $before[ $flag ] !== $after[ $flag ];
 		}
+		$rebuild = $rebuild || $before['custom_fields'] !== $after['custom_fields'];
 		foreach ( ContentReader::TYPES as $postType => [ , $flag ] ) {
 			if ( $before[ $flag ] !== $after[ $flag ] ) {
 				$this->queue->contentType( $postType ); // Indexed or removed in jobs; no rebuild needed (D-093).
@@ -341,6 +397,23 @@ final class Actions {
 				: __( 'Settings saved.', 'creative-search' )
 		);
 		return AdminPage::url( 'tools' );
+	}
+
+	/**
+	 * The custom fields from the Tools tab (D-119): the boxes ticked, then the other names typed, separated by
+	 * commas or new lines; sanitised by the settings.
+	 *
+	 * @param mixed $ticked The boxes.
+	 * @param mixed $typed  The other names.
+	 * @return string[]
+	 */
+	public static function metaKeys( mixed $ticked, mixed $typed ): array {
+		$keys  = Cast::strings( is_array( $ticked ) ? $ticked : array() );
+		$parts = preg_split( '/[\s,]+/', Cast::str( $typed ) );
+		foreach ( is_array( $parts ) ? $parts : array() as $key ) {
+			$keys[] = $key;
+		}
+		return Settings::sanitizeMetaKeys( $keys );
 	}
 
 	/**
@@ -414,24 +487,22 @@ final class Actions {
 	private static function fallback( array $input ): array {
 		$kept    = Settings::sanitizeIds( isset( $input['fallback_products'] ) && is_array( $input['fallback_products'] ) ? $input['fallback_products'] : array() );
 		$removed = Settings::sanitizeIds( isset( $input['fallback_remove'] ) && is_array( $input['fallback_remove'] ) ? $input['fallback_remove'] : array() );
-		$ids     = array_values( array_diff( $kept, $removed ) );
-		$unknown = array();
-		foreach ( array_filter( array_map( 'trim', explode( ',', sanitize_text_field( Cast::str( $input['fallback_add'] ?? '' ) ) ) ) ) as $ref ) {
-			$id = wc_get_product_id_by_sku( $ref );
-			if ( 0 === $id && ctype_digit( $ref ) && wc_get_product( (int) $ref ) instanceof \WC_Product ) {
-				$id = (int) $ref;
-			}
-			if ( $id > 0 ) {
-				$ids[] = $id;
-			} else {
-				$unknown[] = $ref;
-			}
-		}
-		if ( array() !== $unknown ) {
+		return Settings::sanitizeIds( array_merge( array_values( array_diff( $kept, $removed ) ), self::products( Cast::str( $input['fallback_add'] ?? '' ) ) ) );
+	}
+
+	/**
+	 * Products from a list of SKUs or ids separated by commas, in order (one not found is reported in the notice).
+	 *
+	 * @param string $refs The list.
+	 * @return int[]
+	 */
+	private static function products( string $refs ): array {
+		$found = OwnerRules::products( explode( ',', $refs ) );
+		if ( array() !== $found['unknown'] ) {
 			/* translators: %s: the SKUs or ids not found */
-			self::$warning = sprintf( __( 'No product has the SKU or ID %s.', 'creative-search' ), wp_sprintf_l( '%l', $unknown ) );
+			self::$warning = sprintf( __( 'No product has the SKU or ID %s.', 'creative-search' ), wp_sprintf_l( '%l', $found['unknown'] ) );
 		}
-		return Settings::sanitizeIds( $ids );
+		return $found['ids'];
 	}
 
 	/**

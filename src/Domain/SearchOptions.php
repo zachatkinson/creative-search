@@ -30,6 +30,10 @@ final class SearchOptions {
 	 *                                         token (off for "search instead for", the shopper's exact words).
 	 * @param int                $kind         What is ranked: the products ({@see Kind::PRODUCT}) or the posts and
 	 *                                         pages ({@see Kind::CONTENT}, D-093).
+	 * @param bool               $strict       Strong matches only (D-118): each word as typed, its spellings, stem and
+	 *                                         synonyms, never a word it begins or a typo's neighbour.
+	 * @param int[]              $scope        Products of these term-taxonomy ids only (a category and its subcategories,
+	 *                                         D-117); none limits nothing.
 	 */
 	public function __construct(
 		public readonly array $weights = array(),
@@ -39,7 +43,9 @@ final class SearchOptions {
 		public readonly int $limit = 500,
 		public readonly int $termLimit = 3,
 		public readonly bool $retry = true,
-		public readonly int $kind = Kind::PRODUCT
+		public readonly int $kind = Kind::PRODUCT,
+		public readonly bool $strict = false,
+		public readonly array $scope = array()
 	) {
 	}
 

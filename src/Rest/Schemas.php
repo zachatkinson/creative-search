@@ -42,11 +42,32 @@ final class Schemas {
 							),
 							'image'      => array( 'type' => array( 'object', 'null' ) ),
 							'price_html' => array( 'type' => 'string' ),
+							'price'      => array( 'type' => array( 'number', 'null' ) ),
 							'in_stock'   => array( 'type' => 'boolean' ),
 							'type'       => array( 'type' => 'string' ),
 							'classes'    => array(
 								'type'  => 'array',
 								'items' => array( 'type' => 'string' ),
+							),
+							'matched'    => array( 'type' => 'string' ),
+							'cart'       => array( 'type' => 'boolean' ),
+						),
+					),
+				),
+				'queries'   => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'scopes'    => array(
+					'type'  => 'array',
+					'items' => array(
+						'type'       => 'object',
+						'properties' => array(
+							'id'   => array( 'type' => 'integer' ),
+							'name' => array( 'type' => 'string' ),
+							'url'  => array(
+								'type'   => 'string',
+								'format' => 'uri',
 							),
 						),
 					),

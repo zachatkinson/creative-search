@@ -166,6 +166,35 @@ final class LogRepository extends Repository {
 	}
 
 	/**
+	 * Past searches that start with some text and found something, the most searched first (suggested searches,
+	 * D-112): from the results page, or from the panel when the shopper chose a suggestion, so the words typed on
+	 * the way to a search are never counted. A prefix range on the `normalised` key.
+	 *
+	 * @param string $prefix  The normalised text typed.
+	 * @param string $lang    Language code.
+	 * @param string $since   UTC `Y-m-d H:i:s`.
+	 * @param int    $minimum Searches a query needs.
+	 * @param int    $limit   At most.
+	 * @return string[] Normalised queries.
+	 */
+	public function completions( string $prefix, string $lang, string $since, int $minimum, int $limit ): array {
+		global $wpdb;
+		$rows = $this->rows(
+			$this->prepare(
+				'SELECT normalised, COUNT(*) AS searches FROM %i WHERE normalised LIKE %s AND lang = %s AND created_at >= %s AND results > 0 AND (source = %s OR clicked_type IS NOT NULL) GROUP BY normalised HAVING COUNT(*) >= %d ORDER BY searches DESC, normalised ASC LIMIT %d',
+				Tables::log(),
+				$wpdb->esc_like( $prefix ) . '%',
+				$lang,
+				$since,
+				'page',
+				$minimum,
+				$limit
+			)
+		);
+		return array_map( static fn( array $row ): string => (string) $row['normalised'], $rows );
+	}
+
+	/**
 	 * How many distinct queries since a time.
 	 *
 	 * @param string $since    UTC `Y-m-d H:i:s`.

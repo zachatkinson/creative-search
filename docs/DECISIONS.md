@@ -172,6 +172,8 @@ A synonym's `word` must tokenise to exactly one token (after folding and stop-wo
 
 **Why:** The index has one term per posting, so a multi-word `word` would need a phrase search per synonym on every query; the owner can enter the reverse row instead. Multi-word `means` is the common shape (`deck` → `skateboard deck`) and costs nothing. Searching the synonym's stem keeps `trucks` ⇄ `axles` working when the product says `axle`.
 
+**Superseded by D-109 (1.3):** either side may now be several words, matched as a phrase; a one-word row works as described here.
+
 ### D-030 · Branch coverage measured by mutation; the ABSPATH guard on one line · 2026-10-21
 
 The spec's "100 % line, branch and mutation coverage on `src/Domain`" is met as line coverage from pcov (`tools/coverage-floor.php`, floor 100 % on `src/Domain`) and mutation coverage from Infection (`infection-domain.json5`, MSI and covered MSI 100 %). pcov does not record branches; Xdebug's branch coverage would need the slower driver on every run and a different report format. A killed mutant on every condition is a stronger statement than a visited branch. Each Domain file's `defined( 'ABSPATH' ) || exit;` is written on one line so pcov does not report the `exit` branch as uncovered; it is a load guard, not WordPress code.
@@ -331,6 +333,8 @@ Answers are kept with `wp_cache_set()` under a key of the live generation, a sal
 
 **Spec deviation, flagged for Zach:** the spec's Compatibility line says "with and without a persistent object cache (transients fall back)". Without one, answers are not shared between requests and the rate limit does not hold. The rate limit's client key trusts a WooCommerce session cookie only when its HMAC verifies (a forged cookie per request would otherwise buy a new bucket each time), and `csearch_client_ip` lets a site behind a proxy supply the shopper's address.
 
+**Checked 2026-10-23 on Redis:** with Redis 7.4 and Redis Object Cache (Predis) on wp-env, a second `/suggest` was served from Redis (141 ms, then 46 ms, keyspace hits up); a reindex moved the answers to the new generation's keys (`g27-…` to `g28-…`); a synonym added through WP-CLI applied on the next request; the 31st request in ten seconds was answered 429 with `Retry-After`; and the shopper's browser tests (search block, panel, results, the handoff checks, the sticky header) passed with Redis on, 78 of 78. Redis and the plugin were removed after; nothing was added to the project.
+
 **Settled 2026-10-22 (Skatehouse handoff):** the open question is closed. Redis Object Cache is installed and connected on the Skatehouse demo (its comment closes every page, checked 22 October), so the answer is the persistent object cache, as Zach said; the spec's transient fallback does not come back. The demo has no page cache yet; one is on Skatehouse's go-live list, and the block's server render stays free of nonces and anything per user or time-limited so a page cached for days still searches (handoff item 4).
 
 ### D-052 · A click finds its log row by query, not by id · 2026-10-21
@@ -371,9 +375,11 @@ The milestone 3 review's fixes (the store interface, the container's hook list, 
 
 ### D-057 · How the results page is changed, in classic and block themes · 2026-10-21
 
-The plugin ranks the main query of a product search (`post_type=product`, WooCommerce's own search form and the block's) and nothing else. It hooks `pre_get_posts` at priority 20, after WooCommerce, sets `post__in` to the ranked ids (or `array( 0 )` when there are none) and removes the `posts_search` clause for that query. WooCommerce already makes "Relevance" the first entry and the default sort on a search; the plugin maps it to `post__in` order through `woocommerce_get_catalog_ordering_args`. The count and corrected lines print on `woocommerce_before_shop_loop` (priority 5) in classic templates and before the `woocommerce/product-results-count` block in block templates; the no-results state prints on `woocommerce_no_products_found` and after `woocommerce/product-collection-no-results`. A search that leaves exactly one product redirects to it, as WooCommerce does by default.
+The plugin ranks the main query of a product search (`post_type=product`, WooCommerce's own search form and the block's) and nothing else. It hooks `pre_get_posts` at priority 20, after WooCommerce, sets `post__in` to the ranked ids (or `array( 0 )` when there are none) and removes the `posts_search` clause for that query. WooCommerce already makes "Relevance" the first entry and the default sort on a search; the plugin maps it to `post__in` order through `woocommerce_get_catalog_ordering_args`. The count and corrected lines print on `woocommerce_before_shop_loop` (priority 5) in classic templates and before the `woocommerce/product-results-count` block in block templates; the no-results state prints on `woocommerce_no_products_found` (WooCommerce's own notice taken off it on such a search, D-122) and after `woocommerce/product-collection-no-results`. A search that leaves exactly one product redirects to it, as WooCommerce does by default.
 
 **Why:** The spec says "unchanged template" and names Kadence and Storefront (classic) while the shop may move to a block theme; hooking WooCommerce's own extension points serves both without a template override.
+
+**Superseded in part by D-118 (1.3, Zach's choice to follow Baymard):** a sort other than Relevance no longer keeps every match; it keeps the strong ones.
 
 ### D-058 · "Search instead for" turns the retry off; the nearest categories come from the term suggestions · 2026-10-21
 
@@ -734,3 +740,199 @@ Handoff item 11. The copy is two files Zach exports into the gitignored `tests/f
 
 **Why:** the golden queries are about Skatehouse's real names, sizes and pages; only the shop's own data tests them. WooCommerce's importer is what the shop itself would use, so a row that fails here would fail there too.
 
+### D-104 · A query that names a variation shows it · 2026-10-22
+
+Each product document now keeps its SKUs and attribute values beside it, in a new table `facts`, one row per value in the shop's order: the product's own attribute values (taxonomy term names, custom options as written), its SKU, then each visible variation's values and SKU (variation SKUs only when `index_variation_skus` is on), at most 300 a product. A row holds the variation id (0 for the product), the field (SKU or attribute), the query argument that chooses it (`attribute_` and the sanitized attribute name), the attribute's name, the value, the label shown, the variation's own image and the value's index terms (the analyzer's terms, plus the `=` SKU key for a SKU, at most 255 characters). The rows are written and deleted with the document, so a rebuild leaves one generation. `Domain\MatchExplainer` names a variation when the query is one of its SKUs in full, or else by the query tokens that reach the attribute values of some variations but not all: the variation reaching most of them wins, the first in the shop's order on a tie. The panel's row and the results page's card (`woocommerce_product_get_image_id`, `post_type_link`, for the main product search only) then show the variation's own photo when it has one and link to the product with its arguments, so WooCommerce opens it with that design chosen. A value every variation shares names nothing, and an "any" value adds no argument.
+
+**Why:** handoff research (docs/research): a shopper who types "mumber fur fire" wants to see the Fire grip and land on it chosen, not the product's first photo and a blank form. One row a value, rather than a JSON column on the document, lets the reader fetch only the shown documents' rows by primary key prefix and keeps the values' terms comparable with the query's without decoding; the table is small (a few rows a product) and never on the ranking path.
+
+**Languages (review minor 5):** the facts are read once, from the product as the shop wrote it, and the same labels go on every language's document; they do not pass through the `csearch_languages` readers. So a French page reads "Correspond à Design : Fire" with the shop's own value, and a French word names a variation only when the shop's value is that word. A language plugin translates them through `csearch_document`'s `facts` (HOOKS.md). **Why:** WooCommerce keeps one set of attribute values per product; the readers of D-076 translate the fields a shopper searches, and a variation's label is shown as the shop wrote it on the product page too.
+
+### D-105 · "Why this matched", for the shown products only · 2026-10-22
+
+A suggestion row and a results-page card say what matched when the name the shopper sees does not: nothing when every query token is in the name; otherwise the query's whole SKU key, then for each token outside the name in order a SKU it reaches ("Matches SKU MUM-FUR-ICE", the named variation's first), an attribute value ("Matches Design: Fire", or "Matches 54mm" when the attribute has no name), then the short or long description ("Matches the description"). A token found only in a category, tag or brand says nothing: the card already places the product, and those are not something the shopper asked of it. The search reports the terms each token reached and the query's key (the reduced query's when a word was dropped, so the line explains what was actually searched); `Search\MatchDetails` reads, for the shown documents only, which of those terms each carries field by field (one join of terms to postings) and their facts, and caches the answer by the document ids, which belong to one generation and are never reused. On the results page `Results\MatchDecorations` works it out lazily, once for the page's products, on the first card that asks; the line prints on `woocommerce_after_shop_loop_item_title` (priority 4) and after the block theme's product title. In the panel it is part of the option's name.
+
+**Why:** Baymard: a result whose reason is not visible reads as a wrong result, notably for SKU and attribute matches. Computing it only for what is shown keeps the search's budgets untouched; the cache keeps a warm results page at its one extra query.
+
+### D-106 · Documents say whether the panel can add to cart · 2026-10-22
+
+Documents gain `cart`: 1 for a simple product that is purchasable and in stock, 0 otherwise (a variable product needs a choice). It is written with the document and kept current by the stock update (`DocumentRepository::setStock`), so the panel's add to cart (fork C of 1.3) reads it from the document without loading the product.
+
+**Why:** the panel answers from the index alone; whether a product can go to the cart in one click is the one more thing it needs to know.
+
+### D-107 · Schema 3, read only once rebuilt · 2026-10-22
+
+`Schema::DB_VERSION` becomes '3' (pre-approved under "Zach's answers on the flagged decisions"). A site on schema 2 gets the `facts` table and the `cart` column through `dbDelta` and owes a rebuild (`Upgrader::rebuildAfter` now owes one for any stored version from 1 up to the current one). The schema-one fallbacks of D-090 now ask `Upgrader::below('2')`, so a site on 2 waiting for its rebuild keeps reading its live index as before; the facts and the per-field terms are read only from 3, so until the rebuild goes live no variation is named and no reason is shown, rather than half of one. `Migration::complete()` also requires the new table and column.
+
+**Why:** an upgrade must never break the search it upgrades; the new features can wait for the rebuild, the search cannot.
+
+### D-108 · The owner's redirect for a search · 2026-10-22
+
+Spec 1.3. On the Redirects and pins tab (D-111) or with `wp csearch redirect add "size guide" /size-guides/`, the owner sends a search to a page instead of the results. A rule answers a query whose words are its words: both are read as a query is (`Domain\QueryRules`, the tokenizer's folded key, stop words out), so capitals, accents, punctuation and "the" do not matter and the order of the words does. A rule names a language or every language; one for the query's language and one for every language: the first stored wins. The target must be on this site: a path such as `/size-guide/` is made a full address with `home_url()`, and the address is checked with `wp_validate_redirect()` when saved and again when used, after the filter `csearch_query_redirect`, so neither the setting nor the filter can send a shopper off the site. `Results\QueryRouter` checks it first, before D-101's filters and D-102's categories, on the same terms as those: the main product search's first page, not `csearch_all`, not a page past the first, not a search that already filters or sorts. The query is logged once, as typed, with the count of products its words rank, so the owner still sees what the search would have found; the routed request fetches nothing, and the shopper goes on with the 302 on `template_redirect` (priority 5). The panel and the REST answers are unchanged: the panel's own submit lands on the results page, which redirects. Adding a rule for words that already have one replaces it. At most 200 rules (`Settings::QUERY_RULES_MAX`); a query 200 characters, an address 2,048.
+
+**Why:** spec 1.3's query redirects. A search for "returns" or "size guide" wants the page, not products that mention it. Same-site only because a stored address is a way to send a shopper anywhere; `wp_validate_redirect` is WordPress's own test and honours `allowed_redirect_hosts`. Logging with the ranked count keeps D-102's rule that a routed query is logged once.
+
+### D-109 · Synonyms of more than one word, matched as a phrase · 2026-10-22
+
+Supersedes D-029's one-word rule. A synonym row with more than one word on either side ("ss" means "stainless steel", "skate shoes" means "sneakers") is a phrase rule (`Domain\Synonyms::phrases()`): when the query's kept words hold its words side by side, in order, the parser (`QueryParser::alternatives()`) makes another form of the query with those words replaced by what they mean. The replacing words keep the place's phrase number, carry their own one-word synonyms, are never a prefix, and score as SYNONYM (`QueryToken::$synonym`, which `Searcher::widen()` turns from EXACT, variant and stem into the SYNONYM kind), so a form ranks a match below the words the shopper typed. `Searcher::run()` ranks the query and each form and merges them: each product once, at its best score, then cut to the limit; categories and tags the same way. At most three forms (`Query::MAX_ALTERNATIVES`), each at most eight words; the spelling retry runs on the query as typed only. A one-word for one-word row works as before (D-029's alternatives). `SynonymService::expand()` and the Synonyms tab's "Test a search" show phrase meanings too.
+
+Behaviour change: a `means` of several words is now that phrase as a whole. Before, "deck" meaning "skateboard deck" added "skateboard" and "deck" each as alternatives; now a search for "deck" also searches the form "skateboard deck". A product that says only "skateboard" no longer matches "deck" through that row.
+
+Caveat: a form's words score as SYNONYM, but a form with more words can match more fields than the typed word, so a product found only through the meaning can outrank one found through the typed word. The golden set and the rank-parity tests are unchanged.
+
+**Why:** spec 1.3, and D-029's own reasoning: a multi-word `word` needed a phrase search per synonym on every query. Matching phrases on the query's kept words in the parser costs nothing per document, and running a form as an ordinary query reuses the whole ranking (and the SQL plan's parity) instead of a new phrase path. Treating a multi-word meaning as a phrase is what owners mean by "ss = stainless steel": steel alone is not stainless.
+
+### D-110 · Products pinned to a search · 2026-10-22
+
+Spec 1.3. On the Redirects and pins tab or with `wp csearch pin add kazumi MNL-PER-00016,123`, the owner pins up to five products (`Settings::PINS_MAX`), by SKU or ID, in order, to a search's words (matched as D-108's are). They come first, in that order, in the panel, on the results page and in `/search`, before the ranked products and each once; the rest follow in their rank. Visibility still rules: a pin that is not published, is hidden from search or excluded, or has no document in the language, is left out (`IndexRepository::productDocuments()`, the same documents a search would find). A pinned search is never sent to a category or filter (D-101, D-102), since the owner chose what it shows. The pins are part of the cache key (`SearchService::settingsKey()`), and saving a rule bumps the cache, so a change shows at once. Filter: `csearch_pinned_products`.
+
+**Why:** spec 1.3's pinned products: an owner who knows the best answer for "kazumi" wants it first, whatever the scores say. Five keeps the panel's own results in view (it shows six by default).
+
+### D-111 · Redirects and pins: one tab, stored in the settings · 2026-10-22
+
+The rules of D-108 and D-110 live in the settings option (`query_redirects`, `pinned_products`), not in a table: they are few (200 each at most), read whole on every search with the other settings already loaded, and fork A's schema change (DB_VERSION 3) is the only one this milestone. A new tab, "Redirects and pins", after "Boosts and exclusions", holds both lists, each rule with a remove box, and an add row for each; one Save button saves both, through `Admin\Actions` (`csearch_rules_save`) and `Search\OwnerRules`, which checks and stores a rule and bumps the cache. Products are entered as SKUs or IDs separated by commas, as the fallback products are, and an unknown one is named in a warning. WP-CLI: `wp csearch redirect list|add|remove` and `wp csearch pin list|add|remove`. The panel script does not change: a redirect happens where the panel's submit already lands.
+
+**Why:** the boosts tab is already long; the two rules are both "for this exact search, do this", so they share the matching explanation once. Text entry by SKU matches the fallback products and works by keyboard and screen reader without a picker script.
+
+### D-112 · Suggested searches from the search log · 2026-10-22
+
+The panel offers up to three searches other shoppers made that start with what is typed ("kazumi" → "kazumi deck", "kazumi dealer"), above the products, two on a phone (Baymard: keyword query suggestions). `Search\QuerySuggestions` reads them from the search log of the retention window (`LogRepository::completions()`: a `LIKE` prefix on `normalised`, escaped, in the panel's language, grouped and counted), keeping only a query that was searched at least three times (`MINIMUM`), found something (`results > 0`), and was either submitted from a results page or led to a click in the panel (`source = 'page' OR clicked_type IS NOT NULL`), so half-typed words the panel searched as they were typed never come back as suggestions. Nothing is suggested before three characters (`MIN_CHARS`). `Domain\Completions` then leaves out the typed words themselves, duplicates by key, anything holding the log's redaction mark, and any query with a word the index does not hold in some form (as written, a spelling, its stem): one dictionary lookup for all twelve candidates read (`SCAN`). The owner's filter `csearch_suggested_searches` has the last word. Setting `suggest_queries`, on by default. No summary table: the log is read on its key, and the answer is cached with the rest of the panel's.
+
+**Why:** Baymard's autocomplete research: query suggestions are what most shoppers use the panel for, and the shop's own searches are the best source of them. The thresholds keep one shopper (or a bot) from putting words in everyone's panel: three searches, a result, a page or a click, and every word already in the catalogue's own vocabulary, so nothing can be suggested that the shop did not write. A summary table would be a schema change for a read that is already one indexed range.
+
+### D-113 · Category scopes ("kazumi in Decks") · 2026-10-22
+
+Under the products the panel offers up to two categories holding most of the first ten ranked products, each a link to the same search within the category: `?s=<query>&post_type=product&product_cat=<slug>`, WooCommerce's own parameter, so its widgets and counts agree. `Domain\Scopes::pick()` counts each category once a product over the first ten (`TOP`), keeps those holding at least two (`MINIMUM`), drops a parent whose child holds as many (the child says it better), drops a category holding every product found (it narrows nothing), drops categories the panel already shows as a term, and orders by count, then id. `Search\CategoryScopes` reads the ten products' categories in one query (`DocumentRepository::categoriesOf()`) and their names in one `get_terms()`. Shown only with products. Setting `suggest_scopes`, on by default.
+
+**Why:** Baymard: scope suggestions help shoppers narrow a broad search before the results page, and a category the results already concentrate in is the narrowing they most likely want. Ten products and two categories keep the read small and the panel short.
+
+### D-114 · "Showing results for" a typo's correction · 2026-10-22
+
+When a search finds products only through a typo match (the one- and two-edit candidates of D-033), `SearchResult::$corrected` now carries the query as it was read, each typo replaced by the term it matched ("kazuni dealer" → "kazumi dealer"), and the new `SearchResult::$dropped` says whether a word was also left out. The results page, the Tools tab's test search and `wp csearch search` say "Showing results for “kazumi dealer”." Only when a word was dropped do they add "Search instead for" the words as typed; a typo alone has no such link, because the exact words find the same products. The panel's corrected line reads the same. The term shown is the folded index term (lower case, no accents).
+
+**Why:** Baymard: a search that silently corrects a typo should say so, so the shopper can trust the results. A link back to the misspelled words would lead to the same page and only confuse.
+
+### D-115 · Add to cart from the panel · 2026-10-22
+
+With `suggest_cart` on (off by default) a product row the index marks as addable in one step (the document's `cart` flag) shows an "Add" affordance. Following the ARIA Authoring Practices for a combobox listbox and axe's `nested-interactive` rule, an option holds no focusable child: the affordance is a pointer-only `<span aria-hidden="true">` that stops the click from reaching the row, and the keyboard and screen-reader path is Shift+Enter on the active product row, announced through the row's `aria-describedby` ("Shift+Enter adds it to the cart."). The result is announced in the panel's live region ("Dealer deck added to your cart." or "Could not add …"). The request is WooCommerce's own `wc-ajax=add_to_cart` endpoint (same origin, form-encoded, `product_id` and `quantity`), which works under a page cache; afterwards the cart fragments are refreshed through jQuery's `added_to_cart` when the theme has it, otherwise the blocks' `wc-blocks_added_to_cart` event, and the shopper is sent to the cart when the shop's "Redirect to the cart page after successful addition" is set. Known limit: a touch screen-reader user has no Shift+Enter, so they add from the product page as before.
+
+**Why:** Baymard notes that shoppers who know what they want expect to add it from the autocomplete. Off by default, because a store selling variable products, or one that wants every shopper to see the product page, should choose it.
+
+### D-116 · Analytics events from the panel · 2026-10-22
+
+With `analytics_events` on (the default) the panel dispatches `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` as bubbling `CustomEvent`s on its form, and, when the page has a Google Tag Manager `dataLayer`, pushes the matching GA4 events: `search` (`search_term`), `select_item` for a product (with `item_list_id` `csearch_suggestions` and the item), `select_content` for anything else (`content_type`, `content_id`), `add_to_cart` (currency and value when the price is known) and `csearch_no_results` (`search_term`, once per query). Every ecommerce push is preceded by `{ ecommerce: null }`, as Google's examples do. The plugin never creates `dataLayer` and makes no request of its own; a site using `gtag.js` alone forwards the DOM events itself or uses GTM.
+
+The search term in every event is redacted first (1.3 review, blocker 1): the form carries the search log's own patterns (`Scrub::sources()`), and a search that looks like an e-mail address, a phone number, a card number or a postal code is sent as `[redacted]`, as the log stores it. `no-results` fires once, when a search the panel found nothing for is submitted, not for every prefix the panel looked up while it was typed.
+
+**Why:** owners want to know what the panel does for them without a second plugin. Pushing to a layer that already exists adds no tracking the owner did not install; the DOM events let any other tool listen. What the plugin will not keep in its own log it does not hand to a tag manager either.
+
+### D-117 · Search within the current category: a ticked box, a `product_cat` argument, a scoped ranking · 2026-10-22
+
+1.3, Baymard's "search within the current category" (94 % of mobile sites miss it). The scope is WooCommerce's own query variable, `product_cat=<slug>` beside `s` and `post_type=product`, so the URL is one WordPress and WooCommerce already understand (the archive's tax query, the filters, the sort) and a link from anywhere, a suggestion row among them, can carry it as is. The form shows the choice only where there is one to make: on a category page, or on the results of a search already kept to a category (`Results\CategoryScope::current()`), as a single checkbox above the field, "Only in Decks", ticked. A checkbox, not a two-option select: it is one control with one name, reads the same to a screen reader ("Only in Decks, checkbox, checked"), needs no "All products" value (unticked sends nothing, so the URL stays clean and the search covers the shop), works without the script, and is a 44 px target on a phone. Above the field, so the suggestion panel still opens right under the input.
+
+The ranking is scoped, not cut: `SearchOptions::$scope` and `RankPlan::$scope` carry the category's term-taxonomy id and its subcategories' (`get_term_children()`, as WooCommerce's `product_cat` includes children), and `RankRepository` adds `EXISTS (… term_relationships …)` to the one statement, through the relationships' primary key; the PHP ranking (explain, the upgrade window) keeps the same documents through one lookup. So a broad word in a small category is ranked within the category and never lost past the 500-id cap of a shop-wide ranking. The panel takes the same scope as `cat` on `/suggest` (the script sends it while the box is ticked, each scope cached apart), so the suggestions match the results. The results page reads "N results for “x” in Decks" (`_n()`, the category's name) and adds "Search all products for “x”." with `csearch_all=1` and without `product_cat`, keeping the page's filters and sort. `Results\QueryRouter` never opens another category for a scoped search (the shopper chose this one); a size in it becomes the filter on the search for the other words in the same category, or on the category page itself when the size was all of it (D-101). An unknown slug keeps nothing out.
+
+**Why:** Baymard: shoppers on a category page expect the search to stay there, and must be able to leave it. WooCommerce's own argument keeps every other part of the page working unchanged; ranking within the scope keeps the answer right for any catalogue size.
+
+### D-118 · A sort other than Relevance lists the strong matches only · 2026-10-22
+
+1.3, Baymard's faceted-sorting finding (only 10 % of sites keep weak matches from rising when the shopper sorts by price), chosen by Zach over D-057's behaviour. A strong match is a product that matches every word of the query as typed, through the word itself, its spellings, its stem or the owner's synonyms (`SearchOptions::$strict`): `Domain\Searcher::widen()` adds no prefix completions of the word being typed and no typo candidates, and the least-matched word is never dropped. "Strong" is defined by how each word matched, not by a score threshold, because a score depends on the field weights, the catalogue's term counts and the owner's boosts, where a word-by-word rule means the same thing in every shop and to the shopper ("every word I typed"). The results page runs the strict search when `orderby` is set to anything but `relevance` (`ProductSearch::sorted()`); if it finds nothing, the full set is used, so a sort never empties a page that Relevance fills. Relevance is unchanged. The count, the filters and the corrected line follow the set actually listed. Cached apart (`rankedIds`' key carries the flag).
+
+**Why:** Zach's choice to follow Baymard: on a price sort, a near-miss (a completion such as "skate" → "Skateboards", a typo's neighbour) would otherwise sit at the top just for being cheap.
+
+### D-119 · Custom fields are field 9, "custom", weight 4 · 2026-10-22
+
+1.3, the competitor scan's first gap (custom fields and ACF; six of the plugins have it). The setting `custom_fields` lists product meta keys (letters, digits, `_ . : -`, 64 characters, 20 at most, never WordPress's own `_wp_…` and `_edit_…`). They are indexed as a new field, `Domain\Fields::CUSTOM` (9, `custom`), not folded into the attributes: the postings' `field` column is a `tinyint` and every reader of field ids iterates `Fields::NAMES`, so a ninth field needs no schema change, and its own weight (4, between an attribute's 5 and a tag's 3) lets the owner or `csearch_fields` turn it up or down without touching the attributes. Values go through `Domain\MetaText` (pure): strings and numbers kept, lists flattened three levels deep (a serialised array, an ACF checkbox), `true`/`false`/`null`/objects dropped, then tags stripped and the product's custom text capped at 2,000 characters in all, as the long description is. The Tools tab offers, as checkboxes, the 30 meta keys products use most (`Repository\MetaKeyRepository`, one grouped query on the admin screen only, keys starting with `_` left out as WooCommerce's and ACF's internals) plus an "Other fields" box for any other name. A changed list says to rebuild the index, as the other index settings do; a change to a chosen key on one product (`added/updated/deleted_post_meta`) queues that product.
+
+**Why:** shops keep searchable facts (material, compatibility, a model number) in custom fields; a field of its own keeps their weight the owner's call and leaves the attribute weight as the spec set it.
+
+**Why this matched (review minor 6):** a match found only in a custom field says nothing (`MatchExplainer` has no reason for field 9). **Why:** a meta key is a developer's name (`material`, `_spec_core`), not words a shopper should read, and ACF's field label would need a WordPress read per shown product; the card is no worse than before 1.3.
+
+### D-120 · ACF read through its own field object, with a hand-written stub · 2026-10-22
+
+When ACF is active, each chosen key is read through `get_field_object( $key, $productId, false, false )` for its type: choices (select, checkbox, radio, button group) add their labels to their stored values, post fields (post object, relationship, page link) are searched by the posts' titles, taxonomy fields by the terms' names, and fields that hold no words a shopper types (image, file, gallery, user, Google map, colour, password, URL, e-mail, oEmbed, true/false) are skipped. Without ACF the raw meta is read. PHPStan knows the one function from `tools/acf-stubs.php`, written by hand like the WP-CLI stubs, rather than adding the ACF stubs package as a dependency (CLAUDE.md: ask before a dependency).
+
+**Why:** ACF stores ids and choice keys, not the words shoppers see; reading the field's own settings indexes the words. One function does not justify a dependency.
+
+### D-121 · Merging 1.3: pins checked for visibility, WooCommerce 11.2's search rule, the test bootstrap · 2026-10-22
+
+Found while the four parts of 1.3 were put together and run in wp-env:
+
+- **WooCommerce 11.2's search rule.** On a search the page does not treat as a product archive, WooCommerce 11.2 adds "hidden from search" to the query itself, outside `woocommerce_product_query_tax_query`, the filter `hidden_by_sku` lifted it through. `ProductSearch::enforce()` (after WooCommerce's `pre_get_posts`) lifts it the same way for a ranked search, so a hidden product's exact SKU reaches the results page again.
+- **Pins and hidden products.** The ranked search lifting that rule means WooCommerce no longer drops a pinned product hidden from search, so `rankedIds()` keeps a pin only when its document is visible, as the panel already did. A panel kept to a category shows no pins and no category scopes (one may lie outside it).
+- **A variation's SKU named whole.** A fact's terms are stored tab-separated, so a SKU's key term (`=mum fur ice`, spaces in it) survives; and an attribute value the shopper can read ("Design: Fire") says why before a part of a SKU holding the same word.
+- **Custom fields offered.** `total_sales`, WooCommerce's counter on every product, is not offered as a field to search.
+- **The integration bootstrap** declares `WC_Unit_Tests_Bootstrap`, WooCommerce's own switch that stops it caching its visibility term ids for the process: the core suite deletes every term after each test class, so a later class read ids that no longer existed.
+
+**Why:** each was a fault the parts' own suites could not see, because they ran without WordPress; they are covered by the integration suite now.
+
+### D-122 · One result message on an empty search · 2026-10-22
+
+From the Skatehouse demo check on 22 October: a product search with no results showed WooCommerce's "No products were found matching your selection." (`wc_no_products_found` on `woocommerce_no_products_found`) and then the plugin's no-results state ("0 results for …" and the nearest categories). That is two status messages saying the same thing, and a screen reader announced both.
+
+On a product search the plugin answers that found nothing (`ResultsView::answersEmpty()`: a ranked main query with words and no products shown), `ResultsHooks::oneNoResultsMessage()` removes `wc_no_products_found`, and nothing else, on `wp`: after the main query has run and before the template, so before the action fires. The action still runs with every other callback on it; a listing that is not such a search (the shop, a category, a filter with no match, a search of posts) keeps WooCommerce's notice. This replaces 1.1's narrower removal (handoff item 7), which took the notice out only when a post or page led the no-results state.
+
+Block themes are not changed: their notice is the `woocommerce/product-collection-no-results` block, not `wc_no_products_found`, and is still left out only when a page leads.
+
+**Why:** one message per state. The plugin's state says the same thing and offers somewhere to go, so it is the one kept.
+
+### D-123 · "Sorted by relevance" on search results · 2026-10-22
+
+From the same check: WooCommerce's result count adds visually hidden "Sorted by …" text from the shop's default sort. `woocommerce_result_count()` does not look at whether the page is a search, and its `woocommerce_catalog_orderedby` messages have no entry for relevance, so a screen reader heard "Sorted by latest" while the sort menu showed Relevance and the products were in the plugin's order.
+
+On a search the plugin answers in Relevance order (no `orderby` in the URL, or `orderby=relevance`; `ResultsView::inRelevanceOrder()`):
+
+- `woocommerce_catalog_orderedby` gains `relevance` → "Sorted by relevance" (translatable, with context);
+- `woocommerce_default_catalog_orderby` answers `relevance`, so the result count reads it when the URL has no `orderby`.
+
+Checked against WooCommerce 11.2's code, and in `ResultsTest` by comparing with the filters removed: the sort menu is unchanged (on a search WooCommerce already drops "Default sorting", the only option the default decides, and selects Relevance), and so are WooCommerce's ordering arguments (for a search with words they already use relevance; the default is read only for a search without any). A search sorted another way (`orderby=price`) keeps WooCommerce's own line ("Sorted by price: low to high"), and category and shop pages are not touched.
+
+**Why:** the hidden text has to name the order the products are actually in.
+
+### D-124 · The dialog's history step keeps the Interactivity API's key · 2026-10-22
+
+From the Skatehouse header check on 22 October (the search dialog in Button mode, D-099): Forward after Back reloaded the page. Opening the dialog pushed a history step whose state was only `{ csearch: '<block id>' }`. WordPress's Interactivity API stamps the page's own step with `{ wpInteractivityId }` and, on `popstate`, reloads the page when the state it lands on is not null and lacks the current session's id. Back landed on the page's own step and was fine; Forward landed on the dialog's step and reloaded.
+
+The step is now built on the current state, `{ ...history.state, csearch: id }`, so it carries the runtime's key. That `pushState` is the only place the plugin writes history state (its other navigations are `location.replace`). A page loaded or reloaded on a dialog's step has no dialog open, so `view.js` removes the stale `csearch` key when it loads, keeping the rest of the state (the runtime's key among it, stamped before the plugin's module runs).
+
+**Why:** the plugin's step is an addition to the page's step, not a replacement for it; any key another script keeps there must survive.
+
+### D-125 · The field's input resists theme input styles · 2026-10-22
+
+From the Skatehouse header (Field mode in Kadence's sticky header): themes style `input[type="text"]` and `input:focus` more specifically than `.csearch-input`. Kadence adds a background, a 1px border, a 3px radius, padding and a focus box-shadow, and sites add their own `input:focus` outline, so the input drew a second box inside `.csearch-field` and focus showed stacked rings.
+
+In Field mode the input's rules are scoped as `.wp-block-creative-search-search:not([data-csearch-mode="button"]) .csearch-field .csearch-input` (and its `:hover`, `:focus` and `:focus-visible`), specificity 0,4,0 to 0,5,0. That beats the usual theme selectors (`input[type="text"]` 0,1,1; `.site-header input[type="search"]:focus` 0,3,1) without `!important`. They reset background, border, radius, box-shadow, outline, padding, size, max-width and appearance. The one focus indicator is `.csearch-field:focus-within`. On a touch screen the input's font size is at least 16px (`max(16px, 1em)`), so iOS does not zoom the page on focus. Button mode's dialog is left as it was.
+
+**Why:** the block is often dropped into a header the theme styles; it has to look like itself there without the site writing overrides.
+
+### D-126 · A panel in a fixed or sticky header scrolls inside itself · 2026-10-22
+
+D-092 keeps the panel at its natural height and drops its last rows until it fits the screen, because the page can scroll. In a fixed or sticky header (Skatehouse's Kadence header, which shrinks, hides on scroll down and comes back on scroll up) the page scrolling cannot bring a row into view, and on a phone the keyboard covers the lower part of the screen.
+
+When the block has a fixed or sticky ancestor, or on a touch screen (`pointer: coarse`), the panel is capped to the room between the field and the bottom of `visualViewport`, or between the top and the field when it opens above. It scrolls inside itself with `overscroll-behavior: contain`, and keeps at least two rows (96px). The cap follows `visualViewport` resize and scroll (the keyboard opening and closing) and the page's scroll, at most once a frame. D-092's rule then applies within the cap: the last rows are dropped until the rest fit it, so with room for two suggestions and "See all" there is still no inner scrollbar. Only when even those do not fit (the keyboard open over a short screen) does the panel scroll. Arrowing to a row scrolls the panel, not the page (`scrollIntoView` is not used there), and once rows have been dropped the chosen one is brought back into view. With `panelPosition: auto` the panel opens above only when the room below is short (240px) and there is more room above than below. The arithmetic is in `assets/src/block/placement.js`, unit-tested on its own; the view only measures and applies.
+
+A desktop page that scrolls keeps D-092: natural height, no inner scrollbar.
+
+The first build of this scrolled the panel instead of dropping rows. The full browser run caught it on the phone projects: D-092's "no scrollbar" tests failed, and axe in Safari flagged the scrolling panel (`scrollable-region-focusable`; the rows are reached from the field through `aria-activedescendant`, which that rule cannot see). Dropping rows to the cap fixed both. The border is counted in the cap (`box-sizing: border-box`).
+
+**Why:** Baymard: every suggestion must be reachable. Where the page cannot scroll it into view, the panel has to.
+
+### D-127 · Dimming the page: a block setting, and inside a transformed header · 2026-10-22
+
+D-097's backdrop already renders in Field mode, on by default, and a click on it closes the suggestions; the `csearch_dim_page` filter was the only way to turn it off. The block now has a "Dim the page behind the suggestions" toggle (`dimPage`, on by default; `dim_page="no"` on the shortcode). Like `mode` it is set per form, with no site-wide setting, and the filter still has the last word.
+
+The backdrop is `position: fixed; inset: 0`. A header with a transform, as Kadence's sticky header has (`position: fixed` with `translateY` for hide on scroll), becomes the containing block of its fixed descendants, so the backdrop covered only the header. When the panel opens, and as the page scrolls, the view measures where the backdrop landed and, if it is not the viewport, moves it back over the viewport. It stays inside the header's stacking context: the header's own `z-index` keeps it above the page, and the form stays above the backdrop (`.is-dimmed > .csearch-form`).
+
+**Why:** Baymard recommends dimming the page behind desktop suggestions; it has to work in the sticky headers shops actually use, and an owner whose header still misbehaves can switch it off per block.
+
+### D-128 · Colour hooks for the field, the panel, the submit button and the focus ring · 2026-10-22
+
+Seven documented custom properties: `--csearch-field-bg`, `--csearch-field-fg`, `--csearch-panel-bg`, `--csearch-panel-fg`, `--csearch-submit-bg`, `--csearch-submit-fg` and `--csearch-focus-ring`. They are read where they are used, each falling back to today's value (`var(--csearch-field-bg, var(--csearch-bg))` and so on), and never declared by the plugin. A site can therefore set them on `:root`, a header or the block without a specificity contest. The panel's row tint and secondary text are mixed from the panel's colours, so a dark panel keeps readable rows. They apply in both modes; with nothing set, both look as before.
+
+**Why:** sites were targeting internal classes to colour the search bar, and those classes are not a contract.
+
+### D-129 · The cold budgets keep the fastest of three timings · 2026-10-23
+
+The catalogue benchmark times each golden query's cold `/suggest` and its `/search` three times, emptying the object cache before each, and keeps the fastest. The p95 is then taken over the 50 queries as before, and the budgets are unchanged (100 ms cold, 100 ms `/search`). The warm timing and the memory figure are still single measurements.
+
+**Why:** the merge of 1.2 failed CI on identical code. The 10,000-product job measured a cold p95 of 78.6 ms on the pull request, then 123.3 ms on `main` and 132.6 ms on the tag; `/search` went from 52.8 ms to 93.7 ms. A shared runner's noise only ever adds time, so the fastest of three is the code's cost, while a slow query still shows in the p95 across queries. The extra two timings add about 10 seconds at 10,000 products.

@@ -71,8 +71,13 @@ final class SearchCommand {
 		$result = $this->search->run( $query, $lang, $limit, 3 );
 		$format = isset( $assoc['format'] ) && is_string( $assoc['format'] ) ? $assoc['format'] : 'table';
 		if ( 'table' === $format && null !== $result->corrected ) {
-			/* translators: 1: the query, 2: the query the results are for */
-			WP_CLI::log( sprintf( __( 'Nothing matched every word of "%1$s"; showing results for "%2$s".', 'creative-search' ), $query, $result->corrected ) );
+			WP_CLI::log(
+				$result->dropped
+					/* translators: 1: the query, 2: the query the results are for */
+					? sprintf( __( 'Nothing matched every word of "%1$s"; showing results for "%2$s".', 'creative-search' ), $query, $result->corrected )
+					/* translators: %s: the query the results are for, with a typo corrected */
+					: sprintf( __( 'Showing results for "%s".', 'creative-search' ), $result->corrected )
+			);
 		}
 		$rows = array();
 		foreach ( array_merge( array_values( $result->products ), array_values( $result->terms ) ) as $i => $hit ) {
@@ -134,7 +139,7 @@ final class SearchCommand {
 			null === $result->corrected
 				/* translators: 1: query, 2: language code, 3: what was found */
 				? sprintf( __( 'Query "%1$s" in %2$s: %3$s.', 'creative-search' ), $query, $result->lang, $found )
-				/* translators: 1: query, 2: language code, 3: the query after a dropped word, 4: what was found */
+				/* translators: 1: query, 2: language code, 3: the query after a dropped word or a corrected typo, 4: what was found */
 				: sprintf( __( 'Query "%1$s" in %2$s, showing results for "%3$s": %4$s.', 'creative-search' ), $query, $result->lang, $result->corrected, $found )
 		);
 		$format = isset( $assoc['format'] ) && is_string( $assoc['format'] ) ? $assoc['format'] : 'table';

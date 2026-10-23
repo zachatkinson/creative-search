@@ -93,4 +93,35 @@ final class ScrubTest extends TestCase {
 		self::assertFalse( Scrub::looksPersonal( $query ), $query );
 		self::assertSame( $query, Scrub::redact( $query ) );
 	}
+
+	public function test_sources_are_the_patterns_without_their_delimiters_and_flags(): void {
+		$sources = Scrub::sources();
+		self::assertSame( '[^\s@]+@[^\s@]', $sources[0], 'the e-mail pattern, its /u gone' );
+		self::assertSame( '(?<!\d)\d{5}-\d{4}(?!\d)', $sources[ count( $sources ) - 1 ], 'the ZIP+4 pattern, no flag to strip' );
+		self::assertCount( 7, $sources );
+	}
+
+	#[DataProvider( 'personal' )]
+	public function test_the_sources_redact_what_the_log_redacts( string $query ): void {
+		self::assertTrue( self::anySource( $query ), $query );
+	}
+
+	#[DataProvider( 'shop' )]
+	public function test_the_sources_leave_the_shop_alone( string $query ): void {
+		self::assertFalse( self::anySource( $query ), $query );
+	}
+
+	/**
+	 * Whether any source, compiled as the browser compiles it (the `u` flag), matches.
+	 *
+	 * @param string $query The query.
+	 */
+	private static function anySource( string $query ): bool {
+		foreach ( Scrub::sources() as $source ) {
+			if ( 1 === preg_match( '/' . $source . '/u', $query ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
 }

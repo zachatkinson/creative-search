@@ -26,7 +26,8 @@ final class FieldsTest extends TestCase {
 		self::assertSame( 6, Fields::TAG );
 		self::assertSame( 7, Fields::BRAND );
 		self::assertSame( 8, Fields::ATTRIBUTE );
-		self::assertSame( range( 1, 8 ), array_keys( Fields::NAMES ) );
+		self::assertSame( 9, Fields::CUSTOM, 'the owner\'s custom fields (D-119)' );
+		self::assertSame( range( 1, 9 ), array_keys( Fields::NAMES ) );
 	}
 
 	public function test_names_and_ids_round_trip(): void {
@@ -35,7 +36,8 @@ final class FieldsTest extends TestCase {
 			self::assertSame( $name, Fields::name( $id ) );
 		}
 		self::assertSame( 0, Fields::id( 'colour' ) );
-		self::assertSame( '', Fields::name( 9 ) );
+		self::assertSame( '', Fields::name( 10 ) );
+		self::assertSame( '', Fields::name( 0 ) );
 	}
 
 	public function test_default_weights_are_the_spec_table(): void {
@@ -49,6 +51,7 @@ final class FieldsTest extends TestCase {
 				'tag'       => 3,
 				'short'     => 2,
 				'long'      => 1,
+				'custom'    => 4,
 			),
 			Fields::DEFAULT_WEIGHTS
 		);
@@ -72,6 +75,7 @@ final class FieldsTest extends TestCase {
 				Fields::TAG       => 3,
 				Fields::BRAND     => 6,
 				Fields::ATTRIBUTE => 5,
+				Fields::CUSTOM    => 4,
 			),
 			$weights
 		);

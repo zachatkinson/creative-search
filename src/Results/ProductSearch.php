@@ -22,8 +22,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ids, capped at 500, become `post__in`; WordPress's own search clause and search terms are removed for that
  * query so nothing else filters by the raw words (WooCommerce's classic filter widgets count the ranked set
  * instead); the "Relevance" sort (WooCommerce's default on a search) becomes `post__in` order, and any other
- * sort keeps the match set and WooCommerce's ordering. Empty searches, feeds and searches that are not for
- * products are left to WordPress and WooCommerce.
+ * sort keeps the strong matches only, in WooCommerce's ordering (D-118). `product_cat` keeps the search to a
+ * category and its subcategories (D-117). Empty searches, feeds and searches that are not for products are left
+ * to WordPress and WooCommerce.
  */
 final class ProductSearch {
 
@@ -32,7 +33,7 @@ final class ProductSearch {
 	/**
 	 * The answer for the main query, once it has been searched.
 	 *
-	 * @var array{ids: int[], corrected: string|null, query: string, lang: string}|null
+	 * @var array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}|null
 	 */
 	private ?array $answer = null;
 
@@ -88,6 +89,15 @@ final class ProductSearch {
 	}
 
 	/**
+	 * Whether the shopper sorted the results by something other than Relevance (price, popularity, rating, date):
+	 * then only the strong matches are listed, so a sort never brings a weak one up (D-118).
+	 */
+	public static function sorted(): bool {
+		$orderby = isset( $_GET['orderby'] ) && is_string( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only sort parameter.
+		return '' !== $orderby && 'relevance' !== $orderby;
+	}
+
+	/**
 	 * Rank the main product search: `pre_get_posts` at priority 5, before WooCommerce's own pass (which reads
 	 * the answer for its visibility clause and overwrites `post__in`; {@see ProductSearch::enforce()} sets it
 	 * again after).
@@ -109,14 +119,14 @@ final class ProductSearch {
 		$exact = isset( $_GET[ self::EXACT_ARG ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only search parameter.
 		// A second page, another sort, or the page a redirect landed on is the same search, not a new one for the log.
 		$repeat       = Cast::int( $query->get( 'paged' ) ) > 1 || isset( $_GET['orderby'] ) || QueryRouter::arrived(); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public, read-only parameters.
-		$this->answer = $this->search->rankedIds( $words, $lang, $repeat ? '' : 'page', $exact );
+		$this->answer = $this->search->rankedIds( $words, $lang, $repeat ? '' : 'page', $exact, CategoryScope::ttIds( CategoryScope::requested() ), self::sorted() );
 		$query->set( 'post__in', array() === $this->answer['ids'] ? array( 0 ) : $this->answer['ids'] );
 		$query->set( 'csearch_ranked', true );
 	}
 
 	/**
 	 * Set the ranked ids again after WooCommerce's own `pre_get_posts` pass, which resets `post__in` from its
-	 * `loop_shop_post_in` filter (priority 20).
+	 * `loop_shop_post_in` filter (priority 20), and lift its search exclusion as {@see ProductSearch::visibility()} does.
 	 *
 	 * @param WP_Query $query The query.
 	 */
@@ -125,6 +135,12 @@ final class ProductSearch {
 			return;
 		}
 		$query->set( 'post__in', array() === $this->answer['ids'] ? array( 0 ) : $this->answer['ids'] );
+		// WooCommerce 11.2 adds "hidden from search" to a search that is not a product archive straight to the query,
+		// not through `woocommerce_product_query_tax_query`; it is lifted here the same way.
+		$taxQuery = $query->get( 'tax_query' );
+		if ( is_array( $taxQuery ) && array() !== $taxQuery ) {
+			$query->set( 'tax_query', $this->visibility( $taxQuery ) );
+		}
 	}
 
 	/**
@@ -245,7 +261,7 @@ final class ProductSearch {
 	/**
 	 * The answer for this page, or null when the page is not a ranked search.
 	 *
-	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}|null
+	 * @return array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}|null
 	 */
 	public function answer(): ?array {
 		return $this->answer;

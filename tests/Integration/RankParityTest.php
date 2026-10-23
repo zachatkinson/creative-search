@@ -184,7 +184,10 @@ final class RankParityTest extends IndexTestCase {
 					$q = "{$a} -{$b}";
 					break;
 				case 5:
-					$q = "\"{$a} {$b}\" {$c}";
+					// Two neighbouring words of the name, so the phrase finds its product and the phrase SQL is held
+					// (random pairs were rarely adjacent, D-088); no extra draw, so the other queries stay the same.
+					$at = (int) array_search( $a, $w, true );
+					$q  = isset( $w[ $at + 1 ] ) ? "\"{$a} {$w[ $at + 1 ]}\" {$c}" : "\"{$a} {$b}\" {$c}";
 					break;
 				case 6:
 					$q = (string) $spec['sku'];

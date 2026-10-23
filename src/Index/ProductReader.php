@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Index;
 
 use CreativeBranding\Search\Domain\Fields;
+use CreativeBranding\Search\Domain\MetaText;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Options;
@@ -33,6 +34,27 @@ final class ProductReader {
 	public const CATEGORY_TAXONOMY      = 'product_cat';
 	public const TAG_TAXONOMY           = 'product_tag';
 	public const BRAND_TAXONOMY         = 'product_brand';
+
+	/**
+	 * ACF field types whose stored value is not words a shopper types: an attachment, a user, a map, a colour, a
+	 * password, an address (D-119).
+	 */
+	public const ACF_SKIPPED = array( 'image', 'file', 'gallery', 'user', 'google_map', 'color_picker', 'password', 'url', 'email', 'oembed', 'true_false' );
+
+	/**
+	 * ACF field types that store choices: their labels are searched as well as their values.
+	 */
+	public const ACF_CHOICES = array( 'select', 'checkbox', 'radio', 'button_group' );
+
+	/**
+	 * ACF field types that store post ids: their titles are searched.
+	 */
+	public const ACF_POSTS = array( 'post_object', 'relationship', 'page_link' );
+
+	/**
+	 * SKUs and attribute values kept per product at most (D-104): 22 designs in three widths, with their SKUs, fit.
+	 */
+	public const FACTS_MAX = 300;
 
 	/**
 	 * Constructor.
@@ -68,8 +90,10 @@ final class ProductReader {
 	 * @return ProductText[] By language code.
 	 */
 	public function read( WC_Product $product ): array {
-		$base = $this->fields( $product );
-		$out  = array();
+		$base  = $this->fields( $product );
+		$facts = $this->facts( $product );
+		$cart  = self::cart( $product );
+		$out   = array();
 		foreach ( $this->languages->all() as $code => $readers ) {
 			$fields = $base;
 			if ( null !== $readers['product'] ) {
@@ -91,7 +115,9 @@ final class ProductReader {
 				$product->is_in_stock(),
 				in_array( $product->get_catalog_visibility(), array( 'visible', 'search' ), true ),
 				Settings::clamp( Cast::int( get_post_meta( $product->get_id(), Options::META_BOOST, true ) ), Settings::BOOST_MIN, Settings::BOOST_MAX ),
-				(int) $product->get_total_sales()
+				(int) $product->get_total_sales(),
+				$cart,
+				$facts
 			);
 			/**
 			 * The document about to be written for a product in one language.
@@ -99,7 +125,8 @@ final class ProductReader {
 			 * @since 0.4.0
 			 *
 			 * @param array<string, mixed> $document `title`, `fields` (Domain\Fields ids to text), `skus`, `url`, `image_id`,
-			 *     `price_min`, `price_max`, `in_stock`, `visible`, `boost`, `total_sales`, `lang`.
+			 *     `price_min`, `price_max`, `in_stock`, `visible`, `boost`, `total_sales`, `lang`, and since 1.3.0 `cart`
+			 *     and `facts` (the SKUs and attribute values, D-104).
 			 * @param WC_Product           $product  The product.
 			 * @param string               $lang     Language code.
 			 */
@@ -125,6 +152,7 @@ final class ProductReader {
 			Fields::TAG       => Settings::isOn( 'index_tags' ) ? $this->termNames( $product, self::TAG_TAXONOMY, false ) : array(),
 			Fields::BRAND     => $this->termNames( $product, self::BRAND_TAXONOMY, false ),
 			Fields::ATTRIBUTE => $this->attributeValues( $product ),
+			Fields::CUSTOM    => $this->customValues( $product ),
 		);
 		/**
 		 * The fields of a product before tokenising.
@@ -158,6 +186,96 @@ final class ProductReader {
 			}
 		}
 		return array_values( array_unique( $skus ) );
+	}
+
+	/**
+	 * Whether the panel may add a product to the cart as it is (D-106): a simple product, purchasable, in stock.
+	 *
+	 * @param WC_Product $product The product.
+	 */
+	public static function cart( WC_Product $product ): bool {
+		return $product->is_type( 'simple' ) && $product->is_purchasable() && $product->is_in_stock();
+	}
+
+	/**
+	 * The product's SKU and attribute values, then each visible variation's (D-104): its value of each attribute,
+	 * with the query argument that preselects it and its own image, and its SKU when variation SKUs are indexed.
+	 * The variations' meta is read in one query; a value of "any" is left out. At most {@see FACTS_MAX}.
+	 *
+	 * @param WC_Product $product The product.
+	 * @return array<int, array{variation: int, field: int, attribute: string, name: string, value: string, label: string, image_id: int|null}>
+	 */
+	public function facts( WC_Product $product ): array {
+		$facts      = array();
+		$attributes = array();
+		foreach ( $product->get_attributes() as $attribute ) {
+			if ( ! $attribute instanceof WC_Product_Attribute ) {
+				continue;
+			}
+			$name   = wc_attribute_label( $attribute->get_name(), $product );
+			$labels = array();
+			if ( $attribute->is_taxonomy() ) {
+				foreach ( $attribute->get_terms() ?? array() as $term ) {
+					if ( $term instanceof WP_Term ) {
+						$labels[ $term->slug ] = $term->name;
+					}
+				}
+			} else {
+				foreach ( $attribute->get_options() as $option ) {
+					$labels[ (string) $option ] = (string) $option;
+				}
+			}
+			$attributes[ 'attribute_' . sanitize_title( $attribute->get_name() ) ] = array( $name, $labels );
+			foreach ( $labels as $label ) {
+				$facts[] = self::fact( 0, Fields::ATTRIBUTE, '', $name, '', $label, null );
+			}
+		}
+		if ( '' !== $product->get_sku() ) {
+			$facts[] = self::fact( 0, Fields::SKU, '', '', '', (string) $product->get_sku(), null );
+		}
+		if ( $product instanceof WC_Product_Variable ) {
+			$children = array_map( 'intval', $product->get_visible_children() );
+			update_meta_cache( 'post', $children );
+			foreach ( $children as $childId ) {
+				$image = Cast::int( get_post_meta( $childId, '_thumbnail_id', true ) );
+				$image = $image > 0 ? $image : null;
+				foreach ( $attributes as $key => [ $name, $labels ] ) {
+					$value = Cast::str( get_post_meta( $childId, $key, true ) );
+					if ( '' !== $value ) {
+						$facts[] = self::fact( $childId, Fields::ATTRIBUTE, $key, $name, $value, $labels[ $value ] ?? $value, $image );
+					}
+				}
+				$sku = Cast::str( get_post_meta( $childId, '_sku', true ) );
+				if ( '' !== $sku && Settings::isOn( 'index_variation_skus' ) ) {
+					$facts[] = self::fact( $childId, Fields::SKU, '', '', '', $sku, $image );
+				}
+			}
+		}
+		return array_slice( array_values( array_filter( $facts, static fn( array $f ): bool => '' !== trim( $f['label'] ) ) ), 0, self::FACTS_MAX );
+	}
+
+	/**
+	 * One fact.
+	 *
+	 * @param int      $variation The variation, or 0.
+	 * @param int      $field     Field id.
+	 * @param string   $attribute The query argument.
+	 * @param string   $name      The attribute's name.
+	 * @param string   $value     The argument's value.
+	 * @param string   $label     What the shopper reads.
+	 * @param int|null $imageId   The variation's image.
+	 * @return array{variation: int, field: int, attribute: string, name: string, value: string, label: string, image_id: int|null}
+	 */
+	private static function fact( int $variation, int $field, string $attribute, string $name, string $value, string $label, ?int $imageId ): array {
+		return array(
+			'variation' => $variation,
+			'field'     => $field,
+			'attribute' => $attribute,
+			'name'      => $name,
+			'value'     => $value,
+			'label'     => $label,
+			'image_id'  => $imageId,
+		);
 	}
 
 	/**
@@ -220,6 +338,56 @@ final class ProductReader {
 			}
 		}
 		return array_values( array_unique( array_filter( $values, static fn( string $v ): bool => '' !== trim( $v ) ) ) );
+	}
+
+	/**
+	 * The texts of the custom fields the owner chose (D-119), each through ACF's own reading when ACF knows the
+	 * field: choices add their labels, post fields their titles, taxonomy fields their term names, and fields
+	 * that hold no words are skipped. Stripped of tags and capped together at 2,000 characters.
+	 *
+	 * @param WC_Product $product The product.
+	 * @return string[]
+	 */
+	public function customValues( WC_Product $product ): array {
+		$texts = array();
+		foreach ( Cast::strings( Settings::get( 'custom_fields' ) ) as $key ) {
+			$raw   = get_post_meta( $product->get_id(), $key, true );
+			$field = function_exists( 'get_field_object' ) ? get_field_object( $key, $product->get_id(), false, false ) : false;
+			$type  = is_array( $field ) ? Cast::str( $field['type'] ?? '' ) : '';
+			if ( in_array( $type, self::ACF_SKIPPED, true ) ) {
+				continue;
+			}
+			$values = MetaText::values( $raw );
+			if ( in_array( $type, self::ACF_CHOICES, true ) && is_array( $field ) ) {
+				$choices = is_array( $field['choices'] ?? null ) ? $field['choices'] : array();
+				foreach ( $values as $value ) {
+					if ( isset( $choices[ $value ] ) && is_scalar( $choices[ $value ] ) && (string) $choices[ $value ] !== $value ) {
+						$values[] = (string) $choices[ $value ];
+					}
+				}
+			} elseif ( in_array( $type, self::ACF_POSTS, true ) ) {
+				$values = array_values( array_filter( array_map( static fn( string $id ): string => is_numeric( $id ) ? get_the_title( (int) $id ) : $id, $values ) ) );
+			} elseif ( 'taxonomy' === $type ) {
+				$values = array_values(
+					array_filter(
+						array_map(
+							static function ( string $id ): string {
+								$term = is_numeric( $id ) ? get_term( (int) $id ) : null;
+								return $term instanceof WP_Term ? $term->name : '';
+							},
+							$values
+						)
+					)
+				);
+			}
+			foreach ( $values as $value ) {
+				$text = self::plain( $value, Settings::CUSTOM_FIELD_CHARS );
+				if ( '' !== trim( $text ) ) {
+					$texts[] = $text;
+				}
+			}
+		}
+		return MetaText::cap( $texts, Settings::CUSTOM_FIELD_CHARS );
 	}
 
 	/**

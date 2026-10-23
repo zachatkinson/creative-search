@@ -89,8 +89,10 @@ final class ResultsHooks implements Hookable {
 		add_filter( 'woocommerce_price_filter_sql', array( $this->products, 'priceRange' ) );
 		add_action( 'woocommerce_before_shop_loop', array( $this, 'printSummary' ), 5 );
 		add_action( 'woocommerce_no_products_found', array( $this, 'printRouted' ), 4 );
-		add_action( 'woocommerce_no_products_found', array( $this, 'leadWithContent' ), 5 );
 		add_action( 'woocommerce_no_products_found', array( $this, 'printNoResults' ), 20 );
+		add_action( 'wp', array( $this, 'oneNoResultsMessage' ) );
+		add_filter( 'woocommerce_catalog_orderedby', array( $this->view, 'orderedBy' ) );
+		add_filter( 'woocommerce_default_catalog_orderby', array( $this->view, 'defaultOrderby' ) );
 		add_action( 'woocommerce_after_shop_loop', array( $this, 'printContentAfter' ), 5 );
 		add_filter( 'render_block_woocommerce/product-template', array( $this, 'blockContentAfter' ) );
 		add_filter( 'woocommerce_redirect_single_search_result', array( $this, 'singleRedirect' ) );
@@ -113,7 +115,7 @@ final class ResultsHooks implements Hookable {
 	}
 
 	/**
-	 * The no-results state below WooCommerce's own notice.
+	 * The no-results state, the page's one result message (D-122).
 	 */
 	public function printNoResults(): void {
 		echo $this->noResultsOnce(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped where it is built, in ResultsView.
@@ -148,11 +150,13 @@ final class ResultsHooks implements Hookable {
 	}
 
 	/**
-	 * Before WooCommerce's own "No products were found": when a post or page matches, that notice goes and the
-	 * no-results state leads with the page (Skatehouse handoff item 7).
+	 * Once the main query has run, before the template: on a product search the plugin answers that found
+	 * nothing, WooCommerce's "No products were found matching your selection." goes, so the no-results state is
+	 * the one message (D-122). Only that callback: the action and its other callbacks still run, and a listing
+	 * that is not such a search keeps the notice.
 	 */
-	public function leadWithContent(): void {
-		if ( $this->view->contentLeads() ) {
+	public function oneNoResultsMessage(): void {
+		if ( $this->view->answersEmpty() ) {
 			remove_action( 'woocommerce_no_products_found', 'wc_no_products_found' );
 		}
 	}

@@ -74,15 +74,42 @@ final class ResultsView {
 			return '';
 		}
 		$count = $this->products->shown();
-		$html  = $this->categoriesLine() . '<p class="csearch-results-summary" role="status">' . esc_html(
-			sprintf(
+		$scope = CategoryScope::requested();
+		$line  = null === $scope
+			? sprintf(
 				/* translators: 1: number of products found, 2: the search query */
 				_n( '%1$s result for “%2$s”', '%1$s results for “%2$s”', $count, 'creative-search' ),
 				number_format_i18n( $count ),
 				$answer['query']
 			)
-		) . '</p>';
-		if ( null !== $answer['corrected'] ) {
+			: sprintf(
+				/* translators: 1: number of products found, 2: the search query, 3: the category searched */
+				_n( '%1$s result for “%2$s” in %3$s', '%1$s results for “%2$s” in %3$s', $count, 'creative-search' ),
+				number_format_i18n( $count ),
+				$answer['query'],
+				$scope->name
+			);
+		$html = $this->categoriesLine() . '<p class="csearch-results-summary" role="status">' . esc_html( $line ) . '</p>';
+		if ( null !== $scope ) {
+			// The same search in every category, the page's filters and sort with it, not its page, and not sent on to a
+			// category it names: the shopper asked for every product (D-117).
+			$all   = add_query_arg( QueryRouter::ALL_ARG, '1', remove_query_arg( array( CategoryScope::ARG, 'paged', 'product-page' ) ) );
+			$html .= '<p class="csearch-results-scope"><a href="' . esc_url( $all ) . '">' . esc_html(
+				sprintf(
+					/* translators: %s: the query the shopper typed */
+					__( 'Search all products for “%s”.', 'creative-search' ),
+					$answer['query']
+				)
+			) . '</a></p>';
+		}
+		if ( null !== $answer['corrected'] && ! $answer['dropped'] ) {
+			// A typo read as its closest term: the shopper's exact words would find the same, so no link (D-114).
+			$html .= '<p class="csearch-results-corrected">' . sprintf(
+				/* translators: %s: the query the results are for, with a typo corrected */
+				esc_html__( 'Showing results for %s', 'creative-search' ),
+				'<em>' . esc_html( $answer['corrected'] ) . '</em>'
+			) . '</p>';
+		} elseif ( null !== $answer['corrected'] ) {
 			// The page the shopper is on, with its language and filters, asked for the exact words.
 			$exact = add_query_arg( ProductSearch::EXACT_ARG, '1', remove_query_arg( array( 'paged', 'product-page' ) ) );
 			$html .= '<p class="csearch-results-corrected">' . sprintf(
@@ -208,6 +235,53 @@ final class ResultsView {
 	 */
 	public function contentAfter(): string {
 		return $this->products->shown() > 0 && $this->pagesBelow() ? $this->contentSection() : '';
+	}
+
+	/**
+	 * Whether this is a product search the plugin answers that found no product: then its no-results state is the
+	 * page's one result message, and WooCommerce's "No products were found matching your selection." is left out
+	 * (D-122).
+	 */
+	public function answersEmpty(): bool {
+		$answer = $this->products->answer();
+		return null !== $answer && '' !== $answer['query'] && 0 === $this->products->shown();
+	}
+
+	/**
+	 * Whether this is a product search the plugin answers, listed in Relevance order (no `orderby`, or
+	 * `orderby=relevance`): WooCommerce's result count then says so (D-123).
+	 */
+	public function inRelevanceOrder(): bool {
+		$answer = $this->products->answer();
+		return null !== $answer && '' !== $answer['query'] && ! ProductSearch::sorted();
+	}
+
+	/**
+	 * `woocommerce_catalog_orderedby`: the result count's "Sorted by relevance", on a search in Relevance order
+	 * (WooCommerce's messages have none, D-123).
+	 *
+	 * @param mixed $messages Messages by `orderby` value.
+	 * @return mixed
+	 */
+	public function orderedBy( $messages ) {
+		if ( ! is_array( $messages ) || ! $this->inRelevanceOrder() ) {
+			return $messages;
+		}
+		$messages['relevance'] = _x( 'Sorted by relevance', 'the result count on search results', 'creative-search' );
+		return $messages;
+	}
+
+	/**
+	 * `woocommerce_default_catalog_orderby`: relevance on a search in Relevance order, so the result count reads
+	 * the order the products are in, not the shop's default sort (D-123). WooCommerce's sort menu already drops
+	 * "Default sorting" and offers Relevance on a search, and its ordering arguments already use relevance for a
+	 * search with words, so neither changes.
+	 *
+	 * @param mixed $orderby The shop's default sort.
+	 * @return mixed
+	 */
+	public function defaultOrderby( $orderby ) {
+		return $this->inRelevanceOrder() ? 'relevance' : $orderby;
 	}
 
 	/**

@@ -36,6 +36,15 @@ final class Settings {
 	public const BOOST_MIN     = -10;
 	public const BOOST_MAX     = 10;
 
+	/**
+	 * The owner's rules for single queries (D-108, D-110): rules of each kind at most, products pinned to one
+	 * query at most, and the longest query a rule names (a query's own cap).
+	 */
+	public const QUERY_RULES_MAX = 200;
+	public const PINS_MAX        = 5;
+	public const RULE_QUERY_MAX  = 200;
+	public const RULE_URL_MAX    = 2048;
+
 	public const LIMIT_DEFAULT     = 6;
 	public const TERMS_DEFAULT     = 3;
 	public const MIN_CHARS_DEFAULT = 2;
@@ -46,11 +55,17 @@ final class Settings {
 	public const PANEL_ABOVE = 'above';
 
 	/**
-	 * The field names the index knows, in the order of their field ids (name 1 … attribute 8).
+	 * The field names the index knows, in the order of their field ids (name 1 … attribute 8, custom fields 9).
 	 *
 	 * @var string[]
 	 */
-	public const FIELDS = array( 'name', 'sku', 'short', 'long', 'category', 'tag', 'brand', 'attribute' );
+	public const FIELDS = array( 'name', 'sku', 'short', 'long', 'category', 'tag', 'brand', 'attribute', 'custom' );
+
+	/**
+	 * Custom fields indexed at most, and the characters kept of all of a product's custom fields together (D-119).
+	 */
+	public const CUSTOM_FIELDS_MAX  = 20;
+	public const CUSTOM_FIELD_CHARS = 2000;
 
 	/**
 	 * Request-level cache of the option.
@@ -73,6 +88,8 @@ final class Settings {
 			'index_posts'                  => 'no',
 			'index_pages'                  => 'no',
 			'fields'                       => self::defaultFieldWeights(),
+			// Product meta keys (ACF field names among them) searched as the "custom" field (D-119).
+			'custom_fields'                => array(),
 			// Languages: empty means the site's language only; the csearch_languages filter adds more.
 			'languages'                    => array(),
 			'fallback_to_default_language' => 'yes',
@@ -89,6 +106,9 @@ final class Settings {
 			// whether a query that names a category opens it.
 			'filter_attributes'            => array(),
 			'category_redirect'            => 'yes',
+			// The owner's rules for single queries (D-108, D-110): a query sent to a page, products pinned to a query.
+			'query_redirects'              => array(),
+			'pinned_products'              => array(),
 			// The suggestion panel's defaults (a block instance can override each).
 			'suggest_limit'                => self::LIMIT_DEFAULT,
 			'suggest_terms'                => self::TERMS_DEFAULT,
@@ -101,6 +121,12 @@ final class Settings {
 			'panel_position'               => self::PANEL_AUTO,
 			'recent_searches'              => 'no',
 			'theme_form_takeover'          => 'no',
+			// The panel's extras (1.3): suggested searches (D-112), categories to search within (D-113), add to cart
+			// (D-115, off: a shop chooses it), and the browser events an analytics tag can listen to (D-116).
+			'suggest_queries'              => 'yes',
+			'suggest_scopes'               => 'yes',
+			'suggest_cart'                 => 'no',
+			'analytics_events'             => 'yes',
 			// Analytics.
 			'retention_days'               => self::RETENTION_DEFAULT,
 			'stats'                        => array(),
@@ -122,6 +148,7 @@ final class Settings {
 			'tag'       => 3,
 			'short'     => 2,
 			'long'      => 1,
+			'custom'    => 4,
 		);
 	}
 
@@ -217,7 +244,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}
@@ -235,8 +262,17 @@ final class Settings {
 		if ( isset( $input['fallback_products'] ) && is_array( $input['fallback_products'] ) ) {
 			$out['fallback_products'] = self::sanitizeIds( $input['fallback_products'] );
 		}
+		if ( isset( $input['custom_fields'] ) && is_array( $input['custom_fields'] ) ) {
+			$out['custom_fields'] = self::sanitizeMetaKeys( $input['custom_fields'] );
+		}
 		if ( isset( $input['filter_attributes'] ) && is_array( $input['filter_attributes'] ) ) {
 			$out['filter_attributes'] = self::sanitizeTaxonomies( $input['filter_attributes'] );
+		}
+		if ( isset( $input['query_redirects'] ) && is_array( $input['query_redirects'] ) ) {
+			$out['query_redirects'] = self::sanitizeRedirects( $input['query_redirects'] );
+		}
+		if ( isset( $input['pinned_products'] ) && is_array( $input['pinned_products'] ) ) {
+			$out['pinned_products'] = self::sanitizePins( $input['pinned_products'] );
 		}
 		foreach ( array( 'help', 'guide' ) as $link ) {
 			if ( isset( $input[ $link . '_page' ] ) ) {
@@ -334,6 +370,65 @@ final class Settings {
 	}
 
 	/**
+	 * Query redirects (D-108): each a query, a language (empty for every one) and an address, 200 at most. Whether
+	 * the address is one of the shop's own is checked where it is used ({@see \CreativeBranding\Search\Search\OwnerRules}).
+	 *
+	 * @param array<mixed, mixed> $input Raw rules.
+	 * @return array<int, array{query: string, lang: string, url: string}>
+	 */
+	public static function sanitizeRedirects( array $input ): array {
+		$out = array();
+		foreach ( $input as $rule ) {
+			$base = is_array( $rule ) ? self::ruleBase( $rule ) : null;
+			$url  = is_array( $rule ) ? mb_substr( esc_url_raw( trim( self::toString( $rule['url'] ?? '' ) ) ), 0, self::RULE_URL_MAX, 'UTF-8' ) : '';
+			if ( null === $base || '' === $url || count( $out ) === self::QUERY_RULES_MAX ) {
+				continue;
+			}
+			$out[] = $base + array( 'url' => $url );
+		}
+		return $out;
+	}
+
+	/**
+	 * Pinned products (D-110): each a query, a language (empty for every one) and one to five product ids in the
+	 * owner's order, 200 at most.
+	 *
+	 * @param array<mixed, mixed> $input Raw rules.
+	 * @return array<int, array{query: string, lang: string, ids: int[]}>
+	 */
+	public static function sanitizePins( array $input ): array {
+		$out = array();
+		foreach ( $input as $rule ) {
+			$base = is_array( $rule ) ? self::ruleBase( $rule ) : null;
+			$ids  = is_array( $rule ) && isset( $rule['ids'] ) && is_array( $rule['ids'] ) ? array_slice( self::sanitizeIds( $rule['ids'] ), 0, self::PINS_MAX ) : array();
+			if ( null === $base || array() === $ids || count( $out ) === self::QUERY_RULES_MAX ) {
+				continue;
+			}
+			$out[] = $base + array( 'ids' => $ids );
+		}
+		return $out;
+	}
+
+	/**
+	 * A rule's query (plain text, 200 characters) and language (a code, or empty for every one); null without a
+	 * query.
+	 *
+	 * @param array<mixed, mixed> $rule Raw rule.
+	 * @return array{query: string, lang: string}|null
+	 */
+	private static function ruleBase( array $rule ): ?array {
+		$query = mb_substr( trim( sanitize_text_field( self::toString( $rule['query'] ?? '' ) ) ), 0, self::RULE_QUERY_MAX, 'UTF-8' );
+		if ( '' === $query ) {
+			return null;
+		}
+		$lang = self::sanitizeLanguages( array( self::toString( $rule['lang'] ?? '' ) ) );
+		return array(
+			'query' => $query,
+			'lang'  => $lang[0] ?? '',
+		);
+	}
+
+	/**
 	 * Attribute taxonomy names (`pa_width`): unique, in the order given; anything else dropped.
 	 *
 	 * @param array<mixed, mixed> $input Raw names.
@@ -345,6 +440,24 @@ final class Settings {
 			$name = is_string( $name ) ? sanitize_key( $name ) : '';
 			if ( 1 === preg_match( '/^pa_[a-z0-9_-]{1,29}$/', $name ) && ! in_array( $name, $out, true ) ) {
 				$out[] = $name;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Meta keys (D-119): letters, digits, underscores, hyphens, dots and colons, 1 to 64 characters, not one of
+	 * WordPress's own `_wp_` or `_edit_` keys; unique, in the order given, 20 at most.
+	 *
+	 * @param array<mixed, mixed> $input Raw keys.
+	 * @return string[]
+	 */
+	public static function sanitizeMetaKeys( array $input ): array {
+		$out = array();
+		foreach ( $input as $key ) {
+			$key = is_string( $key ) ? trim( $key ) : '';
+			if ( 1 === preg_match( '/^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,63}$/', $key ) && 1 !== preg_match( '/^_(wp|edit)_/', $key ) && ! in_array( $key, $out, true ) && count( $out ) < self::CUSTOM_FIELDS_MAX ) {
+				$out[] = $key;
 			}
 		}
 		return $out;

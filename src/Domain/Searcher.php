@@ -16,7 +16,9 @@ defined( 'ABSPATH' ) || exit;
  * stem, and the prefix terms of the unfinished last token; then typo candidates when that finds nothing,
  * D-033); AND across tokens; minus words excluded; quoted phrases enforced; the least-matched token dropped once
  * when no product matches (D-034); hidden products only for their exact SKU; every product scored and sorted;
- * the categories, tags and brands any token names, scored by name; the fallback language when nothing is found.
+ * the query's other forms from the owner's phrase synonyms ranked too and merged, each product at its best (D-109);
+ * the categories, tags and brands any token names, scored by name; the fallback language when nothing is found;
+ * the query the results are for when a token was dropped or a typo read as its closest term (D-114).
  * A search of the posts and pages (1.1) runs the same way over their own postings and counts (D-093).
  */
 final class Searcher {
@@ -61,54 +63,136 @@ final class Searcher {
 	 */
 	private function run( Query $query, string $lang, SearchOptions $options ): SearchResult {
 		$kind      = $options->kind;
-		$widenings = array();
-		foreach ( $query->tokens as $i => $token ) {
-			$widenings[ $i ] = $this->widen( $token, $lang, $kind );
-		}
-		$excluded = $this->excludedTerms( $query, $lang );
-		$n        = $this->index->documentCount( $lang, $kind );
+		$widenings = $this->widenAll( $query, $lang, $kind, $options->strict );
+		$excluded  = $this->excludedTerms( $query, $lang );
+		$n         = $this->index->documentCount( $lang, $kind );
 
-		$products  = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
-		$corrected = null;
+		$products = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
+		$forms    = array( array( $query, $widenings ) );
+		foreach ( $query->alternatives as $alternative ) {
+			$widened  = $this->widenAll( $alternative, $lang, $kind, $options->strict );
+			$forms[]  = array( $alternative, $widened );
+			$products = self::merge( $products, $this->index->rank( RankPlan::of( $alternative, $widened, $lang, $n, $excluded, $options ) ), $options->limit );
+		}
+		$typos    = self::typos( $widenings );
+		$drop     = null;
+		$answered = $query;
+		$used     = $widenings;
 		if ( array() === $products && $options->retry && count( $widenings ) >= 2 ) {
 			$drop     = $this->leastMatched( $widenings, $lang, $kind );
 			$reduced  = $query->without( $drop );
 			$kept     = array_values( array_filter( $widenings, static fn( int $i ): bool => $i !== $drop, ARRAY_FILTER_USE_KEY ) );
 			$products = $this->index->rank( RankPlan::of( $reduced, $kept, $lang, $n, $excluded, $options ) );
 			if ( array() !== $products ) {
-				$corrected = $reduced->text;
+				$answered = $reduced;
+				$used     = $kept;
 			}
+		}
+		// What the results are for, when it is not what was typed: a word left out, a typo read as its closest term.
+		$corrected = null;
+		if ( array() !== $products && ( null !== $drop || array() !== $typos ) ) {
+			$corrected = $query->rewritten( $typos, $drop );
 		}
 
 		$terms = array();
 		if ( Kind::CONTENT !== $kind ) {
-			foreach ( $this->termDocuments( $widenings, $this->excludedOthers( $excluded, $lang ) ) as $document ) {
-				$terms[] = new Hit( $document, $this->scorer->scoreTerm( $query, $document, $widenings ) );
+			$others = $this->excludedOthers( $excluded, $lang );
+			foreach ( $forms as [ $form, $widened ] ) {
+				foreach ( $this->termDocuments( $widened, $others ) as $document ) {
+					$terms[] = new Hit( $document, $this->scorer->scoreTerm( $form, $document, $widened ) );
+				}
 			}
 		}
-		usort( $terms, array( Hit::class, 'compareTerms' ) );
-		$terms = array_slice( $terms, 0, $options->termLimit );
+		$terms = array_slice( self::best( $terms, 'compareTerms' ), 0, $options->termLimit );
 
-		return new SearchResult( $products, $terms, $lang, $corrected );
+		return new SearchResult( $products, $terms, $lang, $corrected, array_map( static fn( TokenWidening $w ): array => self::termsOf( $w->matches ), $used ), $answered->key(), null !== $corrected && null !== $drop );
+	}
+
+	/**
+	 * Widen every token of a query.
+	 *
+	 * @param Query  $query  The query.
+	 * @param string $lang   Language code.
+	 * @param int    $kind   What is searched ({@see Kind}).
+	 * @param bool   $strict Strong matches only (D-118).
+	 * @return TokenWidening[] Keyed as the query's tokens are.
+	 */
+	private function widenAll( Query $query, string $lang, int $kind, bool $strict ): array {
+		$widenings = array();
+		foreach ( $query->tokens as $i => $token ) {
+			$widenings[ $i ] = $this->widen( $token, $lang, $kind, $strict );
+		}
+		return $widenings;
+	}
+
+	/**
+	 * Two rankings as one (a query and one of its other forms, D-109): each product once, at its better score,
+	 * in the products' order, within the limit.
+	 *
+	 * @param Hit[] $ranked One ranking.
+	 * @param Hit[] $more   Another.
+	 * @param int   $limit  At most this many.
+	 * @return Hit[]
+	 */
+	private static function merge( array $ranked, array $more, int $limit ): array {
+		return array_slice( self::best( array_merge( $ranked, $more ), 'compare' ), 0, $limit );
+	}
+
+	/**
+	 * Hits in order, each document once, where it ranks best; keyed by document id (the callers' array_slice() renumbers them).
+	 *
+	 * @param Hit[]                    $hits  Hits, a document perhaps more than once.
+	 * @param 'compare'|'compareTerms' $order {@see Hit::compare()} or {@see Hit::compareTerms()}.
+	 * @return Hit[]
+	 */
+	private static function best( array $hits, string $order ): array {
+		usort( $hits, array( Hit::class, $order ) );
+		$best = array();
+		foreach ( $hits as $hit ) {
+			$best[ $hit->document->id ] ??= $hit;
+		}
+		return $best;
+	}
+
+	/**
+	 * The tokens that matched only through a typo, each with the term it was read as: the closest, the one sharing
+	 * most trigrams on a tie (D-033's order), as indexed, so folded (D-114).
+	 *
+	 * @param array<int, TokenWidening> $widenings One per token.
+	 * @return array<int, string> Token index to term.
+	 */
+	private static function typos( array $widenings ): array {
+		$out = array();
+		foreach ( $widenings as $i => $widening ) {
+			$first = $widening->matches[ array_key_first( $widening->matches ) ?? '' ] ?? null;
+			// A widening holds one level only: typo candidates are tried when nothing nearer was found.
+			if ( null !== $first && in_array( $first->kind, array( TermMatch::TYPO1, TermMatch::TYPO2 ), true ) ) {
+				$out[ $i ] = $first->term;
+			}
+		}
+		return $out;
 	}
 
 	/**
 	 * Widen one token: the exact term, its spellings, its stem and its synonyms, plus the terms it is a prefix
 	 * of when it is the unfinished last token; typo candidates only when none of that finds anything.
 	 *
-	 * @param QueryToken $token A token.
-	 * @param string     $lang  Language code.
-	 * @param int        $kind  What is searched ({@see Kind}): its terms alone are kept.
+	 * @param QueryToken $token  A token.
+	 * @param string     $lang   Language code.
+	 * @param int        $kind   What is searched ({@see Kind}): its terms alone are kept.
+	 * @param bool       $strict Strong matches only (D-118): no prefix terms, no typo candidates.
 	 */
-	public function widen( QueryToken $token, string $lang, int $kind = Kind::PRODUCT ): TokenWidening {
-		$matches = array( $token->text => new TermMatch( $token->text, TermMatch::EXACT ) );
+	public function widen( QueryToken $token, string $lang, int $kind = Kind::PRODUCT, bool $strict = false ): TokenWidening {
+		// A word a phrase synonym put in scores as a synonym, its stem too (D-109).
+		$exact   = $token->synonym ? TermMatch::SYNONYM : TermMatch::EXACT;
+		$matches = array( $token->text => new TermMatch( $token->text, $exact ) );
 		foreach ( $token->variants as $variant ) {
-			$matches[ $variant ] = new TermMatch( $variant, TermMatch::EXACT );
+			$matches[ $variant ] = new TermMatch( $variant, $exact );
 		}
 		if ( $token->stemmable() ) {
 			$stem = $this->analyzer->stemOf( $token->source, $lang );
 			if ( '' !== $stem ) {
-				$matches[ $stem ] ??= new TermMatch( $stem, TermMatch::STEM );
+				$matches[ $stem ] ??= new TermMatch( $stem, $token->synonym ? TermMatch::SYNONYM : TermMatch::STEM );
 			}
 		}
 		foreach ( $token->synonyms as $synonym ) {
@@ -118,7 +202,7 @@ final class Searcher {
 				$matches[ $stem ] ??= new TermMatch( $stem, TermMatch::SYNONYM );
 			}
 		}
-		if ( $token->prefix ) {
+		if ( $token->prefix && ! $strict ) {
 			foreach ( $this->index->termsWithPrefix( $token->text, self::PREFIX_TERMS, $kind, $lang ) as $term => $df ) {
 				$matches[ $term ] ??= new TermMatch( (string) $term, TermMatch::PREFIX, $df );
 			}
@@ -127,7 +211,7 @@ final class Searcher {
 		if ( ! $level->isEmpty() ) {
 			return $level;
 		}
-		if ( $token->fuzzable() ) {
+		if ( $token->fuzzable() && ! $strict ) {
 			$level = $this->lookup( $this->typoCandidates( $token->text ), $lang, $kind, self::TYPO_TERMS );
 			if ( ! $level->isEmpty() ) {
 				return $level;

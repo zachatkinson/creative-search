@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { axe } from './support/axe';
+import { login } from './support/login';
 
 /**
  * Milestone 1 has no screen of its own, so the smoke test proves the plugin is active, raises no console
@@ -7,17 +8,6 @@ import { axe } from './support/axe';
  * screen is WordPress's and WooCommerce's to fix). The axe helper is the one the block (milestone 6) and the
  * admin tabs (milestone 7) will use on every state.
  */
-
-const USER = process.env.WP_ADMIN_USER || 'admin';
-const PASS = process.env.WP_ADMIN_PASS || 'password';
-
-async function login( page: Page ) {
-	await page.goto( '/wp-login.php' );
-	await page.fill( '#user_login', USER );
-	await page.fill( '#user_pass', PASS );
-	await page.click( '#wp-submit' );
-	await page.waitForURL( /wp-admin/ );
-}
 
 // WooCommerce's own dashboard widgets load over admin-ajax after login; WebKit reports those requests as
 // console errors ("due to access control checks"). They are not the plugin's and are left out of the count.

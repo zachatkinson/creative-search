@@ -18,8 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * The steps of an upgrade that `dbDelta()` cannot take: it adds columns and keys but never replaces a primary
  * key, and it fills nothing in. Each step looks at the table before it acts, so an upgrade cut off halfway (a
- * time limit, a crash) resumes where it stopped (D-090), and `complete()` says whether the tables are schema 2,
- * which `Schema::install()` checks before it records the version.
+ * time limit, a crash) resumes where it stopped (D-090), and `complete()` says whether the tables are the current
+ * schema, which `Schema::install()` checks before it records the version.
  */
 final class Migration {
 
@@ -72,12 +72,16 @@ final class Migration {
 	}
 
 	/**
-	 * Whether the tables are schema 2: the postings keyed and filled in, the term counts there.
+	 * Whether the tables are the current schema: the postings keyed and filled in, the term counts there (2), the
+	 * facts table and the documents' cart flag there (3, D-104, D-106; `dbDelta()` adds both, and the rebuild the
+	 * upgrade owes fills them).
 	 */
 	public static function complete(): bool {
 		global $wpdb;
 		$postings = Tables::postings();
 		return self::tableExists( Tables::stats() )
+			&& self::tableExists( Tables::facts() )
+			&& self::columnExists( Tables::documents(), 'cart' )
 			&& self::columnExists( Tables::documents(), 'name_key' )
 			&& self::columnExists( $postings, 'lang' )
 			&& self::POSTINGS_KEY === self::primaryKey( $postings )

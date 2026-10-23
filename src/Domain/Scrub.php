@@ -58,6 +58,16 @@ final class Scrub {
 	}
 
 	/**
+	 * The patterns as a browser's `RegExp` takes them, each with the `u` flag: the panel redacts what it tells an
+	 * analytics tag by the same rules the log uses (D-116).
+	 *
+	 * @return string[]
+	 */
+	public static function sources(): array {
+		return array_map( static fn( string $pattern ): string => implode( '/', array_slice( explode( '/', $pattern ), 1, -1 ) ), self::PATTERNS );
+	}
+
+	/**
 	 * The query, or `[redacted]` when it looks personal.
 	 *
 	 * @param string $query The query as typed.

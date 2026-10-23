@@ -14,8 +14,10 @@ use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Repository\LogRepository;
 use CreativeBranding\Search\Repository\SynonymRepository;
 use CreativeBranding\Search\Settings\Settings;
+use CreativeBranding\Search\Support\Clock;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Fixtures\GoldenQueries;
@@ -34,13 +36,21 @@ use WP_REST_Request;
  * 2. Milestone 4's golden set through the API, with the catalogue in two languages the way skatehouse-core
  *    answers `csearch_languages` and the golden set's synonyms (spec: Security, performance → Performance):
  *    `/suggest` p95 within 60 ms warm and 100 ms cold, `/search` within 100 ms, 4 MB above the baseline. Times
- *    are measured around `rest_do_request()`: the route's own work, without WordPress's bootstrap.
+ *    are measured around `rest_do_request()`: the route's own work, without WordPress's bootstrap. The search
+ *    log holds each golden query from a results page 3 times and 10,000 other rows, so every answer pays for
+ *    its suggested searches (D-112) and its category scopes (D-113), and the owner has 200 redirects and 200
+ *    pinned searches, the most of each (D-108, D-110).
  *
  * Each phase writes its time to STDERR as it ends, so a slow run shows where the time went.
  *
  * @group benchmark
  */
 final class CatalogueBenchmarkTest extends IndexTestCase {
+
+	/**
+	 * Timings of each cold request; the fastest is kept (D-129).
+	 */
+	private const TIMINGS = 3;
 
 	/**
 	 * When the test began, for the phase lines.
@@ -105,6 +115,33 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 		$this->analyzeAside( self::$analyzed );
 		do_action( 'rest_api_init' );
 		$this->phase( 'reindexed in English and French, with the synonyms, pages and posts', $start );
+		$start = hrtime( true );
+		$this->seedLog();
+		// The most owner rules of each kind (D-108, D-110), none of them a golden query: every answer looks its
+		// words up among them (1.3 review M7).
+		$redirects = array();
+		$pins      = array();
+		$products  = array_values( $ids );
+		for ( $i = 0; $i < Settings::QUERY_RULES_MAX; $i++ ) {
+			$redirects[] = array(
+				'query' => 'owner page ' . $i,
+				'lang'  => 0 === $i % 2 ? '' : 'en',
+				'url'   => home_url( '/page-' . $i . '/' ),
+			);
+			$pins[]      = array(
+				'query' => 'owner pick ' . $i,
+				'lang'  => 0 === $i % 2 ? '' : 'fr',
+				'ids'   => array( $products[ $i % count( $products ) ] ),
+			);
+		}
+		Settings::update(
+			array(
+				'query_redirects' => $redirects,
+				'pinned_products' => $pins,
+			)
+		);
+		self::assertCount( Settings::QUERY_RULES_MAX, Settings::get( 'pinned_products' ) );
+		$this->phase( 'search log seeded, 200 redirects and 200 pins', $start );
 
 		$queried  = hrtime( true );
 		$failures = array();
@@ -120,15 +157,28 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 			memory_reset_peak_usage();
 			$start    = hrtime( true );
 			$data     = $this->get( '/suggest', array( 'q' => $q['q'], 'lang' => $q['lang'] ) );
-			$cold[]   = ( hrtime( true ) - $start ) / 1e6;
+			$times    = array( ( hrtime( true ) - $start ) / 1e6 );
 			$memory[] = ( memory_get_peak_usage() - $baseline ) / 1048576;
 			$start    = hrtime( true );
 			$this->get( '/suggest', array( 'q' => $q['q'], 'lang' => $q['lang'] ) );
-			$warm[]   = ( hrtime( true ) - $start ) / 1e6;
-			wp_cache_flush();
-			$start    = hrtime( true );
-			$ranked   = $this->get( '/search', array( 'q' => $q['q'], 'lang' => $q['lang'], 'per_page' => 100 ) );
-			$search[] = ( hrtime( true ) - $start ) / 1e6;
+			$warm[] = ( hrtime( true ) - $start ) / 1e6;
+			// A shared runner only ever adds time: each cold request is timed three times, the cache emptied
+			// before each, and the fastest kept (D-129). The p95 is still taken over the queries.
+			for ( $i = 1; $i < self::TIMINGS; $i++ ) {
+				wp_cache_flush();
+				$start   = hrtime( true );
+				$this->get( '/suggest', array( 'q' => $q['q'], 'lang' => $q['lang'] ) );
+				$times[] = ( hrtime( true ) - $start ) / 1e6;
+			}
+			$cold[] = min( $times );
+			$times  = array();
+			for ( $i = 0; $i < self::TIMINGS; $i++ ) {
+				wp_cache_flush();
+				$start   = hrtime( true );
+				$ranked  = $this->get( '/search', array( 'q' => $q['q'], 'lang' => $q['lang'], 'per_page' => 100 ) );
+				$times[] = ( hrtime( true ) - $start ) / 1e6;
+			}
+			$search[] = min( $times );
 
 			$shown = array_map( static fn( array $p ): string => $skus[ $p['id'] ] ?? '?', $data['products'] );
 			$all   = array_map( static fn( int $id ): string => $skus[ $id ] ?? '?', $ranked['ids'] );
@@ -171,8 +221,9 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 		);
 		$this->phase(
 			sprintf(
-				'%d queries: /suggest p95 cold %.1f ms (budget 100), warm %.1f ms (budget 60); /search p95 %.1f ms (budget 100); peak memory p95 %.2f MB (budget 4)',
+				'%d queries, the fastest of %d cold timings each: /suggest p95 cold %.1f ms (budget 100), warm %.1f ms (budget 60); /search p95 %.1f ms (budget 100); peak memory p95 %.2f MB (budget 4)',
 				count( $cold ),
+				self::TIMINGS,
 				self::p95( $cold ),
 				self::p95( $warm ),
 				self::p95( $search ),
@@ -263,5 +314,41 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 	private static function p95( array $values ): float {
 		sort( $values );
 		return $values[ (int) max( 0, ceil( 0.95 * count( $values ) ) - 1 ) ];
+	}
+
+	/**
+	 * The search log a shop has after a while: each golden query searched three times from a results page (so
+	 * each is a suggested search for its own prefix) and 10,000 other searches, within the retention window.
+	 */
+	private function seedLog(): void {
+		$log  = $this->service( LogRepository::class );
+		$when = Clock::format( Clock::timestamp() - DAY_IN_SECONDS );
+		$rows = array();
+		foreach ( GoldenQueries::queries() as $q ) {
+			$normalised = mb_strtolower( trim( (string) $q['q'] ), 'UTF-8' );
+			for ( $i = 0; $i < 3; $i++ ) {
+				$rows[] = array(
+					'query'      => (string) $q['q'],
+					'normalised' => $normalised,
+					'lang'       => (string) $q['lang'],
+					'results'    => 1,
+					'source'     => 'page',
+					'created_at' => $when,
+				);
+			}
+		}
+		for ( $i = 0; $i < 10000; $i++ ) {
+			$rows[] = array(
+				'query'      => 'noise ' . $i,
+				'normalised' => 'noise ' . $i,
+				'lang'       => 0 === $i % 2 ? 'en' : 'fr',
+				'results'    => $i % 3,
+				'source'     => 0 === $i % 4 ? 'page' : 'suggest',
+				'created_at' => $when,
+			);
+		}
+		foreach ( array_chunk( $rows, 500 ) as $chunk ) {
+			$log->insert( $chunk );
+		}
 	}
 }

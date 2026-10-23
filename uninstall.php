@@ -1,6 +1,6 @@
 <?php
 /**
- * Uninstall: removes the seven tables, every option and transient, the product, post and page meta, the scheduled actions
+ * Uninstall: removes the eight tables, every option and transient, the product, post and page meta, the scheduled actions
  * and the object-cache group, on every site of a network. Deactivation leaves all of it in place.
  *
  * The work is in Install\Uninstaller so the integration suite can prove it leaves nothing; this file only
@@ -30,7 +30,7 @@ if ( class_exists( \CreativeBranding\Search\Install\Uninstaller::class ) ) {
  */
 function csearch_uninstall_site(): void {
 	global $wpdb;
-	foreach ( array( 'log', 'synonyms', 'term_stats', 'trigrams', 'postings', 'terms', 'documents' ) as $table ) {
+	foreach ( array( 'log', 'synonyms', 'term_stats', 'trigrams', 'postings', 'facts', 'terms', 'documents' ) as $table ) {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $wpdb->prefix . 'csearch_' . $table ) );
 	}

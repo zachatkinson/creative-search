@@ -87,7 +87,39 @@ final class QueryParser {
 		foreach ( $kept as $i => $token ) {
 			$kept[ $i ] = $token->withSynonyms( $this->synonyms->alternatives( $token->text, $lang ) );
 		}
-		return new Query( $text, $lang, $kept, $excluded, $all );
+		return new Query( $text, $lang, $kept, $excluded, $all, $this->alternatives( $kept, $excluded, $lang, $all ) );
+	}
+
+	/**
+	 * The query's other forms (D-109): for each phrase synonym whose words the query holds side by side, the
+	 * query with the synonym's words in their place, three at most. The words put in keep the place's quoted
+	 * phrase, are never a prefix, and score as a synonym.
+	 *
+	 * @param QueryToken[] $kept     The tokens to match, keyed from 0 (array_slice() renumbers them).
+	 * @param QueryToken[] $excluded The minus words.
+	 * @param string       $lang     Language code.
+	 * @param bool         $all      Whether every token was a stop word.
+	 * @return Query[]
+	 */
+	private function alternatives( array $kept, array $excluded, string $lang, bool $all ): array {
+		$texts = array_map( static fn( QueryToken $t ): string => $t->text, $kept );
+		$out   = array();
+		foreach ( $this->synonyms->phrases( $lang ) as $rule ) {
+			$at = Synonyms::find( $texts, $rule['from'] );
+			if ( null === $at ) {
+				continue;
+			}
+			$made = array();
+			foreach ( $rule['to'] as $word ) {
+				$made[] = new QueryToken( $word->text, $word->source(), false, $kept[ $at ]->phrase, false, false, $this->synonyms->alternatives( $word->text, $lang ), array(), true );
+			}
+			$tokens = array_slice( array_merge( array_slice( $kept, 0, $at ), $made, array_slice( $kept, $at + count( $rule['from'] ) ) ), 0, Query::MAX_TOKENS );
+			$out[]  = new Query( Query::render( $tokens, $excluded ), $lang, $tokens, $excluded, $all );
+			if ( count( $out ) === Query::MAX_ALTERNATIVES ) {
+				break;
+			}
+		}
+		return $out;
 	}
 
 	/**

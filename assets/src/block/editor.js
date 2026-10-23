@@ -61,6 +61,14 @@ function Edit( { attributes, setAttributes } ) {
 							setAttributes( { mode: value } )
 						}
 					/>
+					{ 'button' !== attributes.mode &&
+						toggle(
+							'dimPage',
+							__(
+								'Dim the page behind the suggestions',
+								'creative-search'
+							)
+						) }
 					{ toggle(
 						'labelVisible',
 						__( 'Show the label', 'creative-search' )

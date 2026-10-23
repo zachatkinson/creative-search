@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { axe } from './support/axe';
+import { login } from './support/login';
 
 /**
  * Milestone 8: the shop in Canadian French. The global setup turned on the bilingual fixture
@@ -7,9 +8,6 @@ import { axe } from './support/axe';
  * with prices as `84,99 $`. The block, the results page and the admin screen speak French, accents fold,
  * French stems match, and a word only the English documents hold falls back to them. Axe on each state.
  */
-
-const USER = process.env.WP_ADMIN_USER || 'admin';
-const PASS = process.env.WP_ADMIN_PASS || 'password';
 
 // French typography puts a no-break space inside guillemets and before a colon.
 const S = '[\\s\\u00a0\\u202f]';
@@ -198,17 +196,14 @@ test.describe( 'scripts blocked, in French', () => {
 
 test.describe( 'the admin in French', () => {
 	test.beforeEach( async ( { page } ) => {
-		await page.goto( '/wp-login.php' );
-		await page.fill( '#user_login', USER );
-		await page.fill( '#user_pass', PASS );
-		await page.click( '#wp-submit' );
-		await page.waitForURL( /wp-admin/ );
+		await login( page );
 	} );
 
 	for ( const [ tab, heading ] of [
 		[ 'analytics', 'Résumé' ],
 		[ 'synonyms', 'Ajouter un synonyme' ],
 		[ 'boosts', 'Règles de promotion' ],
+		[ 'rules', 'Redirections' ],
 		[ 'tools', 'Index' ],
 	] ) {
 		test( `the ${ tab } tab in French`, async ( { page } ) => {

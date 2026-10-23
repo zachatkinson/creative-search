@@ -4,6 +4,61 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-23
+
+Field mode in a sticky site header (the Skatehouse header moving from Button mode to an always-visible field).
+
+### Added
+- Colour hooks: `--csearch-field-bg`, `--csearch-field-fg`, `--csearch-panel-bg`, `--csearch-panel-fg`, `--csearch-submit-bg`, `--csearch-submit-fg` and `--csearch-focus-ring`, set anywhere (`:root`, a header, the block); with none set the block looks as before (D-128).
+- The block's "Dim the page behind the suggestions" toggle (`dimPage`, on by default; `dim_page="no"` on the shortcode). The `csearch_dim_page` filter still has the last word (D-127).
+
+### Changed
+- In a fixed or sticky header, or on a touch screen, the suggestions are capped to the room left in the visible viewport, following the keyboard as it opens and closes. As on a desktop, the last rows are dropped until the rest fit; only when two suggestions and "See all" do not fit does the list scroll inside itself, and then arrowing moves the list, not the page. On `auto`, the panel opens above the field only when there is more room above than below. A desktop page that scrolls keeps the natural height with no inner scrollbar (D-126, refining D-092).
+
+### Fixed
+- Theme input styles (Kadence's background, border, radius, padding and focus shadow, a site's own `input:focus` outline) no longer draw a second box inside the field or stack focus rings: in Field mode the field shows the one focus indicator, and on a touch screen the input is at least 16px so iOS does not zoom (D-125).
+- Inside a header with a transform (Kadence's sticky header), the dimmed page covered only the header; it now covers the viewport, and a click on it still closes the suggestions (D-127).
+
+### Fixed before release (tests and CI)
+- The browser tests log in through one helper that waits for wp-login.php's own focus and checks both fields before it submits; on a slow runner the password had landed in the username field (the 1.2 merge's failed CI run).
+- The 10,000-product budgets keep the fastest of three cold timings per query, so a shared runner's noise no longer fails identical code (D-129).
+- New browser tests on Kadence's own sticky header (desktop and phone) and on a fixture header with clashing theme input styles.
+
+## [1.3.0] - 2026-10-22
+
+The rest of docs/research: Baymard's remaining gaps and the competitor scan's, as planned in DECISIONS (Zach on the Skatehouse handoff).
+
+### Added
+- A query that names one design, colour or size of a variable product (by an attribute value only some of its variations carry, or by a variation's whole SKU) shows that variation's own photo in the panel and on the results page, and opens the product with it chosen (`?attribute_design=Fire`). Each product's SKUs and attribute values are kept beside its document in a new `facts` table (D-104).
+- "Why this matched": a suggestion row and a results-page card whose name does not show the matched words say what did, "Matches SKU MUM-FUR-ICE", "Matches Design: Fire" or "Matches the description"; nothing for a name, category, tag or brand match. Worked out for the shown products only and cached (D-105). The `/suggest` answer's products carry `matched`.
+- Documents carry `cart`: a simple product that is purchasable and in stock, for the panel's add to cart (D-106).
+- Search within the current category (Baymard): on a category page, and on a search already kept to one, the search form offers "Only in Decks", ticked. The search then sends `product_cat=decks`, the suggestions and the results keep to Decks and its subcategories (ranked within them, not cut from the shop's ranking), and the results page reads "3 results for “kazumi” in Decks" with a link to search every product. Such a search is never sent to another category; a size in it becomes the filter in the same category. `/suggest` takes `cat` (D-117).
+- Custom fields, ACF's among them: product meta keys ticked or typed under Tools → What to index (`custom_fields`, none by default) are searched as their own field, weight 4. Lists are flattened; ACF choices add their labels, post and taxonomy fields their titles and names; a product's custom text is capped at 2,000 characters; a change to one of those fields reindexes the product (D-119, D-120).
+- Suggested searches in the panel: up to three past searches that start with what is typed, each searched at least three times, found something and every word still in the catalogue (two on a phone). Setting `suggest_queries` (on), filter `csearch_suggested_searches` (D-112).
+- Category scopes in the panel: "kazumi in Decks", up to two categories holding most of the first ten products, each the search within that category (`product_cat`). Setting `suggest_scopes` (on) (D-113).
+- Add to cart from the panel for products that need no choice: a pointer "Add" on the row and Shift+Enter from the keyboard, through WooCommerce's own `wc-ajax=add_to_cart`. Setting `suggest_cart` (off) (D-115).
+- Analytics events: `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` on the form, and the GA4 `search`, `select_item`, `select_content`, `add_to_cart` and `csearch_no_results` on an existing `dataLayer`, with a search that looks like personal details sent as `[redacted]`, and no-results once per submitted search. Setting `analytics_events` (on) (D-116).
+- The suggest answer carries `queries`, `scopes`, and each product's `price` and `cart`.
+- A "Suggestions" section on the Tools tab for the four settings.
+- Query redirects: the owner sends a search's words to a page of this site instead of the results ("size guide" to the size guides), on the new Redirects and pins tab or with `wp csearch redirect add|list|remove`. Same-site only; checked before categories and filters; the search is still logged with what it would have found. Setting `query_redirects`, filter `csearch_query_redirect` (D-108, D-111).
+- Synonyms of more than one word on either side: "ss" means "stainless steel", "skate shoes" means "sneakers". A search holding the words side by side also searches what they mean, as a whole, and each product is ranked once at its better score (D-109).
+- Pinned products: up to five products, by SKU or ID, first for a search's words in the panel, on the results page and in `/search`, on the Redirects and pins tab or with `wp csearch pin add|list|remove`. Hidden and unpublished products are still left out; a pinned search is not sent to a category. Setting `pinned_products`, filter `csearch_pinned_products` (D-110, D-111).
+
+### Changed
+- A sort other than Relevance (price, popularity, rating, date) lists the strong matches only: every word as typed, its spellings, stem or synonyms, never a completion of an unfinished word or a typo's neighbour, so a sort never brings a weak match to the top (Baymard). When nothing is strong, every match is listed. The count and filters follow (D-118, which replaces D-057's "any other sort keeps the match set").
+- A search found through a typo says "Showing results for “kazumi dealer”." on the results page, in the panel, on the Tools tab and in `wp csearch search`, with no "search instead" link unless a word was also left out. `SearchResult` gains `dropped` (D-114).
+- A synonym whose meaning is several words now means that phrase as a whole, not each of its words: "deck" meaning "skateboard deck" no longer makes "skateboard" alone match "deck" (D-109, superseding D-029).
+- The Synonyms tab's test box is "Test a search" and takes several words.
+- Schema 3: the `facts` table and the documents' `cart` column. A site on schema 2 upgrades in place and owes a rebuild; until it is done, the live index is read as before and no variation or reason is shown (D-107).
+- `csearch_document` gains `cart` and `facts`; `csearch_suggestion_classes` receives the image the row shows, the variation's when one is named.
+
+### Fixed
+- A product search with no results showed WooCommerce's "No products were found matching your selection." above the plugin's no-results state, two status messages for one state; on searches the plugin answers, WooCommerce's notice is left out and its other callbacks still run (D-122).
+- On the chosen row, the price, stock and other secondary text fell to 4.34:1 contrast on the row's tint with the default colours (Storefront); it is darker there now, above 4.5:1.
+- In Button mode, Forward after Back reloaded the page: the dialog's history step dropped the Interactivity API's own key, so the runtime treated it as foreign. The step now keeps the page's state and adds its own key; a stale key left by a reload is removed on its own (D-124).
+- WooCommerce's result count said "Sorted by" the shop's default sort (for example "Sorted by latest") on search results that were in Relevance order; it now says "Sorted by relevance" there, and a search sorted another way keeps WooCommerce's own line (D-123).
+- On WooCommerce 11.2, a search the page does not treat as a product archive had WooCommerce's "hidden from search" rule added outside `woocommerce_product_query_tax_query`, so `hidden_by_sku` never brought a hidden product's exact SKU to the results page; the ranked search now lifts it there too.
+
 ## [1.2.0] - 2026-10-22
 
 Items 9 to 11 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md).

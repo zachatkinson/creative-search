@@ -17,7 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Creates and upgrades the seven plugin tables with dbDelta() (spec: Data model).
+ * Creates and upgrades the eight plugin tables with dbDelta() (spec: Data model; the eighth, `csearch_facts`, and
+ * the documents' `cart` column are schema 3, D-104 and D-106).
  *
  * Keys are written exactly as dbDelta() parses them (two spaces after PRIMARY KEY, `UNIQUE KEY name (cols)`,
  * `KEY name (cols)`). Integer types carry the display width SHOW COLUMNS reports (bigint(20) unsigned,
@@ -31,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class Schema {
 
-	public const DB_VERSION = '2';
+	public const DB_VERSION = '3';
 
 	/**
 	 * Create or upgrade every table. Idempotent.
@@ -70,6 +71,7 @@ final class Schema {
 		$stats     = Tables::stats();
 		$synonyms  = Tables::synonyms();
 		$log       = Tables::log();
+		$facts     = Tables::facts();
 
 		return "
 CREATE TABLE {$documents} (
@@ -89,6 +91,7 @@ CREATE TABLE {$documents} (
   boost smallint(6) NOT NULL DEFAULT 0,
   total_sales int(10) unsigned NOT NULL DEFAULT 0,
   indexed_at datetime NOT NULL,
+  cart tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY  (id),
   UNIQUE KEY object (generation,type,object_id,lang),
   KEY generation_lang (generation,lang)
@@ -150,6 +153,19 @@ CREATE TABLE {$log} (
   PRIMARY KEY  (id),
   KEY created_at (created_at),
   KEY normalised (normalised)
+) {$charset};
+CREATE TABLE {$facts} (
+  document_id bigint(20) unsigned NOT NULL,
+  position smallint(5) unsigned NOT NULL,
+  variation_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  field tinyint(3) unsigned NOT NULL,
+  attribute varchar(191) NOT NULL DEFAULT '',
+  name varchar(191) NOT NULL DEFAULT '',
+  value varchar(191) NOT NULL DEFAULT '',
+  label varchar(191) NOT NULL DEFAULT '',
+  image_id bigint(20) unsigned NULL,
+  terms varchar(255) NOT NULL DEFAULT '',
+  PRIMARY KEY  (document_id,position)
 ) {$charset};
 ";
 	}

@@ -51,7 +51,7 @@ add_filter(
 
 - **Since:** 0.4.0
 - **Signature:** `apply_filters( 'csearch_document', array $document, WC_Product $product, string $lang ): array`
-- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`. Every value is coerced back to its type afterwards.
+- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`, and since 1.3.0 `cart` (a simple product that can go to the cart from the panel, D-106) and `facts` (its SKUs and attribute values, each `variation_id`, `field`, `attribute`, `name`, `value`, `label`, `image_id`, D-104; as the shop wrote them, the same on every language's document, so a language plugin translates `name` and `label` here). Every value is coerced back to its type afterwards.
 - **Where it runs:** `Index\ProductReader::read()`, once per product and language per job.
 - **Example:**
 
@@ -152,7 +152,7 @@ Internal, listed so an owner reading **Tools → Scheduled Actions** knows them;
 
 - **Since:** 0.4.0
 - **Signature:** `apply_filters( 'csearch_fields', array $weights ): array`
-- **What it does:** the field weights the score uses, by field name (`name`, `sku`, `short`, `long`, `category`, `tag`, `brand`, `attribute`), starting from the `fields` setting. Each is clamped to 0 to 100; 0 takes a field out of the score but not out of the index (D-050).
+- **What it does:** the field weights the score uses, by field name (`name`, `sku`, `short`, `long`, `category`, `tag`, `brand`, `attribute`, and since 1.3.0 `custom`, the owner's custom fields, D-119), starting from the `fields` setting. Each is clamped to 0 to 100; 0 takes a field out of the score but not out of the index (D-050).
 - **Where it runs:** `Search\SearchService::options()`, on every search that is not answered from the cache.
 - **Example:**
 
@@ -188,7 +188,7 @@ add_filter( 'csearch_rate_limit', static fn( int $limit, string $route ): int =>
 
 | Route | Access | Returns |
 | --- | --- | --- |
-| `GET /suggest?q=&lang=&limit=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ products, terms, total, query, corrected, lang }` |
+| `GET /suggest?q=&lang=&limit=&cat=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ queries, products, scopes, terms, content, total, query, corrected, lang }`. Since 1.3.0: `queries`, the suggested searches (D-112); `scopes`, `{ id, name, url }` to search within a category (D-113); `cat`, a product category's slug, keeps the products to it and its subcategories (D-117); each product carries `matched` (the "why this matched" line or an empty string, D-105), `price` (its lowest price as a number, or null, D-116) and `cart` (whether the panel can add it to the cart, D-115), and its `url` and `image` are the named variation's (D-104); `corrected` also names a typo's correction (D-114) |
 | `GET /search?q=&lang=&page=&per_page=&orderby=relevance` | public, rate-limited, cacheable | `{ ids, total, page, pages, corrected, query, lang }` |
 | `GET /status` | `manage_woocommerce` | `{ generation, building, products, documents, terms, last_reindex, progress, backlog, errors }` |
 | `POST /click` (`q`, `lang`, `type`, `id`) | public, rate-limited | `202 { recorded }` (D-052) |
@@ -317,7 +317,7 @@ add_filter( 'csearch_content_limit', static fn( int $limit, string $context ): i
 
 - **Since:** 1.1.0
 - **Signature:** `apply_filters( 'csearch_suggestion_classes', array $classes, int $productId, ?int $imageId, array $row ): array`
-- **What it does:** CSS classes for a product's suggestion row (Skatehouse handoff item 3: Mature Content blurs flagged artwork with one). Each is passed through `sanitize_html_class()`, repeats and non-strings are dropped, and at most 8 are kept. The answer is cached: a plugin whose answer changes calls `do_action( 'csearch_flush_cache' )`.
+- **What it does:** CSS classes for a product's suggestion row (Skatehouse handoff item 3: Mature Content blurs flagged artwork with one). Each is passed through `sanitize_html_class()`, repeats and non-strings are dropped, and at most 8 are kept. Since 1.3.0 `$imageId` is the image the row shows, a named variation's own photo when it has one (D-104). The answer is cached: a plugin whose answer changes calls `do_action( 'csearch_flush_cache' )`.
 - **Where it runs:** `Search\Suggestions`, on a `/suggest` request that is not answered from the cache.
 - **Example:**
 
@@ -365,7 +365,7 @@ add_filter( 'csearch_alternative_queries', static fn( array $found ): array => a
 
 - **Since:** 1.1.0
 - **Signature:** `apply_filters( 'csearch_dim_page', bool $dim ): bool`
-- **What it does:** whether the page dims behind the open suggestions (D-097); true by default. Return false for a theme whose header makes the backdrop sit in the wrong place. Button mode (D-099) has the dialog's own backdrop and ignores it.
+- **What it does:** whether the page dims behind the open suggestions (D-097); receives the block's own "Dim the page behind the suggestions" choice (`dimPage`, true by default, D-127). Return false for a theme whose header makes the backdrop sit in the wrong place. Button mode (D-099) has the dialog's own backdrop and ignores it.
 - **Where it runs:** `Block\SearchForm::render()`, once per form on the page.
 - **Example:**
 
@@ -419,6 +419,76 @@ add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $quer
 - `csearch_all=1`: the ranked results page for the words as typed, never sent to a category or a filter (the link in that line).
 - A search that already carries a `filter_*`, `query_type_*`, price or rating filter, an `orderby`, `csearch_exact` or a page past the first is never routed.
 
+## 1.3: owner rules, the panel and the results page (1.3.0)
+
+### `csearch_query_redirect` (filter)
+
+- **Since:** 1.3.0
+- **Signature:** `apply_filters( 'csearch_query_redirect', ?string $url, string $words, string $lang ): ?string`
+- **What it does:** where a results-page search goes instead of the results (D-108): the owner's redirect for the query's words in its language, or null. Return an address to send it there, null to show the results. The address must be on this site: it goes through `wp_validate_redirect()` after the filter, and one that fails is ignored.
+- **Where it runs:** `Search\OwnerRules::redirect()`, called by `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), before the filters and categories of D-101 and D-102.
+- **Example:**
+
+```php
+// Send "returns" to the returns page in every language.
+add_filter( 'csearch_query_redirect', static fn( ?string $url, string $words ): ?string => 'returns' === strtolower( trim( $words ) ) ? home_url( '/returns/' ) : $url, 10, 2 );
+```
+
+### `csearch_pinned_products` (filter)
+
+- **Since:** 1.3.0
+- **Signature:** `apply_filters( 'csearch_pinned_products', int[] $ids, string $words, string $lang ): int[]`
+- **What it does:** the products shown first for a search, in order (D-110): the owner's pins for the query's words in its language, or none. At most five are used; a product that is not published, is hidden from search or has no document in the language is still left out.
+- **Where it runs:** `Search\OwnerRules::pins()`, called by `SearchService::rankedIds()` (results page and `/search`), `Suggestions` (the panel) and `Results\QueryRouter` (a pinned search is not routed).
+- **Example:**
+
+```php
+// Pin a seasonal product to "gift".
+add_filter( 'csearch_pinned_products', static fn( array $ids, string $words ): array => 'gift' === $words ? array_merge( array( 4321 ), $ids ) : $ids, 10, 2 );
+```
+
+### Query arguments
+
+- `product_cat=<slug>` beside `s` and `post_type=product`: the search kept to a category and its subcategories (D-117), ranked within it (not ranked over the shop and then cut). The results page reads "3 results for “kazumi” in Decks" and links to "Search all products for “kazumi”." (`.csearch-results-scope`, with `csearch_all=1`). Such a search is never sent to another category; a size in it becomes the filter in the same category (D-101). The form on a category page, and on a search kept to one, offers the category as a ticked "Only in Decks" box (`.csearch-scope`, `name="product_cat"`); unticked, it sends nothing.
+- `orderby=` anything but `relevance` (price, popularity, rating, date): only the strong matches are listed, every word as typed, its spellings, stem or the owner's synonyms, never a word it begins or a typo's neighbour; when nothing is strong, every match is (D-118).
+
+### Custom fields
+
+The `custom_fields` setting (Tools → What to index) names product meta keys searched as the `custom` field (id 9, weight 4; `csearch_fields` can change it). An ACF field is read through `get_field_object()` when ACF is active: choices add their labels, post fields their titles, taxonomy fields their term names; image, file, gallery, user, map, colour, password, URL, e-mail, oEmbed and true/false fields are skipped. A change to one of those keys on a product (`added_post_meta`, `updated_post_meta`, `deleted_post_meta`) queues the product's reindex (D-119). `csearch_product_fields` sees the texts under `Domain\Fields::CUSTOM`.
+
+### `csearch_suggested_searches` (filter)
+
+- **Since:** 1.3.0
+- **Signature:** `apply_filters( 'csearch_suggested_searches', array $picked, string $query, string $lang ): array`
+- **What it does:** the past searches the panel suggests for what is typed (D-112), up to three strings, most searched first. Return fewer to keep a word off the panel; anything not a non-empty string is dropped, and at most three are kept.
+- **Where it runs:** `Search\QuerySuggestions::for()`, on a `csearch/v1/suggest` request when `suggest_queries` is on and three characters or more are typed.
+- **Example:**
+
+```php
+add_filter( 'csearch_suggested_searches', static fn( array $picked ): array => array_values( array_filter( $picked, static fn( string $q ): bool => ! str_contains( $q, 'clearance' ) ) ) );
+```
+
+### Events in the page (JavaScript)
+
+With `analytics_events` on (D-116), the panel dispatches bubbling `CustomEvent`s on its `<form>`; listen on the form or on `document`:
+
+| Event | `detail` | `dataLayer` push |
+|---|---|---|
+| `csearch:search` | `{ query }` | `{ event: 'search', search_term }` |
+| `csearch:select` | `{ query, type, id, name, url, position }` (`type`: `product`, `scope`, `product_cat`, `post`, `page`…) | `select_item` for a product (`ecommerce.items`, list `csearch_suggestions`), otherwise `select_content` (`content_type`, `content_id`) |
+| `csearch:no-results` | `{ query }` | `{ event: 'csearch_no_results', search_term }`, once per query |
+| `csearch:add-to-cart` | `{ id, name, quantity }` | `add_to_cart` (`ecommerce.items`, `currency` and `value` when known) |
+
+The `dataLayer` entries are pushed only when `window.dataLayer` already exists, each ecommerce one after `{ ecommerce: null }`.
+
+```js
+document.addEventListener( 'csearch:select', ( event ) => console.log( event.detail.name ) );
+```
+
+### WooCommerce events the panel fires
+
+After adding to the cart (D-115): jQuery's `added_to_cart` on `document.body` when jQuery is on the page, otherwise `wc-blocks_added_to_cart` on `document.body`, so the mini-cart refreshes.
+
 ## Format for later entries
 
 ### `csearch_example` (filter)
@@ -432,3 +502,29 @@ add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $quer
 ```php
 add_filter( 'csearch_example', static fn( $value, $product ) => $value, 10, 2 );
 ```
+
+## 1.4: CSS custom properties (1.4.0)
+
+The block's colour hooks (D-128). Set them anywhere a CSS custom property inherits from: `:root`, a header, the block. The plugin never declares them, so nothing it ships overrides a value a site sets, and each falls back to the look the block has without it.
+
+| Property | Colours | Falls back to |
+| --- | --- | --- |
+| `--csearch-field-bg` | the field's background | the block's background (`--wp--preset--color--base`, else white) |
+| `--csearch-field-fg` | the field's text and icons | the block's text colour |
+| `--csearch-panel-bg` | the suggestions' background; the chosen row's tint is mixed from it | the block's background |
+| `--csearch-panel-fg` | the suggestions' text; the secondary text is mixed from it | the block's text colour (`--wp--preset--color--contrast`, else #1e1e1e) |
+| `--csearch-submit-bg` | the search button's background | transparent |
+| `--csearch-submit-fg` | the search button's icon | the field's text colour |
+| `--csearch-focus-ring` | the field's focus outline, and the clear and search buttons' | the current text colour |
+
+```css
+.site-header {
+	--csearch-field-bg: #111;
+	--csearch-field-fg: #fff;
+	--csearch-panel-bg: #111;
+	--csearch-panel-fg: #fff;
+	--csearch-focus-ring: #f5c400;
+}
+```
+
+Choose pairs with at least 4.5:1 contrast; the focus ring needs 3:1 against what surrounds the field.

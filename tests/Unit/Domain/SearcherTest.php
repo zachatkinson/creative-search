@@ -255,6 +255,27 @@ final class SearcherTest extends TestCase {
 		self::assertSame( TermMatch::TYPO1, $swap->products[0]->score->tokens[0]['kind'], 'a transposition is one edit' );
 	}
 
+	public function test_a_typo_says_what_the_results_are_for(): void {
+		$one = $this->search( 'kazuni' );
+		self::assertSame( 'kazumi', $one->corrected, 'the typo read as the term it matched' );
+		self::assertFalse( $one->dropped, 'nothing was left out: the exact words find the same' );
+		self::assertNull( $this->search( 'kazumy' )->corrected, 'a stem is no typo' );
+		self::assertNull( $this->search( 'kazumi' )->corrected );
+		$two = $this->search( 'kazuni dealer' );
+		self::assertSame( 'kazumi dealer', $two->corrected, 'only the typo is rewritten' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $two ) );
+		$both = $this->search( 'kazuni snowboard' );
+		self::assertSame( 'kazumi', $both->corrected, 'a word left out and a typo read, together' );
+		self::assertTrue( $both->dropped );
+		$first = $this->search( 'dekc kazumi' );
+		self::assertSame( 'deck kazumi', $first->corrected, 'the closest term, in the typo\'s place' );
+		self::assertSame( 'kazumi deck', $this->search( 'kazuni dekc' )->corrected, 'every typo is read' );
+		$none = $this->search( 'skatehoyze kazumi', 'en', new SearchOptions( retry: false ) );
+		self::assertSame( array(), $none->products );
+		self::assertNull( $none->corrected, 'a typo that finds no product reports nothing' );
+		self::assertFalse( $none->dropped );
+	}
+
 	public function test_typos_are_never_tried_for_short_tokens_numbers_or_sku_shapes(): void {
 		self::assertTrue( $this->search( 'dek' )->isEmpty() );
 		self::assertTrue( $this->search( '8.52 ' )->isEmpty(), '8.25 is not found from 8.52' );
@@ -284,18 +305,41 @@ final class SearcherTest extends TestCase {
 		$r = $this->search( 'kazumi wheels' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $r ) );
 		self::assertSame( 'kazumi', $r->corrected, 'wheels matched one product, kazumi three' );
+		self::assertTrue( $r->dropped, 'a word was left out: the exact words are worth offering' );
 		self::assertSame( array( 0 ), array_keys( $r->products[0]->score->tokens ), 'scored for the reduced query' );
+		self::assertSame( 'kazumi', $r->key, 'the key of the query the results answer (D-105)' );
+		self::assertSame( array( array( 'kazumi' ) ), $r->tokens, 'the terms of the tokens kept' );
 		$three = $this->search( 'kazumi dealer snowboard' );
+		self::assertSame( 'kazumi dealer', $three->key );
+		self::assertSame( array( array( 'kazumi' ), array( 'dealer' ) ), $three->tokens, 'reindexed from 0' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $three ) );
 		self::assertSame( 'kazumi dealer', $three->corrected );
 		self::assertTrue( $this->search( 'snowboard' )->isEmpty(), 'one token cannot be dropped' );
 		self::assertNull( $this->search( 'snowboard' )->corrected );
 	}
 
+	public function test_strict_keeps_every_word_as_typed_but_no_completion_or_typo(): void {
+		$strict   = new SearchOptions( retry: false, strict: true );
+		$synonyms = new Synonyms( array( new Synonym( 'en', 'board', 'deck' ) ) );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'kazumi decks', 'en', $strict ) ), 'a stem is a strong match' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'kazumi board', 'en', $strict, $synonyms ) ), 'so is the owner\'s synonym' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'kaz', 'en', $strict ) ), 'a word that is itself a term still matches' );
+		self::assertSame( array(), self::titles( $this->search( 'hoo', 'en', $strict ) ), 'a word being typed is not completed (D-118)' );
+		self::assertSame( array( 'Skatehouse Hoodie, Logo' ), self::titles( $this->search( 'hoo' ) ), 'it is without strict' );
+		self::assertSame( array(), self::titles( $this->search( 'kazuni', 'en', $strict ) ), 'a typo finds nothing strong' );
+		self::assertCount( 2, $this->search( 'kazuni' )->products, 'it does without strict' );
+		$searcher = new Searcher( $this->index );
+		self::assertSame( array(), $searcher->widen( new QueryToken( 'kazuni', 'kazuni' ), 'en', Kind::PRODUCT, true )->matches );
+		self::assertSame( array(), $searcher->widen( new QueryToken( 'hoo', 'hoo', false, 0, true ), 'en', Kind::PRODUCT, true )->matches, 'no prefix terms' );
+		self::assertArrayHasKey( 'hoodie', $searcher->widen( new QueryToken( 'hoo', 'hoo', false, 0, true ), 'en' )->matches );
+	}
+
 	public function test_the_retry_can_be_turned_off_for_the_shoppers_exact_words(): void {
 		$exact = $this->search( 'kazumi wheels', 'en', new SearchOptions( retry: false ) );
 		self::assertSame( array(), $exact->products, 'no product matches both, and nothing is dropped' );
 		self::assertNull( $exact->corrected );
+		self::assertSame( 'kazumi wheels', $exact->key, 'nothing dropped: the whole query' );
+		self::assertSame( array( array( 'kazumi' ), array( 'wheels', 'wheel' ) ), $exact->tokens, 'each token\'s terms, its stem among them' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $this->search( 'kazumi dealer', 'en', new SearchOptions( retry: false ) ) ), 'a query that matches is unaffected' );
 	}
 
@@ -359,6 +403,7 @@ final class SearcherTest extends TestCase {
 		$r = $this->search( 'dba snowboard' );
 		self::assertTrue( $r->isEmpty(), 'the Blank is hidden' );
 		self::assertNull( $r->corrected );
+		self::assertFalse( $r->dropped, 'a retry that found nothing is not reported' );
 		$tie = $this->search( 'wheels bearings' );
 		self::assertSame( 'wheels', $tie->corrected, 'on a tie the later token goes' );
 		self::assertSame( array( 'Orbit Wheels, Classic' ), self::titles( $tie ) );
@@ -561,5 +606,89 @@ final class SearcherTest extends TestCase {
 		self::assertSame( 'fr', $content->fallbackLang );
 		self::assertFalse( $content->retry );
 		self::assertSame( Kind::PRODUCT, $base->kind );
+		$scoped = new SearchOptions( strict: true, scope: array( 12, 14 ) );
+		self::assertFalse( $scoped->forContent( 2 )->strict, 'the posts and pages are never narrowed' );
+		self::assertSame( array(), $scoped->forContent( 2 )->scope, 'nor kept to a category' );
+	}
+
+	/**
+	 * The phrase synonyms of the D-109 tests.
+	 */
+	private static function phraseSynonyms(): Synonyms {
+		return new Synonyms(
+			array(
+				new Synonym( 'en', 'ss', 'stainless steel' ),
+				new Synonym( 'en', 'skate shoes', 'sneakers', true ),
+			)
+		);
+	}
+
+	public function test_a_phrase_synonym_finds_what_its_meaning_names(): void {
+		$this->product( 'Zeta SS Bearings', 'BRG-ZSS-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel Bearings', 'BRG-ZST-00002', array(), true, 0, array() );
+		$this->product( 'Zeta Rusty Steel Bearings', 'BRG-ZRS-00003', array(), true, 0, array() );
+		self::assertSame( array( 'Zeta SS Bearings' ), self::titles( $this->search( 'zeta ss bearings' ) ), 'without the synonym' );
+		$found = self::titles( $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() ) );
+		sort( $found );
+		self::assertSame( array( 'Zeta SS Bearings', 'Zeta Stainless Steel Bearings' ), $found, 'the meaning as a whole: steel alone is not stainless steel' );
+		self::assertNull( $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() )->corrected );
+	}
+
+	public function test_the_forms_merge_each_product_once_at_its_best(): void {
+		$this->product( 'Zeta SS Bearings', 'BRG-ZSS-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel SS Bearings', 'BRG-ZST-00002', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel Bearings', 'BRG-ZSB-00003', array(), true, 0, array() );
+		$r = $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() );
+		// Each form's exact name earns its bonus: the first two are named exactly as one form reads.
+		self::assertSame( array( 'Zeta Stainless Steel Bearings', 'Zeta SS Bearings', 'Zeta Stainless Steel SS Bearings' ), self::titles( $r ), 'found by both forms once, in score order' );
+		$scores = array_map( static fn( Hit $h ): float => $h->score->total(), $r->products );
+		$sorted = $scores;
+		rsort( $sorted );
+		self::assertSame( $sorted, $scores );
+		$plain = $this->search( 'zeta ss bearings' );
+		self::assertSame( 'Zeta Stainless Steel SS Bearings', $plain->products[1]->document->title );
+		self::assertGreaterThan( $plain->products[1]->score->total(), $r->products[2]->score->total(), 'the better of its two scores: the other form names more of it' );
+		$capped = $this->search( 'zeta ss bearings', 'en', new SearchOptions( limit: 2 ), self::phraseSynonyms() );
+		self::assertSame( array( 'Zeta Stainless Steel Bearings', 'Zeta SS Bearings' ), self::titles( $capped ), 'the limit holds over the merged list' );
+	}
+
+	public function test_without_other_forms_the_ranking_is_the_store_order(): void {
+		$this->product( 'Zeta Deck B', 'ZET-DEB-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Deck A', 'ZET-DEA-00002', array(), true, 0, array() );
+		self::assertSame( self::titles( $this->search( 'zeta deck' ) ), self::titles( $this->search( 'zeta deck', 'en', null, self::phraseSynonyms() ) ) );
+	}
+
+	public function test_the_words_a_phrase_synonym_puts_in_score_as_a_synonym(): void {
+		$searcher = new Searcher( $this->index );
+		$put      = $searcher->widen( new QueryToken( 'bearings', 'bearings', false, 0, false, false, array(), array( 'kazumi' ), true ), 'en' );
+		self::assertSame( TermMatch::SYNONYM, $put->matches['bearings']->kind );
+		self::assertSame( TermMatch::SYNONYM, $put->matches['kazumi']->kind, 'its spellings too' );
+		self::assertSame( TermMatch::SYNONYM, $put->matches['bear']->kind, 'and its stem' );
+		$typed = $searcher->widen( new QueryToken( 'bearings', 'bearings' ), 'en' );
+		self::assertSame( TermMatch::EXACT, $typed->matches['bearings']->kind );
+		self::assertSame( TermMatch::STEM, $typed->matches['bear']->kind );
+	}
+
+	public function test_the_forms_reach_their_own_categories(): void {
+		$this->term( Document::CATEGORY, 'Sneakers', 12 );
+		$this->term( Document::CATEGORY, 'Stainless Steel Bearings', 4 );
+		$this->product( 'Zeta Sneakers', 'SNK-ZET-00001', array(), true, 0, array() );
+		$r = $this->search( 'skate shoes', 'en', null, self::phraseSynonyms() );
+		self::assertSame( array( 'Sneakers' ), self::terms( $r ), 'the category the meaning names' );
+		self::assertSame( array( 'Zeta Sneakers' ), self::titles( $r ) );
+		$plain = $this->search( 'ss bearings' );
+		$alt   = $this->search( 'ss bearings', 'en', null, self::phraseSynonyms() );
+		self::assertSame( array( 'Stainless Steel Bearings' ), self::terms( $alt ) );
+		self::assertSame( array( 'Stainless Steel Bearings' ), self::terms( $plain ) );
+		$scores = array();
+		foreach ( array( $plain, $alt ) as $result ) {
+			foreach ( $result->terms as $hit ) {
+				if ( 'Stainless Steel Bearings' === $hit->document->title ) {
+					$scores[] = $hit->score->total();
+				}
+			}
+		}
+		self::assertCount( 2, $scores );
+		self::assertGreaterThan( $scores[0], $scores[1], 'a category reached by both forms keeps its better score' );
 	}
 }

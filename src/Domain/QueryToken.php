@@ -27,6 +27,7 @@ final class QueryToken {
 	 * @param bool     $stopWord Whether it is a stop word in the query's language.
 	 * @param string[] $synonyms Alternative terms from the owner's synonyms.
 	 * @param string[] $variants The other spellings the tokenizer cut at the same position (`philly` for `phillys`).
+	 * @param bool     $synonym  Put in by a phrase synonym (D-109): its exact term and stem score as a synonym.
 	 */
 	public function __construct(
 		public readonly string $text,
@@ -36,7 +37,8 @@ final class QueryToken {
 		public readonly bool $prefix = false,
 		public readonly bool $stopWord = false,
 		public readonly array $synonyms = array(),
-		public readonly array $variants = array()
+		public readonly array $variants = array(),
+		public readonly bool $synonym = false
 	) {
 	}
 
@@ -46,14 +48,14 @@ final class QueryToken {
 	 * @param string[] $synonyms Alternative terms.
 	 */
 	public function withSynonyms( array $synonyms ): self {
-		return new self( $this->text, $this->source, $this->negated, $this->phrase, $this->prefix, $this->stopWord, $synonyms, $this->variants );
+		return new self( $this->text, $this->source, $this->negated, $this->phrase, $this->prefix, $this->stopWord, $synonyms, $this->variants, $this->synonym );
 	}
 
 	/**
 	 * A copy that is not a prefix.
 	 */
 	public function withoutPrefix(): self {
-		return new self( $this->text, $this->source, $this->negated, $this->phrase, false, $this->stopWord, $this->synonyms, $this->variants );
+		return new self( $this->text, $this->source, $this->negated, $this->phrase, false, $this->stopWord, $this->synonyms, $this->variants, $this->synonym );
 	}
 
 	/**

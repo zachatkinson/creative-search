@@ -9,7 +9,9 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 
@@ -18,9 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * `{ products, terms, content, total, query, corrected, lang }` for the panel (spec: The search API → /suggest), built
- * from the documents table alone: name, URL, image, price and stock are on the row, so no WooCommerce product
- * object is loaded on the search path.
+ * `{ queries, products, scopes, terms, content, total, query, corrected, lang }` for the panel (spec: The search API →
+ * /suggest), built from the documents table alone: name, URL, image, price, stock and whether it can go straight
+ * into the cart are on the row, so no WooCommerce product object is loaded on the search path. Suggested searches
+ * (D-112) and the categories to search within (D-113) come with them (1.3).
  */
 final class Suggestions {
 
@@ -32,10 +35,13 @@ final class Suggestions {
 	/**
 	 * Constructor.
 	 *
-	 * @param SearchService $search The search service.
-	 * @param Cache         $cache  Answers.
+	 * @param SearchService    $search  The search service.
+	 * @param Cache            $cache   Answers.
+	 * @param MatchDetails     $matches The variation a query named and why each product matched (D-104, D-105).
+	 * @param QuerySuggestions $queries Suggested searches.
+	 * @param CategoryScopes   $scopes  The categories to search within.
 	 */
-	public function __construct( private SearchService $search, private Cache $cache ) {
+	public function __construct( private SearchService $search, private Cache $cache, private MatchDetails $matches, private QuerySuggestions $queries, private CategoryScopes $scopes ) {
 	}
 
 	/**
@@ -44,14 +50,18 @@ final class Suggestions {
 	 * @param string      $raw   Query as received.
 	 * @param string|null $lang  Language asked for.
 	 * @param int         $limit Products, 1 to 10.
-	 * @return array<mixed> `products`, `terms`, `content` (posts and pages, 1.1), `total`, `query`, `corrected`, `lang`.
+	 * @param int[]       $scope Products of these term-taxonomy ids only: the category the form searches (D-117).
+	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
+	 *                      `total`, `query`, `corrected`, `lang`.
 	 */
-	public function answer( string $raw, ?string $lang, int $limit ): array {
+	public function answer( string $raw, ?string $lang, int $limit, array $scope = array() ): array {
 		$query = SearchService::clean( $raw );
 		$lang  = $this->search->language( $lang );
 		$limit = max( Settings::LIMIT_MIN, min( Settings::LIMIT_MAX, $limit ) );
 		$empty = array(
+			'queries'   => array(),
 			'products'  => array(),
+			'scopes'    => array(),
 			'terms'     => array(),
 			'content'   => array(),
 			'total'     => 0,
@@ -63,15 +73,27 @@ final class Suggestions {
 			return $empty;
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $this->search->settingsKey(), get_locale() ) );
+		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, $this->search->settingsKey(), $panel, get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
-			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms );
+			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
+			// A panel limited to a category leaves out the pins: one may sit outside it (D-110, D-117).
+			$products = $this->pinnedFirst( $result->products, array() === $scope ? $this->search->pinnedDocuments( $query, $lang, $result->lang ) : array() );
+			$shown    = array();
+			foreach ( $result->terms as $hit ) {
+				if ( Document::CATEGORY === $hit->document->type ) {
+					$shown[] = $hit->document->objectId;
+				}
+			}
 			$answer = array(
-				'products'  => $this->products( array_slice( $result->products, 0, $limit ) ),
+				'queries'   => $this->queries->for( $query, $lang ),
+				'products'  => $this->products( array_slice( $products, 0, $limit ), $result ),
+				// A panel already limited to a category offers no other category to search within (D-113, D-117).
+				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown ) : array(),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
-				'total'     => count( $result->products ),
+				'total'     => count( $products ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
@@ -83,27 +105,56 @@ final class Suggestions {
 	}
 
 	/**
-	 * Product rows.
+	 * The ranked products' documents with the owner's pinned products first, in the pins' order (D-110): a pinned
+	 * product that is ranked moves up, one that is not is added.
 	 *
-	 * @param Hit[] $hits Ranked products.
+	 * @param Hit[]                $hits   Ranked products.
+	 * @param array<int, Document> $pinned Pinned products' documents, by product id ({@see SearchService::pinnedDocuments()}).
+	 * @return Document[]
+	 */
+	private function pinnedFirst( array $hits, array $pinned ): array {
+		$documents = array_map( static fn( Hit $h ): Document => $h->document, $hits );
+		if ( array() === $pinned ) {
+			return $documents;
+		}
+		$rest = array_filter( $documents, static fn( Document $d ): bool => ! isset( $pinned[ $d->objectId ] ) );
+		return array_merge( array_values( $pinned ), array_values( $rest ) );
+	}
+
+	/**
+	 * Product rows: a variation the query named shows its own image and opens with it chosen (D-104), and a match
+	 * the row does not show says what it was (D-105).
+	 *
+	 * @param Document[]   $documents Products, in order.
+	 * @param SearchResult $result    The search they came from.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $hits ): array {
-		$rows = $this->search->index()->rows( array_map( static fn( Hit $h ): int => $h->document->id, $hits ) );
-		$out  = array();
-		foreach ( $hits as $hit ) {
-			$row = $rows[ $hit->document->id ] ?? null;
+	private function products( array $documents, SearchResult $result ): array {
+		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
+		$rows    = $this->search->index()->rows( $ids );
+		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
+		$cart    = Settings::isOn( 'suggest_cart' );
+		$out     = array();
+		foreach ( $documents as $document ) {
+			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {
 				continue;
 			}
+			$detail     = $details[ $document->id ] ?? null;
+			$imageId    = $detail->imageId ?? Cast::int( $row['image_id'] );
 			$suggestion = array(
-				'id'         => $hit->document->objectId,
-				'name'       => $hit->document->title,
-				'url'        => Cast::str( $row['url'] ),
-				'image'      => self::image( Cast::int( $row['image_id'] ) ),
+				'id'         => $document->objectId,
+				'name'       => $document->title,
+				'url'        => null === $detail ? Cast::str( $row['url'] ) : MatchDetails::url( Cast::str( $row['url'] ), $detail ),
+				'image'      => self::image( $imageId ),
 				'price_html' => self::price( $row['price_min'], $row['price_max'] ),
-				'in_stock'   => $hit->document->inStock,
+				// The lowest price as a number, for an analytics tag's add-to-cart value (D-116); null when there is none.
+				'price'      => is_numeric( $row['price_min'] ) ? (float) $row['price_min'] : null,
+				'in_stock'   => $document->inStock,
 				'type'       => 'product',
+				'matched'    => null === $detail ? '' : MatchDetails::line( $detail ),
+				// Simple, purchasable, in stock and needing no choice: one click puts it in the cart (D-115).
+				'cart'       => $cart && 1 === Cast::int( $row['cart'] ?? 0 ),
 			);
 			/**
 			 * CSS classes for a product's suggestion row, as Mature Content adds one to blur flagged artwork
@@ -114,10 +165,10 @@ final class Suggestions {
 			 *
 			 * @param string[]             $classes   None by default.
 			 * @param int                  $productId The product.
-			 * @param int|null             $imageId   Its image, or null.
+			 * @param int|null             $imageId   The image the row shows (since 1.3.0 a variation's the query named), or null.
 			 * @param array<string, mixed> $row       The suggestion as the panel receives it.
 			 */
-			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $hit->document->objectId, Cast::int( $row['image_id'] ) > 0 ? Cast::int( $row['image_id'] ) : null, $suggestion );
+			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $document->objectId, $imageId > 0 ? $imageId : null, $suggestion );
 			$suggestion['classes'] = self::classes( $classes );
 			$out[]                 = $suggestion;
 		}

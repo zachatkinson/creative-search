@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Results\CategoryScope;
+use CreativeBranding\Search\Results\MatchDecorations;
 use CreativeBranding\Search\Results\ProductSearch;
 use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
@@ -104,6 +106,11 @@ final class ResultsTest extends IndexTestCase {
 
 		self::assertSame( array(), $this->visit( array( 's' => 'kazumi wheels', 'post_type' => 'product', ProductSearch::EXACT_ARG => '1' ) ), 'the shopper\'s exact words' );
 		self::assertNull( $this->service( ProductSearch::class )->answer()['corrected'] ?? null );
+
+		self::assertNotSame( array(), $this->visit( array( 's' => 'kazuni', 'post_type' => 'product' ) ) );
+		$summary = $this->service( ResultsView::class )->summary();
+		self::assertStringContainsString( 'Showing results for <em>kazumi</em>', $summary, 'a typo says what the results are for (D-114)' );
+		self::assertStringNotContainsString( 'search instead', $summary, 'the exact words would find the same' );
 	}
 
 	public function test_no_results_offers_categories_and_fallback_products(): void {
@@ -124,8 +131,123 @@ final class ResultsTest extends IndexTestCase {
 		self::assertSame( '', $this->service( ResultsView::class )->noResults(), 'only when nothing matched' );
 	}
 
-	public function test_a_results_page_costs_one_extra_query_when_warm(): void {
+	/**
+	 * What `woocommerce_no_products_found` prints on the page just visited.
+	 */
+	private function noProductsFound(): string {
+		ob_start();
+		do_action( 'woocommerce_no_products_found' );
+		return (string) ob_get_clean();
+	}
+
+	public function test_an_empty_search_has_one_result_message(): void {
+		$other = static function (): void {
+			echo '<p class="another-plugin">kept</p>';
+		};
+		add_action( 'woocommerce_no_products_found', $other, 30 );
+		$this->visit( array( 's' => 'zzzzqqq', 'post_type' => 'product' ) );
+		$html = $this->noProductsFound();
+		self::assertStringNotContainsString( 'No products were found matching your selection.', $html, 'WooCommerce\'s notice goes (D-122)' );
+		self::assertSame( 1, substr_count( $html, 'role="status"' ), 'one status message' );
+		self::assertStringContainsString( '0 results for “zzzzqqq”', $html );
+		self::assertStringContainsString( 'another-plugin', $html, 'other callbacks still run' );
+
+		$this->visit( array( 'post_type' => 'product', 'product_cat' => 'no-such-category-' . wp_generate_password( 6, false ) ) );
+		self::assertStringContainsString( 'No products were found matching your selection.', $this->noProductsFound(), 'a listing that is not a search keeps it' );
+		$this->visit( array( 's' => 'zzzzqqq', 'post_type' => 'post' ) );
+		self::assertNotFalse( has_action( 'woocommerce_no_products_found', 'wc_no_products_found' ), 'nor a search the plugin does not answer' );
+		remove_action( 'woocommerce_no_products_found', $other, 30 );
+	}
+
+	/**
+	 * WooCommerce's result count and sort menu on the page just visited, with its ordering arguments.
+	 *
+	 * @return array{count: string, menu: string, args: array<string, mixed>}
+	 */
+	private function sortLines(): array {
+		wc_setup_loop(
+			array(
+				'is_paginated' => true,
+				'is_search'    => is_search(),
+				'total'        => max( 1, (int) $GLOBALS['wp_query']->found_posts ),
+				'per_page'     => 16,
+				'current_page' => 1,
+			)
+		);
+		ob_start();
+		woocommerce_result_count();
+		$count = (string) ob_get_clean();
+		ob_start();
+		woocommerce_catalog_ordering();
+		$menu = (string) ob_get_clean();
+		$args = WC()->query->get_catalog_ordering_args();
+		wc_reset_loop();
+		return array(
+			'count' => $count,
+			'menu'  => $menu,
+			'args'  => $args,
+		);
+	}
+
+	public function test_the_result_count_says_the_order_the_results_are_in(): void {
+		update_option( 'woocommerce_default_catalog_orderby', 'date' );
 		$this->visit( array( 's' => 'kazumi', 'post_type' => 'product' ) );
+		$ours = $this->sortLines();
+		self::assertStringContainsString( 'Sorted by relevance', $ours['count'], 'not the shop\'s "Sorted by latest" (D-123)' );
+		self::assertStringNotContainsString( 'Sorted by latest', $ours['count'] );
+		$view = $this->service( ResultsView::class );
+		remove_filter( 'woocommerce_catalog_orderedby', array( $view, 'orderedBy' ) );
+		remove_filter( 'woocommerce_default_catalog_orderby', array( $view, 'defaultOrderby' ) );
+		$theirs = $this->sortLines();
+		add_filter( 'woocommerce_catalog_orderedby', array( $view, 'orderedBy' ) );
+		add_filter( 'woocommerce_default_catalog_orderby', array( $view, 'defaultOrderby' ) );
+		self::assertStringContainsString( 'Sorted by latest', $theirs['count'], 'what WooCommerce says alone' );
+		self::assertSame( $theirs['menu'], $ours['menu'], 'the sort menu does not change' );
+		self::assertStringContainsString( "value=\"relevance\"  selected='selected'", $ours['menu'] );
+		self::assertSame( $theirs['args'], $ours['args'], 'nor WooCommerce\'s ordering arguments' );
+
+		$this->visit( array( 's' => 'kazumi', 'post_type' => 'product', 'orderby' => 'relevance' ) );
+		self::assertStringContainsString( 'Sorted by relevance', $this->sortLines()['count'] );
+		$this->visit( array( 's' => 'kazumi', 'post_type' => 'product', 'orderby' => 'price' ) );
+		self::assertStringContainsString( 'Sorted by price: low to high', $this->sortLines()['count'] );
+
+		$this->visit( array( 'post_type' => 'product', 'product_cat' => 'decks' ) );
+		self::assertStringContainsString( 'Sorted by latest', $this->sortLines()['count'], 'a category page says what it said' );
+		update_option( 'woocommerce_default_catalog_orderby', 'menu_order' );
+		$this->visit( array( 'post_type' => 'product', 'product_cat' => 'decks' ) );
+		self::assertStringNotContainsString( 'Sorted by', $this->sortLines()['count'] );
+	}
+
+	/**
+	 * A results page, its sorted page and a search kept to a category (D-117, D-118), each with its cards' match
+	 * lines and photos (MatchDecorations, D-107).
+	 *
+	 * @return array<string, array{0: array<string, string>}>
+	 */
+	public static function warm_pages(): array {
+		return array(
+			'relevance' => array( array( 's' => 'kazumi', 'post_type' => 'product' ) ),
+			'sorted'    => array( array( 's' => 'kazumi', 'post_type' => 'product', 'orderby' => 'price' ) ),
+			'scoped'    => array( array( 's' => 'kazumi', 'post_type' => 'product', 'product_cat' => 'decks' ) ),
+		);
+	}
+
+	/**
+	 * @dataProvider warm_pages
+	 *
+	 * @param array<string, string> $args The page's query arguments.
+	 */
+	public function test_a_results_page_costs_one_extra_query_when_warm( array $args ): void {
+		$ids   = $this->visit( $args );
+		$cards = $this->service( MatchDecorations::class );
+		self::assertNotSame( array(), $ids );
+		$render = static function () use ( $cards, $ids ): void {
+			foreach ( $ids as $id ) {
+				$cards->line( $id );
+				$cards->imageId( 0, wc_get_product( $id ) );
+			}
+		};
+		$render(); // The cold page fills the caches.
 		$ours = array();
 		$spy  = static function ( string $sql ) use ( &$ours ): string {
 			$ours[] = $sql; // Every query the plugin's part of the page runs, whatever the table.
@@ -134,8 +256,11 @@ final class ResultsTest extends IndexTestCase {
 		// The suite's go_to() flushes the object cache; run the plugin's part of the page again on the same main
 		// query instead, which is all a warm page adds.
 		$this->service( ProductSearch::class )->reset();
+		$cards->reset();
+		CategoryScope::reset();
 		add_filter( 'query', $spy );
 		$this->service( ProductSearch::class )->apply( $GLOBALS['wp_the_query'] );
+		$render();
 		remove_filter( 'query', $spy );
 		self::assertNotNull( $this->service( ProductSearch::class )->answer() );
 		self::assertCount( 1, $ours, "one extra query: the live generation\n" . implode( "\n", $ours ) );

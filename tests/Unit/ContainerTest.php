@@ -65,7 +65,7 @@ final class ContainerTest extends TestCase {
 		$container = new Container();
 		$hookables = $container->hookables();
 		self::assertSame(
-			array( \CreativeBranding\Search\Hooks\IndexHooks::class, \CreativeBranding\Search\Hooks\JobHooks::class, \CreativeBranding\Search\Hooks\CliHooks::class, \CreativeBranding\Search\Hooks\InstallHooks::class, \CreativeBranding\Search\Hooks\RestHooks::class, \CreativeBranding\Search\Hooks\LogHooks::class, \CreativeBranding\Search\Hooks\ResultsHooks::class, \CreativeBranding\Search\Block\SearchBlock::class, \CreativeBranding\Search\Block\Shortcode::class, \CreativeBranding\Search\Block\WidgetRegistrar::class, \CreativeBranding\Search\Block\FormTakeover::class, \CreativeBranding\Search\Hooks\AdminHooks::class ),
+			array( \CreativeBranding\Search\Hooks\IndexHooks::class, \CreativeBranding\Search\Hooks\JobHooks::class, \CreativeBranding\Search\Hooks\CliHooks::class, \CreativeBranding\Search\Hooks\InstallHooks::class, \CreativeBranding\Search\Hooks\RestHooks::class, \CreativeBranding\Search\Hooks\LogHooks::class, \CreativeBranding\Search\Hooks\ResultsHooks::class, \CreativeBranding\Search\Hooks\MatchHooks::class, \CreativeBranding\Search\Block\SearchBlock::class, \CreativeBranding\Search\Block\Shortcode::class, \CreativeBranding\Search\Block\WidgetRegistrar::class, \CreativeBranding\Search\Block\FormTakeover::class, \CreativeBranding\Search\Hooks\AdminHooks::class ),
 			array_map( static fn( object $h ): string => $h::class, $hookables )
 		);
 		self::assertSame( $hookables, $container->hookables(), 'the same instances on a second call' );

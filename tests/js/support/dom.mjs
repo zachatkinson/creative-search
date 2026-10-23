@@ -14,12 +14,17 @@ export function installDom() {
 		focused: null,
 		backs: 0,
 		fetch: null,
+		events: [],
+		bodyEvents: [],
 	};
 	class FakeElement {
 		constructor( id = '' ) {
 			this.id = id;
 			this.value = '';
-			this.form = { requestSubmit: () => ( dom.submitted = true ) };
+			this.form = {
+				requestSubmit: () => ( dom.submitted = true ),
+				dispatchEvent: ( event ) => dom.events.push( event ) > 0,
+			};
 			this.open = false;
 			this.dataset = {};
 			const classes = new Set();
@@ -59,6 +64,7 @@ export function installDom() {
 	};
 	globalThis.document = {
 		documentElement: { lang: 'en-CA' },
+		body: { dispatchEvent: ( event ) => dom.bodyEvents.push( event ) > 0 },
 		getElementById: ( id ) => elements.get( id ) || null,
 		createElement: () => {
 			const t = { content: { textContent: '' } };
@@ -77,6 +83,13 @@ export function installDom() {
 		setTimeout: ( ...a ) => globalThis.setTimeout( ...a ),
 		clearTimeout: ( ...a ) => globalThis.clearTimeout( ...a ),
 		fetch: ( ...a ) => dom.fetch( ...a ),
+		CustomEvent: class {
+			constructor( type, init = {} ) {
+				this.type = type;
+				this.detail = init.detail;
+				this.bubbles = Boolean( init.bubbles );
+			}
+		},
 		innerHeight: 800,
 		matchMedia: () => ( { matches: false } ),
 		localStorage: {
@@ -95,6 +108,9 @@ export function installDom() {
 		history: {
 			state: null,
 			pushState( state ) {
+				this.state = state;
+			},
+			replaceState( state ) {
 				this.state = state;
 			},
 			back() {

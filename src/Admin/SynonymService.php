@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Admin;
 
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Domain\Synonyms;
+use CreativeBranding\Search\Domain\Token;
 use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\Languages;
 use CreativeBranding\Search\Repository\SynonymRepository;
@@ -150,9 +151,10 @@ final class SynonymService {
 	}
 
 	/**
-	 * What a word expands to in a language (the test box).
+	 * What a word or phrase also searches for in a language (the test box): each word's one-word synonyms, then the
+	 * meaning of each phrase synonym whose words it holds side by side (D-109).
 	 *
-	 * @param string $word A word.
+	 * @param string $word A word or a few.
 	 * @param string $lang Language code.
 	 * @return string[]
 	 */
@@ -160,9 +162,16 @@ final class SynonymService {
 		$tokenizer = $this->analyzers->tokenizer();
 		$synonyms  = new Synonyms( $this->repository->forLanguages( array( $lang ) ), $tokenizer );
 		$out       = array();
+		$texts     = array();
 		foreach ( $tokenizer->tokenize( $word, $lang, false ) as $token ) {
+			$texts[ $token->position ] ??= $token->text;
 			foreach ( $synonyms->alternatives( $token->text, $lang ) as $alternative ) {
 				$out[] = $alternative;
+			}
+		}
+		foreach ( $synonyms->phrases( $lang ) as $rule ) {
+			if ( null !== Synonyms::find( $texts, $rule['from'] ) ) {
+				$out[] = implode( ' ', array_map( static fn( Token $t ): string => $t->text, $rule['to'] ) );
 			}
 		}
 		return array_values( array_unique( $out ) );

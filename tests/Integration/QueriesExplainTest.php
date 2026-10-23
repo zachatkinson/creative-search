@@ -12,6 +12,8 @@ namespace CreativeBranding\Search\Tests\Integration;
 use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Results\CategoryScope;
+use CreativeBranding\Search\Search\SearchService;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
@@ -57,7 +59,7 @@ final class QueriesExplainTest extends IndexTestCase {
 			return $sql;
 		};
 		add_filter( 'query', $spy );
-		// An exact word, a prefix, a typo, a SKU with a number, French, and a results page.
+		// An exact word, a prefix, a typo, a SKU with a number, French, a category, and a results page.
 		foreach ( array( array( 'kazumi', 'en' ), array( 'kaz', 'en' ), array( 'kazmui', 'en' ), array( 'deck 8.25', 'en' ), array( 'planches', 'fr' ) ) as [ $q, $lang ] ) {
 			wp_cache_flush();
 			$request = new WP_REST_Request( 'GET', '/csearch/v1/suggest' );
@@ -65,10 +67,22 @@ final class QueriesExplainTest extends IndexTestCase {
 			$request->set_param( 'lang', $lang );
 			self::assertSame( 200, rest_do_request( $request )->get_status() );
 		}
+		// A suggestion kept to a category with subcategories (D-117).
+		wp_cache_flush();
+		CategoryScope::reset();
+		$request = new WP_REST_Request( 'GET', '/csearch/v1/suggest' );
+		$request->set_param( 'q', 'kazumi' );
+		$request->set_param( 'cat', 'skateboards' );
+		self::assertSame( 200, rest_do_request( $request )->get_status() );
 		wp_cache_flush();
 		$request = new WP_REST_Request( 'GET', '/csearch/v1/search' );
 		$request->set_param( 'q', 'kazumi deck' );
 		self::assertSame( 200, rest_do_request( $request )->get_status() );
+		// A results page sorted by price, kept to the strong matches (D-118), and kept to a category.
+		wp_cache_flush();
+		$this->service( SearchService::class )->rankedIds( 'kazumi deck', 'en', '', false, array(), true );
+		wp_cache_flush();
+		$this->service( SearchService::class )->rankedIds( 'kazumi', 'en', '', false, CategoryScope::ttIds( CategoryScope::bySlug( 'decks' ) ), true );
 		remove_filter( 'query', $spy );
 
 		self::assertNotEmpty( $caught );

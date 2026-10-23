@@ -4,7 +4,7 @@ Everything the owner can set, with its default and its range. All of it lives in
 
 Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on every request, written only once the tables match it, D-090), `csearch_rebuild_owed` (set to 0 when a schema upgrade needs a full rebuild, then to the generation of the reindex begun to settle it; cleared when that generation goes live, so a cancelled or abandoned rebuild is queued again, D-090), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, a list of lower-case words, set on the Tools tab), `csearch_analysis_version` (the tokenizer's rules the index was built under; an update that changes them owes one full rebuild, D-098), `csearch_attribute_terms` (the values of the `filter_attributes` attributes, a folded word to its attribute and slug; autoloaded; deleted when a term of those attributes or the choice changes, rebuilt by the next search, D-101), `csearch_category_stems` (each category name's stems by language; autoloaded; deleted when a category changes or a rebuild goes live, D-102). Product meta: `_csearch_boost` (−10 to 10, absent for 0) and `_csearch_exclude` (`yes` or absent), set in the product editor's Search tab and carried by the product CSV (D-070). Post and page meta: `_csearch_exclude` (`yes` or absent), set in the editor's Search box (D-093). User meta: `csearch_dismissed_notices` (the warnings a user dismissed, until each clears; D-071). Transients: `csearch_notice_{user id}` (an action's answer, for one minute).
 
-**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` the suggestion panel's defaults, `category_redirect` and `filter_attributes`; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`) and `hidden_by_sku`. `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
+**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` the suggestion panel's defaults, `category_redirect` and `filter_attributes`, and (under "Suggestions", for every search bar) `suggest_queries`, `suggest_scopes`, `suggest_cart` and `analytics_events`, and `custom_fields`; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`) and `hidden_by_sku`; the Redirects and pins tab sets `query_redirects` and `pinned_products` (also `wp csearch redirect` and `wp csearch pin`). `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
 
 ## What to index
 
@@ -15,7 +15,8 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | `index_variation_skus` | `yes` | yes/no | Index every variation's SKU on the parent document. |
 | `index_posts` | `no` | yes/no | Index published posts, searched apart from the products and shown after them (D-093). Changing it queues the posts' indexing or the removal of their documents. |
 | `index_pages` | `no` | yes/no | Index published pages the same way, except the front page and WooCommerce's shop, cart, checkout and account pages. |
-| `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
+| `custom_fields` | `[]` | meta keys, 1 to 64 characters of letters, digits, `_ . : -`, not `_wp_…` or `_edit_…`; 20 at most | Product meta keys (ACF field names among them) searched as the `custom` field, 2,000 characters a product in all (D-119). A change asks for a rebuild; a change to one of these fields on a product reindexes it. |
+| `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1, custom 4 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
 
 ## Languages
 
@@ -35,6 +36,8 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | `help_text` | `''` | plain text, at most 120 characters | Its wording; empty reads "Can’t find what you need? Contact us". |
 | `guide_page` | `0` | a page id, 0 for none | The no-results page's second link, such as a size or buying guide. |
 | `guide_text` | `''` | plain text, at most 120 characters | Its wording; empty reads "Need help choosing? Read our guides". |
+| `query_redirects` | `[]` | at most 200 `{query, lang, url}`; query 200 characters, url 2,048 | A search whose words are `query`'s (read as a query is: case, accents, punctuation and stop words aside) in `lang` (`''` for every language) goes to `url`, an address on this site, instead of the results page (D-108). Filter: `csearch_query_redirect`. |
+| `pinned_products` | `[]` | at most 200 `{query, lang, ids}`, 5 product ids each | Those products come first, in order, for that search in the panel, on the results page and in `/search`; a pinned search is not sent to a category (D-110). Filter: `csearch_pinned_products`. |
 
 ## The results page (1.2)
 
@@ -47,7 +50,7 @@ Both on the Tools tab, under "Results page".
 
 ## The suggestion panel's defaults
 
-A block instance can override each of these; they are the defaults for new blocks, the shortcode and the widget.
+A block instance can override each of these but the last four (1.3), which apply to every search bar; they are the defaults for new blocks, the shortcode and the widget.
 
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
@@ -62,8 +65,12 @@ A block instance can override each of these; they are the defaults for new block
 | `panel_position` | `auto` | auto, below, above | `auto` opens below, and above on a phone when the keyboard would cover it. |
 | `recent_searches` | `no` | yes/no | The shopper's last 5 searches, in their browser only. Off by default for privacy (D-004). |
 | `theme_form_takeover` | `no` | yes/no | Replace a classic theme's `get_search_form()` with the block's form. |
+| `suggest_queries` | `yes` | yes/no | Up to 3 searches other shoppers made above the products (2 on a phone), from the search log: each made 3 times or more in the retention window, from the results page or with a suggestion chosen, that found products, starts with what is typed (3 characters or more), and has every word in the index (D-112). Filter: `csearch_suggested_searches`. |
+| `suggest_scopes` | `yes` | yes/no | Up to 2 "kazumi in Decks" rows after the products: the categories holding at least 2 of the first 10 ranked products, each a link to the search with WooCommerce's `product_cat` parameter (D-113). |
+| `suggest_cart` | `no` | yes/no | Add to cart from the panel for a simple product that is purchasable, in stock and needs no choice: a small "Add" at the row's end, and Shift+Enter on the chosen row (D-115). Uses WooCommerce's own add-to-cart endpoint; honours "Redirect to the cart page after successful addition". |
+| `analytics_events` | `yes` | yes/no | The `csearch:search`, `csearch:select`, `csearch:no-results` and `csearch:add-to-cart` events on the form, and the matching Google Analytics events on the page's `dataLayer` when it has one (D-116). The search term in each is redacted first: a search that looks like an email address, a phone number, a card number or a postal code reads `[redacted]` (`Scrub::sources()`, the same patterns the search log uses). `csearch:no-results` fires once, when a search is submitted that the panel found nothing for, not for every prefix typed. Nothing is sent anywhere by the plugin. |
 
-A block or shortcode also takes `mode` (`field`, the default, or `button`: an icon that opens the same form in a modal dialog, full screen on a phone; D-099). It is set per instance, with no site-wide setting.
+A block or shortcode also takes `mode` (`field`, the default, or `button`: an icon that opens the same form in a modal dialog, full screen on a phone; D-099) and, in Field mode, whether the page dims behind the open suggestions (`dimPage` on the block, "Dim the page behind the suggestions"; `dim_page="no"` on the shortcode; on by default; D-127). Both are set per instance, with no site-wide setting; the `csearch_dim_page` filter has the last word on the second.
 
 ## Analytics
 

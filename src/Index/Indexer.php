@@ -10,11 +10,13 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Index;
 
 use CreativeBranding\Search\Domain\Document;
+use CreativeBranding\Search\Domain\Fact;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Install\Upgrader;
 use CreativeBranding\Search\Repository\ContentIdRepository;
 use CreativeBranding\Search\Repository\DocumentRepository;
+use CreativeBranding\Search\Repository\FactRepository;
 use CreativeBranding\Search\Repository\PostingRepository;
 use CreativeBranding\Search\Repository\ProductIdRepository;
 use CreativeBranding\Search\Repository\StatRepository;
@@ -43,6 +45,11 @@ final class Indexer {
 	public const SKU_KEY_PREFIX = '=';
 
 	/**
+	 * The longest list of a fact's terms, the column's width.
+	 */
+	public const FACT_TERMS = 255;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param ProductReader       $products  Reads products.
@@ -57,6 +64,7 @@ final class Indexer {
 	 * @param StatRepository      $stats     Term counts per generation and language.
 	 * @param ContentReader       $content   Reads posts and pages.
 	 * @param ContentIdRepository $contentIds Post and page ids.
+	 * @param FactRepository      $facts     The products' SKUs and attribute values (D-104).
 	 */
 	public function __construct(
 		private ProductReader $products,
@@ -70,7 +78,8 @@ final class Indexer {
 		private ProductIdRepository $productIds,
 		private StatRepository $stats,
 		private ContentReader $content,
-		private ContentIdRepository $contentIds
+		private ContentIdRepository $contentIds,
+		private FactRepository $facts
 	) {
 	}
 
@@ -301,7 +310,7 @@ final class Indexer {
 		foreach ( $this->generations() as $target ) {
 			if ( array() !== $this->documents->idsOf( Document::PRODUCT, $productId, $target ) ) {
 				$indexed = true;
-				$this->documents->setStock( $productId, $target, $product->is_in_stock() );
+				$this->documents->setStock( $productId, $target, $product->is_in_stock(), ProductReader::cart( $product ) );
 			}
 		}
 		if ( ! $indexed ) {
@@ -338,6 +347,7 @@ final class Indexer {
 		$this->dictionary->decrement( $total );
 		$this->stats->decrement( $counts );
 		$this->postings->deleteFor( $ids );
+		$this->facts->deleteFor( $ids );
 		$this->documents->delete( $ids );
 	}
 
@@ -404,8 +414,12 @@ final class Indexer {
 				'visible'     => $text->visible,
 				'boost'       => $text->boost,
 				'total_sales' => $text->totalSales,
+				'cart'        => $text->cart,
 			)
 		);
+		if ( array() !== $text->facts ) {
+			$this->facts->write( $documentId, $this->factTerms( $text ) );
+		}
 		if ( array() === $postings ) {
 			return;
 		}
@@ -420,6 +434,36 @@ final class Indexer {
 		}
 		$this->dictionary->increment( array_values( $ids ) );
 		$this->stats->increment( array_values( $ids ), $generation, $text->lang );
+	}
+
+	/**
+	 * A product's facts with the terms each one's label is cut into, as the document's own postings are (its
+	 * exact tokens and stems), a SKU's key term with them, so a query's terms can be compared with each (D-104).
+	 *
+	 * @param ProductText $text The product in one language.
+	 * @return array<int, array{variation: int, field: int, attribute: string, name: string, value: string, label: string, image_id: int|null, terms: string}>
+	 */
+	private function factTerms( ProductText $text ): array {
+		$analyzer = $this->analyzers->analyzer();
+		$out      = array();
+		foreach ( $text->facts as $fact ) {
+			$terms = array_map( 'strval', array_keys( $analyzer->analyze( array( $fact['field'] => $fact['label'] ), $text->lang ) ) );
+			if ( Fields::SKU === $fact['field'] ) {
+				$key = $this->analyzers->tokenizer()->key( $fact['label'], $text->lang );
+				if ( '' !== $key ) {
+					$terms[] = self::SKU_KEY_PREFIX . mb_substr( $key, 0, 63, 'UTF-8' );
+				}
+			}
+			$joined = '';
+			foreach ( array_unique( $terms ) as $term ) {
+				if ( strlen( $joined ) + strlen( $term ) + 1 > self::FACT_TERMS ) {
+					break;
+				}
+				$joined .= ( '' === $joined ? '' : Fact::SEPARATOR ) . $term;
+			}
+			$out[] = $fact + array( 'terms' => $joined );
+		}
+		return $out;
 	}
 
 	/**

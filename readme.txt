@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.2.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,7 +28,7 @@ No external service, no API key, no outbound requests. French and English stem a
 
 = Does it send anything off the site? =
 
-No. The index, the suggestions and the analytics are all on the server; nothing leaves it.
+No. The index, the suggestions and the analytics are all on the server, and the plugin sends nothing to any other service. With "Analytics events" on (the default), the search bar also tells the page's own tag manager (its `dataLayer`, when the page has one) what was searched and chosen, with a search that looks like an email address, a phone number, a card number or a postal code sent as "[redacted]" instead; turn it off under WooCommerce → Search → Tools.
 
 = What does it keep about shoppers? =
 
@@ -46,11 +46,25 @@ It is an ARIA combobox built to the WAI-ARIA Authoring Practices list-autocomple
 
 The plugin's repository (docs/BENCHMARK.md) has a feature-by-feature comparison with FiboSearch free and Pro, built from FiboSearch's own documentation. A measured run against FiboSearch free on a generated catalogue is there too; it is interim until it is repeated on a real shop's catalogue.
 
+= How do I change the search bar's colours? =
+
+Set any of these CSS custom properties, on `:root`, your header or the block (Appearance → Editor → Styles → Additional CSS, or your theme's stylesheet). Each falls back to the block's own look when unset:
+
+`--csearch-field-bg` and `--csearch-field-fg` (the field), `--csearch-panel-bg` and `--csearch-panel-fg` (the suggestions), `--csearch-submit-bg` and `--csearch-submit-fg` (the search button), and `--csearch-focus-ring` (the focus outline).
+
+For example: `.site-header { --csearch-field-bg: #111; --csearch-field-fg: #fff; --csearch-focus-ring: #f5c400; }`
+
 = How do I see why a product ranks where it does? =
 
 WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi deck"`.
 
 == Upgrade Notice ==
+
+= 1.4.0 =
+The search field holds its own look inside a theme's header, and its suggestions keep to the screen in a sticky header and above a phone's keyboard. No settings change; to stop the page dimming behind the suggestions, untick it on the block.
+
+= 1.3.0 =
+Adds a table for each product's variations and SKUs, so the index is rebuilt once in the background after the update. Searches keep working meanwhile; the variation photos and "Matches" lines appear once it is done.
 
 = 1.2.0 =
 A search that names a category now opens it, and sizes can become your shop's filters (Tools tab). Turn the first off under WooCommerce → Search → Tools if you prefer the results page.
@@ -62,6 +76,22 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.4.0 =
+* The search field keeps its own look inside a theme's header: no second box from the theme's input styles, one focus ring, and no zoom on iPhone.
+* In a sticky header, and on phones, the suggestions keep to the screen above the keyboard; on a very short screen they scroll inside themselves.
+* "Dim the page behind the suggestions" can be switched off on each block, and the dimming covers the page inside sticky headers that slide away.
+* Colour the field, the suggestions, the search button and the focus ring with seven CSS custom properties (see the FAQ).
+
+= 1.3.0 =
+* A search that names one design, colour or size of a product shows that variation's photo and opens the product with it chosen.
+* A result found by its SKU, an attribute or its description says so: "Matches SKU KZ-825".
+* On a category page the search box offers "Only in Decks", and the panel suggests searching within the categories most results are in.
+* The panel suggests searches other shoppers made that found products, says when it corrected a typo, and can add a simple product to the cart (off by default).
+* Sorting by price, popularity, rating or date lists only the products that match every word.
+* Redirect a search to a page, pin products to the top of a search, and synonyms of several words ("ss" means "stainless steel"): the new Redirects and pins tab.
+* Search your products' custom fields, ACF's included (Tools tab).
+* Search events for Google Tag Manager, in the page only.
 
 = 1.2.0 =
 * A search that names a category, such as "wheels", opens that category, with a line to search every product instead (on by default; Tools tab).

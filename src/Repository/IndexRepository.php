@@ -12,6 +12,7 @@ namespace CreativeBranding\Search\Repository;
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\Fact;
 use CreativeBranding\Search\Domain\IndexStore;
 use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\RankPlan;
@@ -70,6 +71,7 @@ final class IndexRepository implements IndexStore {
 	 * @param RankRepository     $ranks      The ranking statement.
 	 * @param StatRepository     $stats      Term counts per generation and language.
 	 * @param SchemaOneReads     $schemaOne  The reads while the schema upgrade waits (D-090).
+	 * @param FactRepository     $facts      The products' SKUs and attribute values (D-104).
 	 */
 	public function __construct(
 		private IndexState $state,
@@ -80,8 +82,26 @@ final class IndexRepository implements IndexStore {
 		private AnalyzerFactory $analyzers,
 		private RankRepository $ranks,
 		private StatRepository $stats,
-		private SchemaOneReads $schemaOne
+		private SchemaOneReads $schemaOne,
+		private FactRepository $facts
 	) {
+	}
+
+	/**
+	 * The documents whose product is in a category or its subcategories, as the ranking statement keeps them (D-117):
+	 * all of them when the search is not kept to one.
+	 *
+	 * @param array<int, Document> $documents Documents by id.
+	 * @param int[]                $scope     Term-taxonomy ids; none keeps every document.
+	 * @return array<int, Document>
+	 */
+	private function inScope( array $documents, array $scope ): array {
+		if ( array() === $scope || array() === $documents ) {
+			return $documents;
+		}
+		$objects = array_map( static fn( Document $d ): int => $d->objectId, $documents );
+		$rows    = $this->ranks->scopedObjects( $objects, $scope );
+		return array_filter( $documents, static fn( Document $d ): bool => isset( $rows[ $d->objectId ] ) );
 	}
 
 	/**
@@ -106,7 +126,7 @@ final class IndexRepository implements IndexStore {
 	 */
 	public function termsWithPrefix( string $prefix, int $limit, int $kind = Kind::PRODUCT, string $lang = '' ): array {
 		if ( Kind::CONTENT === $kind ) {
-			return Upgrader::needed() ? array() : $this->postings->contentPrefix( $prefix, $limit, $this->generation(), $lang );
+			return Upgrader::below( '2' ) ? array() : $this->postings->contentPrefix( $prefix, $limit, $this->generation(), $lang );
 		}
 		return $this->dictionary->withPrefix( $prefix, $limit );
 	}
@@ -131,7 +151,7 @@ final class IndexRepository implements IndexStore {
 	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>>
 	 */
 	public function postings( array $terms, string $lang, int $kind ): array {
-		if ( Upgrader::needed() ) {
+		if ( Upgrader::below( '2' ) ) {
 			// Schema 1 had no posts or pages (D-090, D-093).
 			return Kind::CONTENT === $kind ? array() : $this->schemaOne->forTerms( $terms, $this->generation(), $lang, Kind::PRODUCT === $kind );
 		}
@@ -186,9 +206,9 @@ final class IndexRepository implements IndexStore {
 	 */
 	public function frequencies( array $terms, string $lang, int $kind = Kind::PRODUCT ): array {
 		if ( Kind::CONTENT === $kind ) {
-			return Upgrader::needed() ? array() : $this->postings->contentFrequencies( $terms, $this->generation(), $lang );
+			return Upgrader::below( '2' ) ? array() : $this->postings->contentFrequencies( $terms, $this->generation(), $lang );
 		}
-		return Upgrader::needed()
+		return Upgrader::below( '2' )
 			? $this->schemaOne->frequencies( $terms, $this->generation(), $lang )
 			: $this->stats->frequencies( $terms, $this->generation(), $lang );
 	}
@@ -201,7 +221,7 @@ final class IndexRepository implements IndexStore {
 	 * @param int      $kind  Products or content.
 	 */
 	public function productCount( array $terms, string $lang, int $kind = Kind::PRODUCT ): int {
-		if ( Upgrader::needed() ) {
+		if ( Upgrader::below( '2' ) ) {
 			return Kind::CONTENT === $kind ? 0 : $this->schemaOne->productCount( $terms, $this->generation(), $lang );
 		}
 		return $this->postings->productCount( $terms, $this->generation(), $lang, $kind );
@@ -214,11 +234,11 @@ final class IndexRepository implements IndexStore {
 	 * @return Hit[]
 	 */
 	public function rank( RankPlan $plan ): array {
-		if ( $this->explaining || Upgrader::needed() ) { // While the schema upgrade waits, the statement's columns may not be there yet (D-090).
+		if ( $this->explaining || Upgrader::below( '2' ) ) { // While the schema upgrade waits, the statement's columns may not be there yet (D-090).
 			return ( new Ranker() )->rank(
 				$plan,
 				$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, $plan->kind ),
-				fn( array $ids, string $key ): array => $this->documents( $ids, $key )
+				fn( array $ids, string $key ): array => $this->inScope( $this->documents( $ids, $key ), $plan->scope )
 			);
 		}
 		$hits = array();
@@ -323,6 +343,51 @@ final class IndexRepository implements IndexStore {
 			}
 		}
 		return $ids;
+	}
+
+	/**
+	 * Which of some terms some product documents of a language carry, field by field, in the live generation
+	 * (D-105); none until schema 3's rebuild has gone live.
+	 *
+	 * @param int[]    $documentIds Product document ids.
+	 * @param string[] $terms       Terms.
+	 * @param string   $lang        Language code.
+	 * @return array<int, array<int, string[]>> Document id to field id to terms.
+	 */
+	public function fieldsOf( array $documentIds, array $terms, string $lang ): array {
+		return ! Upgrader::rebuilt() ? array() : $this->postings->fieldsOf( $documentIds, $terms, $this->generation(), $lang );
+	}
+
+	/**
+	 * The SKUs and attribute values of some product documents (D-104); none until the schema has them and the
+	 * rebuild it owes has gone live.
+	 *
+	 * @param int[] $documentIds Product document ids.
+	 * @return array<int, Fact[]> Document id to its facts.
+	 */
+	public function facts( array $documentIds ): array {
+		return ! Upgrader::rebuilt() ? array() : $this->facts->of( $documentIds );
+	}
+
+	/**
+	 * The live generation's documents of some products in one language, in the order of the ids given (the
+	 * owner's pinned products, D-110); a product not in the index in that language is left out.
+	 *
+	 * @param string $lang       Language code.
+	 * @param int[]  $productIds Product ids.
+	 * @return Document[]
+	 */
+	public function productDocuments( string $lang, array $productIds ): array {
+		$ids       = $this->documents->productDocumentIds( $this->generation(), $lang, $productIds );
+		$documents = $this->documents( array_values( $ids ) );
+		$out       = array();
+		foreach ( $productIds as $productId ) {
+			$document = $documents[ $ids[ $productId ] ?? 0 ] ?? null;
+			if ( null !== $document ) {
+				$out[] = $document;
+			}
+		}
+		return $out;
 	}
 
 	/**

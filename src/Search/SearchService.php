@@ -9,7 +9,9 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
+use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
@@ -62,6 +64,7 @@ final class SearchService {
 	 * @param Languages         $languages The indexed languages.
 	 * @param Cache             $cache     Answers.
 	 * @param SearchLog         $log       The log writer.
+	 * @param OwnerRules        $rules     The owner's pinned products (D-110).
 	 */
 	public function __construct(
 		private IndexRepository $index,
@@ -69,7 +72,8 @@ final class SearchService {
 		private SynonymRepository $synonyms,
 		private Languages $languages,
 		private Cache $cache,
-		private SearchLog $log
+		private SearchLog $log,
+		private OwnerRules $rules
 	) {
 	}
 
@@ -103,9 +107,10 @@ final class SearchService {
 	 * @param int    $termLimit Terms at most.
 	 * @param bool   $retry     Retry without the least-matched token when nothing matches.
 	 * @param bool   $explain   Rank in PHP, with every part of each score (D-086): the same order, more memory.
+	 * @param int[]  $scope     Products of these term-taxonomy ids only (D-117).
 	 */
-	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false ): SearchResult {
-		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry ), $explain );
+	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false, array $scope = array() ): SearchResult {
+		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry, $scope ), $explain );
 	}
 
 	/**
@@ -230,32 +235,82 @@ final class SearchService {
 	}
 
 	/**
-	 * The ranked product ids for a results page, cached, logged.
+	 * The owner's pinned products for a query (D-110), in the pins' order, as documents of the language that
+	 * answered: one hidden from search, or not in the index in that language, is left out. The panel and the
+	 * results page both put them first.
+	 *
+	 * @param string $query  The query, cleaned.
+	 * @param string $lang   Its language.
+	 * @param string $answer The language whose documents answered.
+	 * @return array<int, Document> Product id to document.
+	 */
+	public function pinnedDocuments( string $query, string $lang, string $answer ): array {
+		$pins = $this->rules->pins( $query, $lang );
+		if ( array() === $pins ) {
+			return array();
+		}
+		$pinned = array();
+		foreach ( $this->index->productDocuments( $answer, $pins ) as $document ) {
+			if ( $document->visible ) {
+				$pinned[ $document->objectId ] = $document;
+			}
+		}
+		return $pinned;
+	}
+
+	/**
+	 * The ranked product ids for a results page, cached, logged, with what a page needs to say which variation
+	 * the query named and why each product matched (D-104, D-105): each product's document, the terms each token
+	 * reached, the query's key and the language whose documents answered.
 	 *
 	 * @param string      $raw    Query as received.
 	 * @param string|null $lang   Language asked for.
 	 * @param string      $source page or suggest; empty for a repeat of a search already logged.
 	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
-	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}
+	 * @param int[]       $scope  Products of these term-taxonomy ids only: a category and its subcategories (D-117).
+	 * @param bool        $strong The strong matches only, when any (D-118): a sort other than Relevance.
+	 * @return array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}
 	 */
-	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false ): array {
+	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false, array $scope = array(), bool $strong = false ): array {
 		$query = self::clean( $raw );
 		$lang  = $this->language( $lang );
 		if ( '' === $query ) {
 			return array(
 				'ids'       => array(),
 				'corrected' => null,
+				'dropped'   => false,
 				'query'     => '',
 				'lang'      => $lang,
+				'docs'      => array(),
+				'tokens'    => array(),
+				'key'       => '',
+				'from'      => $lang,
 			);
 		}
-		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $this->settingsKey() ) );
+		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $scope, $strong, $this->settingsKey() ) );
 		$cached = $this->cache->get( $key );
 		if ( null === $cached ) {
-			$result = $this->run( $query, $lang, self::MAX_IDS, 0, ! $exact );
+			$result = $strong ? $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, false, $scope, true ), false ) : null;
+			if ( null === $result || array() === $result->products ) {
+				// Nothing matches every word as typed: the sort keeps every match rather than show nothing (D-118).
+				$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact, $scope ), false );
+			}
+			$docs = array();
+			foreach ( $result->products as $hit ) {
+				$docs[ $hit->document->objectId ] = $hit->document->id;
+			}
+			// The owner's pinned products first, in their order (D-110). One hidden from search is left out here: the
+			// ranked query lifts WooCommerce's search exclusion (a hidden product's exact SKU may be ranked), and
+			// WooCommerce's query still leaves out one that is not published.
+			$pins   = array_keys( $this->pinnedDocuments( $query, $lang, $result->lang ) );
 			$cached = array(
-				'ids'       => $result->productIds(),
+				'ids'       => array_slice( array_values( array_unique( array_merge( $pins, $result->productIds() ) ) ), 0, self::MAX_IDS ),
 				'corrected' => $result->corrected,
+				'dropped'   => $result->dropped,
+				'docs'      => $docs,
+				'tokens'    => $result->tokens,
+				'key'       => $result->key,
+				'from'      => $result->lang,
 			);
 			$this->cache->set( $key, $cached );
 		}
@@ -266,19 +321,40 @@ final class SearchService {
 		return array(
 			'ids'       => $ids,
 			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
+			'dropped'   => true === ( $cached['dropped'] ?? false ),
 			'query'     => $query,
 			'lang'      => $lang,
+			'docs'      => self::documentsOf( $cached['docs'] ?? null ),
+			'tokens'    => array_map( array( Cast::class, 'strings' ), is_array( $cached['tokens'] ?? null ) ? $cached['tokens'] : array() ),
+			'key'       => Cast::str( $cached['key'] ?? null ),
+			'from'      => Cast::str( $cached['from'] ?? null, $lang ),
 		);
+	}
+
+	/**
+	 * Product id to document id, from a cached answer (an answer cached before 1.3 has none).
+	 *
+	 * @param mixed $docs The cached map.
+	 * @return array<int, int>
+	 */
+	private static function documentsOf( mixed $docs ): array {
+		$out = array();
+		foreach ( is_array( $docs ) ? $docs : array() as $product => $document ) {
+			$out[ (int) $product ] = Cast::int( $document );
+		}
+		return $out;
 	}
 
 	/**
 	 * The search options from the settings.
 	 *
-	 * @param int  $limit     Products at most.
-	 * @param int  $termLimit Terms at most.
-	 * @param bool $retry     Retry without the least-matched token.
+	 * @param int   $limit     Products at most.
+	 * @param int   $termLimit Terms at most.
+	 * @param bool  $retry     Retry without the least-matched token.
+	 * @param int[] $scope     Products of these term-taxonomy ids only (D-117).
+	 * @param bool  $strict    Strong matches only (D-118).
 	 */
-	public function options( int $limit, int $termLimit, bool $retry = true ): SearchOptions {
+	public function options( int $limit, int $termLimit, bool $retry = true, array $scope = array(), bool $strict = false ): SearchOptions {
 		$weights = Settings::fieldWeights();
 		/**
 		 * The field weights the score uses, by field name (name, sku, short, long, category, tag, brand, attribute).
@@ -299,7 +375,10 @@ final class SearchService {
 			self::boostRules( Settings::get( 'boost_rules' ) ),
 			max( 1, min( self::MAX_IDS, $limit ) ),
 			max( 0, min( self::MAX_TERMS, $termLimit ) ),
-			$retry
+			$retry,
+			Kind::PRODUCT,
+			$strict,
+			array_values( array_unique( array_map( 'intval', $scope ) ) )
 		);
 	}
 
@@ -333,7 +412,14 @@ final class SearchService {
 	 * @return array<int, mixed>
 	 */
 	public function settingsKey(): array {
-		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ) );
+		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ), Settings::get( OwnerRules::PINS ) );
+	}
+
+	/**
+	 * The owner's rules for single queries.
+	 */
+	public function rules(): OwnerRules {
+		return $this->rules;
 	}
 
 	/**
