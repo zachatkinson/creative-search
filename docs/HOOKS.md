@@ -419,6 +419,41 @@ add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $quer
 - `csearch_all=1`: the ranked results page for the words as typed, never sent to a category or a filter (the link in that line).
 - A search that already carries a `filter_*`, `query_type_*`, price or rating filter, an `orderby`, `csearch_exact` or a page past the first is never routed.
 
+## 1.3: the panel (1.3.0)
+
+### `csearch_suggested_searches` (filter)
+
+- **Since:** 1.3.0
+- **Signature:** `apply_filters( 'csearch_suggested_searches', array $picked, string $query, string $lang ): array`
+- **What it does:** the past searches the panel suggests for what is typed (D-112), up to three strings, most searched first. Return fewer to keep a word off the panel; anything not a non-empty string is dropped, and at most three are kept.
+- **Where it runs:** `Search\QuerySuggestions::for()`, on a `csearch/v1/suggest` request when `suggest_queries` is on and three characters or more are typed.
+- **Example:**
+
+```php
+add_filter( 'csearch_suggested_searches', static fn( array $picked ): array => array_values( array_filter( $picked, static fn( string $q ): bool => ! str_contains( $q, 'clearance' ) ) ) );
+```
+
+### Events in the page (JavaScript)
+
+With `analytics_events` on (D-116), the panel dispatches bubbling `CustomEvent`s on its `<form>`; listen on the form or on `document`:
+
+| Event | `detail` | `dataLayer` push |
+|---|---|---|
+| `csearch:search` | `{ query }` | `{ event: 'search', search_term }` |
+| `csearch:select` | `{ query, type, id, name, url, position }` (`type`: `product`, `scope`, `product_cat`, `post`, `page`…) | `select_item` for a product (`ecommerce.items`, list `csearch_suggestions`), otherwise `select_content` (`content_type`, `content_id`) |
+| `csearch:no-results` | `{ query }` | `{ event: 'csearch_no_results', search_term }`, once per query |
+| `csearch:add-to-cart` | `{ id, name, quantity }` | `add_to_cart` (`ecommerce.items`, `currency` and `value` when known) |
+
+The `dataLayer` entries are pushed only when `window.dataLayer` already exists, each ecommerce one after `{ ecommerce: null }`.
+
+```js
+document.addEventListener( 'csearch:select', ( event ) => console.log( event.detail.name ) );
+```
+
+### WooCommerce events the panel fires
+
+After adding to the cart (D-115): jQuery's `added_to_cart` on `document.body` when jQuery is on the page, otherwise `wc-blocks_added_to_cart` on `document.body`, so the mini-cart refreshes.
+
 ## Format for later entries
 
 ### `csearch_example` (filter)

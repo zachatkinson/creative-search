@@ -82,7 +82,14 @@ final class ResultsView {
 				$answer['query']
 			)
 		) . '</p>';
-		if ( null !== $answer['corrected'] ) {
+		if ( null !== $answer['corrected'] && ! $answer['dropped'] ) {
+			// A typo read as its closest term: the shopper's exact words would find the same, so no link (D-114).
+			$html .= '<p class="csearch-results-corrected">' . sprintf(
+				/* translators: %s: the query the results are for, with a typo corrected */
+				esc_html__( 'Showing results for %s', 'creative-search' ),
+				'<em>' . esc_html( $answer['corrected'] ) . '</em>'
+			) . '</p>';
+		} elseif ( null !== $answer['corrected'] ) {
 			// The page the shopper is on, with its language and filters, asked for the exact words.
 			$exact = add_query_arg( ProductSearch::EXACT_ARG, '1', remove_query_arg( array( 'paged', 'product-page' ) ) );
 			$html .= '<p class="csearch-results-corrected">' . sprintf(

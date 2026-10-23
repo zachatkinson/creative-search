@@ -2,7 +2,9 @@
  * The search block's state machine, as an Interactivity API store. The server renders the whole form
  * (it submits with no script); this turns it into the APG list-autocomplete combobox: suggestions after
  * 150 ms of quiet, one request in flight, stale answers dropped by sequence number, the last 20 answers
- * cached per page, keyboard parity, a polite live region, and the click beacon.
+ * cached per page, keyboard parity, a polite live region, and the click beacon. Since 1.3: suggested searches
+ * above the products (D-112), searches within a category (D-113), add to cart for a simple product (D-115) and
+ * the events an analytics tag can listen to (D-116).
  *
  * Every word the shopper reads arrives translated in the context (`SearchForm::context()`), so this file
  * holds no string a translator needs.
@@ -28,6 +30,14 @@ const PHONE_TERMS = 2;
 const TERMS = 3;
 // Posts and pages, after the products, at most (Skatehouse handoff item 7).
 const CONTENT = 2;
+// Suggested searches above the products, at most; on a phone they leave the products their four (D-112).
+const QUERIES = 3;
+const PHONE_QUERIES = 2;
+// Searches within a category, at most, in the room the terms have (D-113).
+const SCOPES = 2;
+// The list an analytics tag sees the suggestions as (D-116).
+const LIST_ID = 'csearch_suggestions';
+const LIST_NAME = 'Search suggestions';
 // Frames fit() waits for the rows to render before it gives up measuring.
 const FIT_TRIES = 10;
 // Panels fit() re-measures when their size changes (a web font arriving, an image loading).
@@ -36,7 +46,7 @@ const watched = new WeakSet();
 /**
  * Per-instance bookkeeping the context should not carry (timers, the abort controller, the cache).
  *
- * @type {Map<string, {seq: number, timer: number, slow: number, ctrl: AbortController|null, cache: Map<string, Object>, last: Object|null}>}
+ * @type {Map<string, {seq: number, timer: number, slow: number, ctrl: AbortController|null, cache: Map<string, Object>, last: Object|null, adding: boolean, silent: string}>}
  */
 const privates = new Map();
 
@@ -50,6 +60,8 @@ function priv( ctx ) {
 			ctrl: null,
 			cache: new Map(),
 			last: null,
+			adding: false,
+			silent: '',
 		};
 		privates.set( ctx.id, p );
 	}
@@ -194,7 +206,56 @@ function setActive( ctx, index ) {
 function moveTo( ctx, index ) {
 	setActive( ctx, index );
 	const row = ctx.rows[ index ];
-	ctx.query = row && ! row.all ? row.name : ctx.typed;
+	// A search within a category writes the words it searches, not "kazumi in Decks".
+	ctx.query = row && ! row.all ? ( row.value ?? row.name ) : ctx.typed;
+}
+
+/**
+ * Tell the page what happened (D-116): a `csearch:<name>` event on the form for any script, and the matching
+ * Google Analytics event on the page's `dataLayer` when it has one (Google Tag Manager's). Nothing leaves the
+ * page from here; with the setting off, nothing happens at all.
+ *
+ * @param {Object}      ctx    The block's context.
+ * @param {string}      name   `search`, `select`, `no-results` or `add-to-cart`.
+ * @param {Object}      detail What the event carries.
+ * @param {Object|null} layer  The dataLayer entry, or null for none.
+ */
+function emit( ctx, name, detail, layer = null ) {
+	if ( ! ctx.events ) {
+		return;
+	}
+	const form = formOf( document.getElementById( `${ ctx.id }-input` ) );
+	try {
+		form?.dispatchEvent?.(
+			new window.CustomEvent( `csearch:${ name }`, {
+				bubbles: true,
+				detail,
+			} )
+		);
+	} catch {
+		// No CustomEvent (a very old browser): the dataLayer still hears it.
+	}
+	const data = window.dataLayer;
+	if ( layer && Array.isArray( data ) ) {
+		if ( layer.ecommerce ) {
+			data.push( { ecommerce: null } ); // Clear the last one, as Google's examples do.
+		}
+		data.push( layer );
+	}
+}
+
+/**
+ * The analytics item for a product row.
+ *
+ * @param {Object} row A product row.
+ * @return {Object} A Google Analytics item.
+ */
+function item( row ) {
+	const out = { item_id: String( row.pid ), item_name: row.name };
+	if ( typeof row.price === 'number' ) {
+		out.price = row.price;
+	}
+	return out;
 }
 
 function closePanel( ctx ) {
@@ -261,6 +322,9 @@ function productRow( ctx, p, index ) {
 		width: p.image?.width || null,
 		height: p.image?.height || null,
 		priceHtml: ctx.prices ? p.price_html || null : null,
+		price: typeof p.price === 'number' ? p.price : null,
+		cart: Boolean( ctx.cart && p.cart ),
+		hint: ctx.cart && p.cart ? `${ ctx.id }-cart-hint` : null,
 		stock: stock || null,
 		out: ctx.stock && ! p.in_stock,
 		meta: Boolean( price || stock ),
@@ -283,6 +347,36 @@ function termRow( ctx, t, index ) {
 		label: fill( i18n.termLabel, t.name, kind, num( t.count, ctx.lang ) ),
 		kind: `${ kind } (${ num( t.count, ctx.lang ) })`,
 		meta: true,
+	};
+}
+
+function queryRow( ctx, q, index ) {
+	return {
+		key: `q${ q }`,
+		id: `${ ctx.id }-opt-${ index }`,
+		index,
+		query: true,
+		name: q,
+		value: q,
+		label: q,
+		type: ctx.i18n.search,
+		meta: true,
+	};
+}
+
+function scopeRow( ctx, s, query, index ) {
+	const name = fill( ctx.i18n.scope, query, s.name );
+	return {
+		key: `s${ s.id }`,
+		id: `${ ctx.id }-opt-${ index }`,
+		index,
+		scope: true,
+		cid: s.id,
+		url: s.url,
+		name,
+		value: query,
+		label: name,
+		meta: false,
 	};
 }
 
@@ -309,27 +403,31 @@ function contentRow( ctx, c, index, first ) {
 }
 
 /**
- * How many products, terms and posts or pages the panel shows: the owner's limit, at most 10 rows in all on a
- * desktop with terms giving way first, 4 products and 2 terms on a phone (D-092), and up to 2 posts or pages
- * after them (Skatehouse handoff item 7).
+ * How many suggested searches, products, terms and posts or pages the panel shows: the owner's limit, at most
+ * 10 rows in all on a desktop with terms giving way first, 4 products and 2 terms on a phone (D-092), up to 3
+ * suggested searches above the products (2 on a phone, D-112), and up to 2 posts or pages after them (Skatehouse
+ * handoff item 7). The room for terms is shared with the searches within a category, which take it first (D-113).
  *
  * @param {Object} ctx     The block's context.
  * @param {number} content Posts and pages in the answer.
- * @return {{products: number, terms: number, content: number}} The budget.
+ * @param {number} queries Suggested searches in the answer.
+ * @return {{queries: number, products: number, room: number, content: number}} The budget.
  */
-function budget( ctx, content = 0 ) {
+function budget( ctx, content = 0, queries = 0 ) {
 	const phone = Boolean( window.matchMedia?.( PHONE ).matches );
 	const pages = Math.min( CONTENT, content );
+	const asked = Math.min( phone ? PHONE_QUERIES : QUERIES, queries );
 	const products = Math.min(
 		ctx.limit,
-		phone ? PHONE_PRODUCTS : MOST - pages
+		phone ? PHONE_PRODUCTS : MOST - pages - asked
 	);
-	const terms = phone
+	const room = phone
 		? PHONE_TERMS
-		: Math.min( TERMS, MOST - products - pages );
+		: Math.min( TERMS, MOST - products - pages - asked );
 	return {
+		queries: asked,
 		products,
-		terms: ctx.terms ? Math.max( 0, terms ) : 0,
+		room: Math.max( 0, room ),
 		content: pages,
 	};
 }
@@ -379,7 +477,12 @@ function fit( ctx, tries = FIT_TRIES ) {
 			if ( box.bottom <= top + height && box.top >= top ) {
 				return;
 			}
-			const drop = suggestions[ suggestions.length - 1 ];
+			// The last row goes, but a suggested search before any product (D-112).
+			const last = ( keep ) => suggestions.findLast( keep );
+			const drop =
+				last( ( r ) => ! r.product && ! r.query ) ||
+				last( ( r ) => r.query ) ||
+				suggestions[ suggestions.length - 1 ];
 			const chosen = ctx.rows[ ctx.active ];
 			ctx.rows = ctx.rows
 				.filter( ( r ) => r !== drop )
@@ -405,16 +508,29 @@ function fit( ctx, tries = FIT_TRIES ) {
 
 function showAnswer( ctx, data, input ) {
 	const found = Array.isArray( data.content ) ? data.content : [];
-	const most = budget( ctx, found.length );
+	const asked = Array.isArray( data.queries ) ? data.queries : [];
+	const most = budget( ctx, found.length, asked.length );
 	const products = (
 		Array.isArray( data.products ) ? data.products : []
 	).slice( 0, most.products );
-	const terms = ( Array.isArray( data.terms ) ? data.terms : [] ).slice(
-		0,
-		most.terms
-	);
+	const scopes = (
+		products.length && Array.isArray( data.scopes ) ? data.scopes : []
+	).slice( 0, Math.min( SCOPES, most.room ) );
+	const terms = ctx.terms
+		? ( Array.isArray( data.terms ) ? data.terms : [] ).slice(
+				0,
+				most.room - scopes.length
+			)
+		: [];
+	const query = data.query || ctx.query.trim();
 	const rows = [];
+	asked
+		.slice( 0, most.queries )
+		.forEach( ( q ) => rows.push( queryRow( ctx, q, rows.length ) ) );
 	products.forEach( ( p ) => rows.push( productRow( ctx, p, rows.length ) ) );
+	scopes.forEach( ( sc ) =>
+		rows.push( scopeRow( ctx, sc, query, rows.length ) )
+	);
 	terms.forEach( ( t ) => rows.push( termRow( ctx, t, rows.length ) ) );
 	found
 		.slice( 0, most.content )
@@ -451,6 +567,17 @@ function showAnswer( ctx, data, input ) {
 	setActive( ctx, -1 );
 	openPanel( ctx, input );
 	fit( ctx );
+	const p = priv( ctx );
+	if ( count === 0 && p.silent !== ctx.answered ) {
+		// Once per query: the same words answered from the cache again say nothing new.
+		p.silent = ctx.answered;
+		emit(
+			ctx,
+			'no-results',
+			{ query: ctx.answered },
+			{ event: 'csearch_no_results', search_term: ctx.answered }
+		);
+	}
 }
 
 function showRecent( ctx, input ) {
@@ -506,6 +633,36 @@ function pushed( ctx ) {
 
 function formOf( input ) {
 	return input?.form || input?.closest?.( 'form' );
+}
+
+/**
+ * Let the mini-cart know (D-115): WooCommerce's classic fragments through jQuery's `added_to_cart`, which its
+ * blocks also translate for the Mini-Cart block; the block's own event when the page has no jQuery.
+ *
+ * @param {Object} data The add-to-cart answer: `fragments` and `cart_hash`.
+ */
+function refreshCart( data ) {
+	const body = document.body;
+	if ( window.jQuery && body ) {
+		window
+			.jQuery( body )
+			.trigger( 'added_to_cart', [
+				data.fragments,
+				data.cart_hash,
+				null,
+			] );
+		return;
+	}
+	try {
+		body?.dispatchEvent?.(
+			new window.CustomEvent( 'wc-blocks_added_to_cart', {
+				bubbles: true,
+				cancelable: true,
+			} )
+		);
+	} catch {
+		// No CustomEvent: the cart is right on the next page.
+	}
 }
 
 const { state, actions, callbacks } = store( 'creative-search/search', {
@@ -647,7 +804,12 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 						ctx.rows[ ctx.active ]
 					) {
 						event.preventDefault();
-						actions.pick( ctx.rows[ ctx.active ], input );
+						// Shift+Enter puts the chosen product in the cart, as its description says (D-115).
+						if ( event.shiftKey && ctx.rows[ ctx.active ].cart ) {
+							actions.cart( ctx.rows[ ctx.active ] );
+						} else {
+							actions.pick( ctx.rows[ ctx.active ], input );
+						}
 					}
 					break;
 				case 'Escape':
@@ -709,6 +871,15 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			const ctx = getContext();
 			remember( ctx, ctx.query );
 			closePanel( ctx );
+			const words = ctx.query.trim();
+			if ( words ) {
+				emit(
+					ctx,
+					'search',
+					{ query: words },
+					{ event: 'search', search_term: words }
+				);
+			}
 			const form = event?.target;
 			if ( pushed( ctx ) && form?.action ) {
 				// Replace the dialog's history entry, so Back from the results returns to the page itself.
@@ -739,7 +910,7 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 		pick( row, input ) {
 			const ctx = getContext();
 			const form = formOf( input );
-			if ( row.recent ) {
+			if ( row.recent || row.query ) {
 				ctx.query = row.name;
 				ctx.typed = row.name;
 				if ( input ) {
@@ -755,7 +926,8 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 				return;
 			}
 			actions.beacon( row );
-			remember( ctx, ctx.query );
+			actions.selected( row );
+			remember( ctx, row.scope ? row.value : ctx.query );
 			closePanel( ctx );
 			if ( row.url && pushed( ctx ) ) {
 				window.location.replace( row.url );
@@ -783,6 +955,108 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 					id: String( row.pid ),
 				} )
 			);
+		},
+		selected( row ) {
+			const ctx = getContext();
+			let type = row.ctype || row.taxonomy;
+			if ( row.product ) {
+				type = 'product';
+			} else if ( row.scope ) {
+				type = 'scope';
+			}
+			const id = row.scope ? row.cid : row.pid;
+			emit(
+				ctx,
+				'select',
+				{
+					query: ctx.answered,
+					type,
+					id,
+					name: row.name,
+					url: row.url,
+					position: row.index,
+				},
+				row.product
+					? {
+							event: 'select_item',
+							ecommerce: {
+								item_list_id: LIST_ID,
+								item_list_name: LIST_NAME,
+								items: [ { ...item( row ), index: row.index } ],
+							},
+						}
+					: {
+							event: 'select_content',
+							content_type: type,
+							content_id: String( id ),
+						}
+			);
+		},
+		cartClick( event ) {
+			const ctx = getContext();
+			// The row itself goes to the product: the click stops here.
+			event.stopPropagation();
+			event.preventDefault();
+			actions.cart( ctx.row );
+		},
+		*cart( row ) {
+			const ctx = getContext();
+			const p = priv( ctx );
+			if ( ! ctx.cart || ! row?.cart || p.adding ) {
+				return;
+			}
+			p.adding = true;
+			let ok = false;
+			try {
+				// WooCommerce's own add-to-cart endpoint: a POST, so a page cache never answers it.
+				const response = yield window.fetch( ctx.cart, {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: {
+						Accept: 'application/json',
+						'Content-Type':
+							'application/x-www-form-urlencoded; charset=UTF-8',
+					},
+					body: new URLSearchParams( {
+						product_id: String( row.pid ),
+						quantity: '1',
+					} ).toString(),
+				} );
+				const data = response.ok ? yield response.json() : null;
+				ok = Boolean( data && ! data.error );
+				if ( ok ) {
+					refreshCart( data );
+				}
+			} catch {
+				ok = false;
+			} finally {
+				p.adding = false;
+			}
+			ctx.live = fill(
+				ok ? ctx.i18n.added : ctx.i18n.notAdded,
+				row.name
+			);
+			if ( ! ok ) {
+				return;
+			}
+			const layer = {
+				event: 'add_to_cart',
+				ecommerce: { items: [ { ...item( row ), quantity: 1 } ] },
+			};
+			if ( typeof row.price === 'number' && ctx.currency ) {
+				layer.ecommerce.currency = ctx.currency;
+				layer.ecommerce.value = row.price;
+			}
+			emit(
+				ctx,
+				'add-to-cart',
+				{ id: row.pid, name: row.name, quantity: 1 },
+				layer
+			);
+			if ( ctx.cartPage ) {
+				// The shop sends shoppers to the cart after adding, as its own buttons do.
+				window.location.assign( ctx.cartPage );
+			}
 		},
 		dismiss() {
 			closePanel( getContext() );
@@ -862,7 +1136,7 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			const { ref } = getElement();
 			const row = ctx.row;
 			const parts =
-				row.product || row.term || row.content
+				row.product || row.term || row.content || row.query || row.scope
 					? highlight( row.name, ctx.answered )
 					: [ { text: row.name, mark: false } ];
 			// Built as nodes, never markup: a product name is the shop's text, not HTML.

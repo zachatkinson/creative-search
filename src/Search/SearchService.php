@@ -236,7 +236,7 @@ final class SearchService {
 	 * @param string|null $lang   Language asked for.
 	 * @param string      $source page or suggest; empty for a repeat of a search already logged.
 	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
-	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}
+	 * @return array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string}
 	 */
 	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false ): array {
 		$query = self::clean( $raw );
@@ -245,6 +245,7 @@ final class SearchService {
 			return array(
 				'ids'       => array(),
 				'corrected' => null,
+				'dropped'   => false,
 				'query'     => '',
 				'lang'      => $lang,
 			);
@@ -256,6 +257,7 @@ final class SearchService {
 			$cached = array(
 				'ids'       => $result->productIds(),
 				'corrected' => $result->corrected,
+				'dropped'   => $result->dropped,
 			);
 			$this->cache->set( $key, $cached );
 		}
@@ -266,6 +268,7 @@ final class SearchService {
 		return array(
 			'ids'       => $ids,
 			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
+			'dropped'   => true === ( $cached['dropped'] ?? false ),
 			'query'     => $query,
 			'lang'      => $lang,
 		);

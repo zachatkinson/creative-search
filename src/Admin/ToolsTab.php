@@ -145,9 +145,12 @@ final class ToolsTab {
 		$result = $this->search->run( $query, $lang, self::TEST_LIMIT, Settings::TERMS_MAX, true, true );
 		$hits   = array_merge( Explanation::rows( $result->products ), Explanation::rows( $result->terms ) );
 		echo '<p role="status">';
-		if ( null !== $result->corrected ) {
+		if ( null !== $result->corrected && $result->dropped ) {
 			/* translators: 1: the query, 2: the query the results are for */
 			echo esc_html( sprintf( __( 'Nothing matched every word of “%1$s”; showing results for “%2$s”.', 'creative-search' ), $query, $result->corrected ) ) . ' ';
+		} elseif ( null !== $result->corrected ) {
+			/* translators: %s: the query the results are for, with a typo corrected */
+			echo esc_html( sprintf( __( 'Showing results for “%s”.', 'creative-search' ), $result->corrected ) ) . ' ';
 		}
 		echo esc_html(
 			sprintf(
@@ -254,6 +257,13 @@ final class ToolsTab {
 		echo '</select></td></tr>';
 		self::flag( 'recent_searches', __( 'Recent searches', 'creative-search' ), __( 'Offer the shopper’s own last searches, kept in their browser only.', 'creative-search' ), $settings );
 		self::flag( 'theme_form_takeover', __( 'Theme search form', 'creative-search' ), __( 'Replace the theme’s own search form with this search bar.', 'creative-search' ), $settings );
+		echo '</tbody></table>';
+
+		echo '<h3>' . esc_html__( 'Suggestions', 'creative-search' ) . '</h3><p>' . esc_html__( 'For every search bar.', 'creative-search' ) . '</p><table class="form-table" role="presentation"><tbody>';
+		self::flag( 'suggest_queries', __( 'Suggested searches', 'creative-search' ), __( 'Suggest searches other shoppers made, above the products: only searches made three times or more that found products, with every word in your catalogue.', 'creative-search' ), $settings );
+		self::flag( 'suggest_scopes', __( 'Search within a category', 'creative-search' ), __( 'Offer to search within the categories most of the products are in, such as “kazumi in Decks”.', 'creative-search' ), $settings );
+		self::flag( 'suggest_cart', __( 'Add to cart', 'creative-search' ), __( 'Let shoppers add a simple product that needs no choices straight to the cart from the suggestions.', 'creative-search' ), $settings );
+		self::flag( 'analytics_events', __( 'Analytics events', 'creative-search' ), __( 'Tell the page about searches, chosen suggestions, products added to the cart and searches with no suggestions: events on the search form, and on Google Tag Manager’s data layer when the page has one. Nothing is sent anywhere by this plugin.', 'creative-search' ), $settings );
 		echo '</tbody></table>';
 		submit_button( __( 'Save settings', 'creative-search' ) );
 		echo '</form>';

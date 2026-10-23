@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
@@ -18,9 +19,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * `{ products, terms, content, total, query, corrected, lang }` for the panel (spec: The search API → /suggest), built
- * from the documents table alone: name, URL, image, price and stock are on the row, so no WooCommerce product
- * object is loaded on the search path.
+ * `{ queries, products, scopes, terms, content, total, query, corrected, lang }` for the panel (spec: The search API →
+ * /suggest), built from the documents table alone: name, URL, image, price, stock and whether it can go straight
+ * into the cart are on the row, so no WooCommerce product object is loaded on the search path. Suggested searches
+ * (D-112) and the categories to search within (D-113) come with them (1.3).
  */
 final class Suggestions {
 
@@ -32,10 +34,12 @@ final class Suggestions {
 	/**
 	 * Constructor.
 	 *
-	 * @param SearchService $search The search service.
-	 * @param Cache         $cache  Answers.
+	 * @param SearchService    $search  The search service.
+	 * @param Cache            $cache   Answers.
+	 * @param QuerySuggestions $queries Suggested searches.
+	 * @param CategoryScopes   $scopes  The categories to search within.
 	 */
-	public function __construct( private SearchService $search, private Cache $cache ) {
+	public function __construct( private SearchService $search, private Cache $cache, private QuerySuggestions $queries, private CategoryScopes $scopes ) {
 	}
 
 	/**
@@ -44,14 +48,17 @@ final class Suggestions {
 	 * @param string      $raw   Query as received.
 	 * @param string|null $lang  Language asked for.
 	 * @param int         $limit Products, 1 to 10.
-	 * @return array<mixed> `products`, `terms`, `content` (posts and pages, 1.1), `total`, `query`, `corrected`, `lang`.
+	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
+	 *                      `total`, `query`, `corrected`, `lang`.
 	 */
 	public function answer( string $raw, ?string $lang, int $limit ): array {
 		$query = SearchService::clean( $raw );
 		$lang  = $this->search->language( $lang );
 		$limit = max( Settings::LIMIT_MIN, min( Settings::LIMIT_MAX, $limit ) );
 		$empty = array(
+			'queries'   => array(),
 			'products'  => array(),
+			'scopes'    => array(),
 			'terms'     => array(),
 			'content'   => array(),
 			'total'     => 0,
@@ -63,12 +70,21 @@ final class Suggestions {
 			return $empty;
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $this->search->settingsKey(), get_locale() ) );
+		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $this->search->settingsKey(), $panel, get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms );
+			$shown  = array();
+			foreach ( $result->terms as $hit ) {
+				if ( Document::CATEGORY === $hit->document->type ) {
+					$shown[] = $hit->document->objectId;
+				}
+			}
 			$answer = array(
+				'queries'   => $this->queries->for( $query, $lang ),
 				'products'  => $this->products( array_slice( $result->products, 0, $limit ) ),
+				'scopes'    => $this->scopes->for( $query, $result->productIds(), $shown ),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
 				'total'     => count( $result->products ),
@@ -90,6 +106,7 @@ final class Suggestions {
 	 */
 	private function products( array $hits ): array {
 		$rows = $this->search->index()->rows( array_map( static fn( Hit $h ): int => $h->document->id, $hits ) );
+		$cart = Settings::isOn( 'suggest_cart' );
 		$out  = array();
 		foreach ( $hits as $hit ) {
 			$row = $rows[ $hit->document->id ] ?? null;
@@ -102,8 +119,12 @@ final class Suggestions {
 				'url'        => Cast::str( $row['url'] ),
 				'image'      => self::image( Cast::int( $row['image_id'] ) ),
 				'price_html' => self::price( $row['price_min'], $row['price_max'] ),
+				// The lowest price as a number, for an analytics tag's add-to-cart value (D-116); null when there is none.
+				'price'      => is_numeric( $row['price_min'] ) ? (float) $row['price_min'] : null,
 				'in_stock'   => $hit->document->inStock,
 				'type'       => 'product',
+				// Simple, purchasable, in stock and needing no choice: one click puts it in the cart (D-115).
+				'cart'       => $cart && 1 === Cast::int( $row['cart'] ?? 0 ),
 			);
 			/**
 			 * CSS classes for a product's suggestion row, as Mature Content adds one to blur flagged artwork

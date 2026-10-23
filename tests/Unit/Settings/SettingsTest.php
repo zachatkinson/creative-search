@@ -51,7 +51,11 @@ final class SettingsTest extends TestCase {
 		}
 		self::assertSame( 'yes', $d['category_redirect'], 'a category name opens the category (D-102)' );
 		self::assertSame( array(), $d['filter_attributes'], 'no attribute filters until the owner ticks one (D-101)' );
-		self::assertCount( 30, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertSame( 'yes', $d['suggest_queries'], 'suggested searches on (D-112)' );
+		self::assertSame( 'yes', $d['suggest_scopes'], 'searches within a category on (D-113)' );
+		self::assertSame( 'no', $d['suggest_cart'], 'add to cart off until the shop chooses it (D-115)' );
+		self::assertSame( 'yes', $d['analytics_events'], 'the browser events on; nothing leaves the page (D-116)' );
+		self::assertCount( 34, $d, 'every key is documented in docs/SETTINGS.md' );
 	}
 
 	public function test_the_filter_attributes_are_attribute_taxonomies(): void {

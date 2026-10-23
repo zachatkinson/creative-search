@@ -1658,3 +1658,90 @@ msgstr "%1$s (%2$s)"
 msgctxt "an attribute and its values, such as Width 8.25"
 msgid "%1$s %2$s"
 msgstr "%1$s %2$s"
+
+#. translators: %1$s: a product's name
+#: src/Block/SearchForm.php:268
+#, php-format
+msgid "%1$s added to your cart."
+msgstr "%1$s ajouté à votre panier."
+
+#. translators: %1$s: a product's name
+#: src/Block/SearchForm.php:270
+#, php-format
+msgid "Could not add %1$s to your cart."
+msgstr "Impossible d’ajouter %1$s à votre panier."
+
+#. translators: 1: the query typed, 2: a category, as in "kazumi in Decks"
+#: src/Block/SearchForm.php:265
+#, php-format
+msgctxt "a search within a category"
+msgid "%1$s in %2$s"
+msgstr "%1$s dans %2$s"
+
+#: src/Block/SearchForm.php:266
+msgctxt "a suggestion row"
+msgid "Suggested search"
+msgstr "Recherche suggérée"
+
+#: src/Block/SearchForm.php:112
+msgid "Shift+Enter adds it to the cart."
+msgstr "Maj+Entrée l’ajoute au panier."
+
+#: src/Block/SearchForm.php:182
+msgctxt "adds a suggested product to the cart"
+msgid "Add"
+msgstr "Ajouter"
+
+#: src/Admin/ToolsTab.php:262
+msgid "For every search bar."
+msgstr "Pour toutes les barres de recherche."
+
+#: src/Admin/ToolsTab.php:263
+msgid "Suggested searches"
+msgstr "Recherches suggérées"
+
+#: src/Admin/ToolsTab.php:263
+msgid "Suggest searches other shoppers made, above the products: only searches made three times or more that found products, with every word in your catalogue."
+msgstr "Suggérer, au-dessus des produits, des recherches faites par d’autres clients : seulement celles faites trois fois ou plus, qui ont trouvé des produits et dont chaque mot est dans votre catalogue."
+
+#: src/Admin/ToolsTab.php:264
+msgid "Search within a category"
+msgstr "Chercher dans une catégorie"
+
+#: src/Admin/ToolsTab.php:264
+msgid "Offer to search within the categories most of the products are in, such as “kazumi in Decks”."
+msgstr "Proposer de chercher dans les catégories qui contiennent la plupart des produits, comme « kazumi dans Planches »."
+
+#: src/Admin/ToolsTab.php:265
+msgid "Add to cart"
+msgstr "Ajout au panier"
+
+#: src/Admin/ToolsTab.php:265
+msgid "Let shoppers add a simple product that needs no choices straight to the cart from the suggestions."
+msgstr "Permettre aux clients d’ajouter au panier, directement depuis les suggestions, un produit simple qui ne demande aucun choix."
+
+#: src/Admin/ToolsTab.php:266
+msgid "Analytics events"
+msgstr "Événements d’analyse"
+
+#: src/Admin/ToolsTab.php:266
+msgid "Tell the page about searches, chosen suggestions, products added to the cart and searches with no suggestions: events on the search form, and on Google Tag Manager’s data layer when the page has one. Nothing is sent anywhere by this plugin."
+msgstr "Informer la page des recherches, des suggestions choisies, des produits ajoutés au panier et des recherches sans suggestion : des événements sur le formulaire de recherche, et dans la couche de données de Google Tag Manager quand la page en a une. Cette extension n’envoie rien nulle part."
+
+#. translators: %s: the query the results are for, with a typo corrected
+#: src/Admin/ToolsTab.php:153
+#, php-format
+msgid "Showing results for “%s”."
+msgstr "Résultats pour « %s »."
+
+#. translators: %s: the query the results are for, with a typo corrected
+#: src/Cli/SearchCommand.php:79
+#, php-format
+msgid "Showing results for \"%s\"."
+msgstr "Résultats pour \"%s\"."
+
+#. translators: %s: the query the results are for, with a typo corrected
+#: src/Results/ResultsView.php:89
+#, php-format
+msgid "Showing results for %s"
+msgstr "Résultats pour %s"

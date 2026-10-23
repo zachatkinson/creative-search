@@ -104,6 +104,11 @@ final class ResultsTest extends IndexTestCase {
 
 		self::assertSame( array(), $this->visit( array( 's' => 'kazumi wheels', 'post_type' => 'product', ProductSearch::EXACT_ARG => '1' ) ), 'the shopper\'s exact words' );
 		self::assertNull( $this->service( ProductSearch::class )->answer()['corrected'] ?? null );
+
+		self::assertNotSame( array(), $this->visit( array( 's' => 'kazuni', 'post_type' => 'product' ) ) );
+		$summary = $this->service( ResultsView::class )->summary();
+		self::assertStringContainsString( 'Showing results for <em>kazumi</em>', $summary, 'a typo says what the results are for (D-114)' );
+		self::assertStringNotContainsString( 'search instead', $summary, 'the exact words would find the same' );
 	}
 
 	public function test_no_results_offers_categories_and_fallback_products(): void {

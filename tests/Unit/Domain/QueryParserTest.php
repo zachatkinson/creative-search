@@ -168,6 +168,16 @@ final class QueryParserTest extends TestCase {
 		self::assertSame( 'québécois', self::parser()->parse( 'Québécois', 'en' )->without( 5 )->text, 'the source spelling is written back, lower-cased' );
 	}
 
+	public function test_rewritten_replaces_words_and_leaves_one_out(): void {
+		$q = self::parser()->parse( 'phillys "horor party" deck -blank', 'en' );
+		self::assertSame( 'phillys "horror party" deck -blank', $q->rewritten( array( 1 => 'horror' ) ), 'the typo is replaced inside its phrase' );
+		self::assertSame( 'phillys "horror party" -blank', $q->rewritten( array( 1 => 'horror' ), 3 ) );
+		self::assertSame( 'phillys horror deck -blank', $q->rewritten( array( 1 => 'horror' ), 2 ), 'a phrase left with one word loses its quotes' );
+		self::assertSame( $q->without( 0 )->text, $q->rewritten( array(), 0 ), 'with no word replaced, the same as without()' );
+		self::assertSame( 'phillys "horor party" deck -blank', $q->rewritten( array() ) );
+		self::assertSame( 'phillys "horror party" deck -blank', $q->rewritten( array( 1 => 'horror' ), 9 ), 'an index out of range leaves nothing out' );
+	}
+
 	public function test_render_of_an_empty_query(): void {
 		self::assertSame( '', Query::render( array(), array() ) );
 		$empty = new Query( '', 'en', array() );

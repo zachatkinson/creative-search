@@ -237,6 +237,44 @@
 	font-style: italic;
 }
 
+/* Suggested searches (D-112) and searches within a category (D-113): a search icon before the words. */
+.csearch-option-query::before,
+.csearch-option-scope::before {
+	flex: none;
+	inline-size: 1.25em;
+	block-size: 1.25em;
+	content: "";
+	background-color: var(--csearch-muted);
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 3a7 7 0 1 0 4.2 12.6l5.6 5.6 1.4-1.4-5.6-5.6A7 7 0 0 0 10 3Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z'/%3E%3C/svg%3E")
+		center / contain no-repeat;
+}
+
+/* Add to cart, for a pointer (D-115): at the row's end, a target as tall as the row. */
+.csearch-cart {
+	display: inline-flex;
+	flex: none;
+	gap: 0.25em;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: 44px;
+	min-block-size: 44px;
+	margin-inline-start: auto;
+	padding-inline: var(--csearch-gap);
+	font-size: 0.875em;
+	color: var(--csearch-fg);
+	cursor: pointer;
+	border: 1px solid var(--csearch-border);
+	border-radius: var(--csearch-radius);
+}
+
+.csearch-cart:hover {
+	background: var(--csearch-highlight);
+}
+
+.csearch-cart[hidden] {
+	display: none;
+}
+
 /* The page dims behind the open panel (D-097); the form sits above it. */
 .csearch-backdrop {
 	position: fixed;

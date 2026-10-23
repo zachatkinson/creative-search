@@ -255,6 +255,27 @@ final class SearcherTest extends TestCase {
 		self::assertSame( TermMatch::TYPO1, $swap->products[0]->score->tokens[0]['kind'], 'a transposition is one edit' );
 	}
 
+	public function test_a_typo_says_what_the_results_are_for(): void {
+		$one = $this->search( 'kazuni' );
+		self::assertSame( 'kazumi', $one->corrected, 'the typo read as the term it matched' );
+		self::assertFalse( $one->dropped, 'nothing was left out: the exact words find the same' );
+		self::assertNull( $this->search( 'kazumy' )->corrected, 'a stem is no typo' );
+		self::assertNull( $this->search( 'kazumi' )->corrected );
+		$two = $this->search( 'kazuni dealer' );
+		self::assertSame( 'kazumi dealer', $two->corrected, 'only the typo is rewritten' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $two ) );
+		$both = $this->search( 'kazuni snowboard' );
+		self::assertSame( 'kazumi', $both->corrected, 'a word left out and a typo read, together' );
+		self::assertTrue( $both->dropped );
+		$first = $this->search( 'dekc kazumi' );
+		self::assertSame( 'deck kazumi', $first->corrected, 'the closest term, in the typo\'s place' );
+		self::assertSame( 'kazumi deck', $this->search( 'kazuni dekc' )->corrected, 'every typo is read' );
+		$none = $this->search( 'skatehoyze kazumi', 'en', new SearchOptions( retry: false ) );
+		self::assertSame( array(), $none->products );
+		self::assertNull( $none->corrected, 'a typo that finds no product reports nothing' );
+		self::assertFalse( $none->dropped );
+	}
+
 	public function test_typos_are_never_tried_for_short_tokens_numbers_or_sku_shapes(): void {
 		self::assertTrue( $this->search( 'dek' )->isEmpty() );
 		self::assertTrue( $this->search( '8.52 ' )->isEmpty(), '8.25 is not found from 8.52' );
@@ -284,6 +305,7 @@ final class SearcherTest extends TestCase {
 		$r = $this->search( 'kazumi wheels' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $r ) );
 		self::assertSame( 'kazumi', $r->corrected, 'wheels matched one product, kazumi three' );
+		self::assertTrue( $r->dropped, 'a word was left out: the exact words are worth offering' );
 		self::assertSame( array( 0 ), array_keys( $r->products[0]->score->tokens ), 'scored for the reduced query' );
 		$three = $this->search( 'kazumi dealer snowboard' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $three ) );
@@ -359,6 +381,7 @@ final class SearcherTest extends TestCase {
 		$r = $this->search( 'dba snowboard' );
 		self::assertTrue( $r->isEmpty(), 'the Blank is hidden' );
 		self::assertNull( $r->corrected );
+		self::assertFalse( $r->dropped, 'a retry that found nothing is not reported' );
 		$tie = $this->search( 'wheels bearings' );
 		self::assertSame( 'wheels', $tie->corrected, 'on a tie the later token goes' );
 		self::assertSame( array( 'Orbit Wheels, Classic' ), self::titles( $tie ) );

@@ -107,6 +107,10 @@ final class SearchForm {
 		$html .= '<ul id="' . esc_attr( $listbox ) . '" class="csearch-list" role="listbox" aria-label="' . esc_attr__( 'Suggestions', 'creative-search' ) . '">';
 		$html .= $this->rowTemplate();
 		$html .= '</ul>';
+		if ( Settings::isOn( 'suggest_cart' ) ) {
+			// The description of every row that can go straight into the cart (D-115): read with the row, never shown.
+			$html .= '<span id="' . esc_attr( $id . '-cart-hint' ) . '" hidden>' . esc_html__( 'Shift+Enter adds it to the cart.', 'creative-search' ) . '</span>';
+		}
 		$html .= '</div>';
 		$html .= '</form>';
 		if ( $dialog ) {
@@ -154,7 +158,8 @@ final class SearchForm {
 		return '<template data-wp-each--row="context.rows" data-wp-each-key="context.row.key">'
 			. '<li class="csearch-option" role="option" data-wp-bind--id="context.row.id" data-wp-bind--aria-selected="state.isActive"'
 			. ' data-wp-class--is-active="state.isActive" data-wp-class--csearch-option-product="context.row.product" data-wp-class--csearch-option-term="context.row.term" data-wp-class--csearch-option-all="context.row.all" data-wp-class--csearch-option-recent="context.row.recent"'
-			. ' data-wp-class--csearch-option-content="context.row.content" data-wp-class--has-heading="context.row.heading" data-wp-watch="callbacks.classes"'
+			. ' data-wp-class--csearch-option-content="context.row.content" data-wp-class--csearch-option-query="context.row.query" data-wp-class--csearch-option-scope="context.row.scope" data-wp-class--has-heading="context.row.heading" data-wp-watch="callbacks.classes"'
+			. ' data-wp-bind--aria-describedby="context.row.hint"'
 			. ' data-wp-on--pointerdown="actions.hold" data-wp-on--pointermove="actions.hover" data-wp-on--click="actions.choose">'
 			// The group's heading ("Pages") over its first row: shown, not read, since every row names its own type.
 			. '<span class="csearch-group" aria-hidden="true" hidden data-wp-bind--hidden="!context.row.heading" data-wp-text="context.row.heading"></span>'
@@ -169,6 +174,12 @@ final class SearchForm {
 			. '<span class="csearch-kind" hidden data-wp-bind--hidden="!context.row.kind">' . $this->separator() . '<span data-wp-text="context.row.kind"></span></span>'
 			. '<span class="csearch-sr" hidden data-wp-bind--hidden="!context.row.type">' . $this->separator() . '<span data-wp-text="context.row.type"></span></span>'
 			. '</span>'
+			. '</span>'
+			// Add to cart for a pointer (D-115): an option holds nothing focusable, so this is no button; the keyboard
+			// adds the chosen row with Shift+Enter, which the row's description says.
+			. '<span class="csearch-cart" aria-hidden="true" hidden data-wp-bind--hidden="!context.row.cart" data-wp-on--click="actions.cartClick">'
+			. '<svg class="csearch-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM5.2 4l.4 2H21l-2.2 8.4a2 2 0 0 1-1.9 1.6H8.4a2 2 0 0 1-2-1.6L4.4 4H2V2h4l.4 2Z"/></svg>'
+			. '<span class="csearch-cart-text">' . esc_html_x( 'Add', 'adds a suggested product to the cart', 'creative-search' ) . '</span>'
 			. '</span>'
 			. '</li>'
 			. '</template>';
@@ -220,6 +231,12 @@ final class SearchForm {
 			'terms'     => $options->showTerms,
 			'recent'    => $options->recentSearches,
 			'position'  => $options->panelPosition,
+			// The panel's extras (1.3): the add-to-cart endpoint and the cart page when the shop sends shoppers there
+			// after adding (D-115), the shop's currency and the browser events for an analytics tag (D-116).
+			'cart'      => $this->cartUrl(),
+			'cartPage'  => '' !== $this->cartUrl() && 'yes' === get_option( 'woocommerce_cart_redirect_after_add' ) && function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
+			'currency'  => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
+			'events'    => Settings::isOn( 'analytics_events' ),
 			'i18n'      => array(
 				'counts'     => $counts,
 				'recents'    => $recent,
@@ -232,7 +249,7 @@ final class SearchForm {
 				),
 				'inStock'    => __( 'In stock', 'creative-search' ),
 				'outOfStock' => __( 'Out of stock', 'creative-search' ),
-				/* translators: %1$s: the query the suggestions are for, after a word that matched nothing was left out */
+				/* translators: %1$s: the query the suggestions are for, after a word that matched nothing was left out or a typo was corrected */
 				'corrected'  => __( 'Showing results for %1$s', 'creative-search' ),
 				/* translators: used between the parts of a suggestion's accessible name (name, price, stock); there is a space after the comma */
 				'separator'  => _x( ', ', 'between the parts of a suggestion name', 'creative-search' ),
@@ -244,6 +261,13 @@ final class SearchForm {
 					'brand'    => _x( 'Brand', 'a suggestion row', 'creative-search' ),
 				),
 				'content'    => ResultsView::contentHeading(),
+				/* translators: 1: the query typed, 2: a category, as in "kazumi in Decks" */
+				'scope'      => _x( '%1$s in %2$s', 'a search within a category', 'creative-search' ),
+				'search'     => _x( 'Suggested search', 'a suggestion row', 'creative-search' ),
+				/* translators: %1$s: a product's name */
+				'added'      => __( '%1$s added to your cart.', 'creative-search' ),
+				/* translators: %1$s: a product's name */
+				'notAdded'   => __( 'Could not add %1$s to your cart.', 'creative-search' ),
 				'types'      => array(
 					'post' => _x( 'Post', 'a suggestion row', 'creative-search' ),
 					'page' => _x( 'Page', 'a suggestion row', 'creative-search' ),
@@ -264,6 +288,17 @@ final class SearchForm {
 			'above'     => Settings::PANEL_ABOVE === $options->panelPosition,
 			'dialog'    => FormOptions::BUTTON === $options->mode,
 		);
+	}
+
+	/**
+	 * WooCommerce's own add-to-cart endpoint (the one its "Add to cart" buttons use), when the owner offers it in
+	 * the suggestions; empty otherwise. The same URL for everyone, so a cached page stays right.
+	 */
+	private function cartUrl(): string {
+		if ( ! Settings::isOn( 'suggest_cart' ) || ! class_exists( 'WC_AJAX' ) ) {
+			return '';
+		}
+		return \WC_AJAX::get_endpoint( 'add_to_cart' );
 	}
 
 	/**

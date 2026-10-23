@@ -14,8 +14,10 @@ use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Repository\LogRepository;
 use CreativeBranding\Search\Repository\SynonymRepository;
 use CreativeBranding\Search\Settings\Settings;
+use CreativeBranding\Search\Support\Clock;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Fixtures\GoldenQueries;
@@ -34,7 +36,9 @@ use WP_REST_Request;
  * 2. Milestone 4's golden set through the API, with the catalogue in two languages the way skatehouse-core
  *    answers `csearch_languages` and the golden set's synonyms (spec: Security, performance → Performance):
  *    `/suggest` p95 within 60 ms warm and 100 ms cold, `/search` within 100 ms, 4 MB above the baseline. Times
- *    are measured around `rest_do_request()`: the route's own work, without WordPress's bootstrap.
+ *    are measured around `rest_do_request()`: the route's own work, without WordPress's bootstrap. The search
+ *    log holds each golden query from a results page 3 times and 10,000 other rows, so every answer pays for
+ *    its suggested searches (D-112) and its category scopes (D-113).
  *
  * Each phase writes its time to STDERR as it ends, so a slow run shows where the time went.
  *
@@ -105,6 +109,9 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 		$this->analyzeAside( self::$analyzed );
 		do_action( 'rest_api_init' );
 		$this->phase( 'reindexed in English and French, with the synonyms, pages and posts', $start );
+		$start = hrtime( true );
+		$this->seedLog();
+		$this->phase( 'search log seeded', $start );
 
 		$queried  = hrtime( true );
 		$failures = array();
@@ -263,5 +270,41 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 	private static function p95( array $values ): float {
 		sort( $values );
 		return $values[ (int) max( 0, ceil( 0.95 * count( $values ) ) - 1 ) ];
+	}
+
+	/**
+	 * The search log a shop has after a while: each golden query searched three times from a results page (so
+	 * each is a suggested search for its own prefix) and 10,000 other searches, within the retention window.
+	 */
+	private function seedLog(): void {
+		$log  = $this->service( LogRepository::class );
+		$when = Clock::format( Clock::timestamp() - DAY_IN_SECONDS );
+		$rows = array();
+		foreach ( GoldenQueries::queries() as $q ) {
+			$normalised = mb_strtolower( trim( (string) $q['q'] ), 'UTF-8' );
+			for ( $i = 0; $i < 3; $i++ ) {
+				$rows[] = array(
+					'query'      => (string) $q['q'],
+					'normalised' => $normalised,
+					'lang'       => (string) $q['lang'],
+					'results'    => 1,
+					'source'     => 'page',
+					'created_at' => $when,
+				);
+			}
+		}
+		for ( $i = 0; $i < 10000; $i++ ) {
+			$rows[] = array(
+				'query'      => 'noise ' . $i,
+				'normalised' => 'noise ' . $i,
+				'lang'       => 0 === $i % 2 ? 'en' : 'fr',
+				'results'    => $i % 3,
+				'source'     => 0 === $i % 4 ? 'page' : 'suggest',
+				'created_at' => $when,
+			);
+		}
+		foreach ( array_chunk( $rows, 500 ) as $chunk ) {
+			$log->insert( $chunk );
+		}
 	}
 }

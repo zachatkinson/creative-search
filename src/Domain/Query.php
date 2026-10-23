@@ -79,6 +79,26 @@ final class Query {
 	}
 
 	/**
+	 * The query written back with some words replaced (a typo by the term it matched) and one token left out,
+	 * so the shopper reads what the results are for (D-034, D-114).
+	 *
+	 * @param array<int, string> $words   Index into {@see Query::$tokens} to the word written in its place.
+	 * @param int|null           $without A token left out, or null.
+	 */
+	public function rewritten( array $words, ?int $without = null ): string {
+		$tokens = array();
+		foreach ( $this->tokens as $i => $token ) {
+			if ( $i === $without ) {
+				continue;
+			}
+			$tokens[] = isset( $words[ $i ] )
+				? new QueryToken( $token->text, $words[ $i ], $token->negated, $token->phrase, $token->prefix, $token->stopWord, $token->synonyms, $token->variants )
+				: $token;
+		}
+		return self::render( $tokens, $this->excluded );
+	}
+
+	/**
 	 * Tokens written back as a query: phrases of two or more tokens quoted, minus words with their minus.
 	 *
 	 * @param QueryToken[] $tokens   The tokens to match.
