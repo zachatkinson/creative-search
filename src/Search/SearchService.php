@@ -232,7 +232,9 @@ final class SearchService {
 	}
 
 	/**
-	 * The ranked product ids for a results page, cached, logged.
+	 * The ranked product ids for a results page, cached, logged, with what a page needs to say which variation
+	 * the query named and why each product matched (D-104, D-105): each product's document, the terms each token
+	 * reached, the query's key and the language whose documents answered.
 	 *
 	 * @param string      $raw    Query as received.
 	 * @param string|null $lang   Language asked for.
@@ -240,7 +242,7 @@ final class SearchService {
 	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
 	 * @param int[]       $scope  Products of these term-taxonomy ids only: a category and its subcategories (D-117).
 	 * @param bool        $strong The strong matches only, when any (D-118): a sort other than Relevance.
-	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}
+	 * @return array{ids: int[], corrected: string|null, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}
 	 */
 	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false, array $scope = array(), bool $strong = false ): array {
 		$query = self::clean( $raw );
@@ -251,6 +253,10 @@ final class SearchService {
 				'corrected' => null,
 				'query'     => '',
 				'lang'      => $lang,
+				'docs'      => array(),
+				'tokens'    => array(),
+				'key'       => '',
+				'from'      => $lang,
 			);
 		}
 		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $scope, $strong, $this->settingsKey() ) );
@@ -261,9 +267,17 @@ final class SearchService {
 				// Nothing matches every word as typed: the sort keeps every match rather than show nothing (D-118).
 				$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact, $scope ), false );
 			}
+			$docs = array();
+			foreach ( $result->products as $hit ) {
+				$docs[ $hit->document->objectId ] = $hit->document->id;
+			}
 			$cached = array(
 				'ids'       => $result->productIds(),
 				'corrected' => $result->corrected,
+				'docs'      => $docs,
+				'tokens'    => $result->tokens,
+				'key'       => $result->key,
+				'from'      => $result->lang,
 			);
 			$this->cache->set( $key, $cached );
 		}
@@ -276,7 +290,25 @@ final class SearchService {
 			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
 			'query'     => $query,
 			'lang'      => $lang,
+			'docs'      => self::documentsOf( $cached['docs'] ?? null ),
+			'tokens'    => array_map( array( Cast::class, 'strings' ), is_array( $cached['tokens'] ?? null ) ? $cached['tokens'] : array() ),
+			'key'       => Cast::str( $cached['key'] ?? null ),
+			'from'      => Cast::str( $cached['from'] ?? null, $lang ),
 		);
+	}
+
+	/**
+	 * Product id to document id, from a cached answer (an answer cached before 1.3 has none).
+	 *
+	 * @param mixed $docs The cached map.
+	 * @return array<int, int>
+	 */
+	private static function documentsOf( mixed $docs ): array {
+		$out = array();
+		foreach ( is_array( $docs ) ? $docs : array() as $product => $document ) {
+			$out[ (int) $product ] = Cast::int( $document );
+		}
+		return $out;
 	}
 
 	/**

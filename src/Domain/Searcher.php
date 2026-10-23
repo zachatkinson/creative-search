@@ -70,6 +70,8 @@ final class Searcher {
 
 		$products  = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
 		$corrected = null;
+		$answered  = $query;
+		$used      = $widenings;
 		if ( array() === $products && $options->retry && count( $widenings ) >= 2 ) {
 			$drop     = $this->leastMatched( $widenings, $lang, $kind );
 			$reduced  = $query->without( $drop );
@@ -77,6 +79,8 @@ final class Searcher {
 			$products = $this->index->rank( RankPlan::of( $reduced, $kept, $lang, $n, $excluded, $options ) );
 			if ( array() !== $products ) {
 				$corrected = $reduced->text;
+				$answered  = $reduced;
+				$used      = $kept;
 			}
 		}
 
@@ -89,7 +93,7 @@ final class Searcher {
 		usort( $terms, array( Hit::class, 'compareTerms' ) );
 		$terms = array_slice( $terms, 0, $options->termLimit );
 
-		return new SearchResult( $products, $terms, $lang, $corrected );
+		return new SearchResult( $products, $terms, $lang, $corrected, array_map( static fn( TokenWidening $w ): array => self::termsOf( $w->matches ), $used ), $answered->key() );
 	}
 
 	/**

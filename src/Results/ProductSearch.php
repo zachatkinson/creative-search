@@ -33,7 +33,7 @@ final class ProductSearch {
 	/**
 	 * The answer for the main query, once it has been searched.
 	 *
-	 * @var array{ids: int[], corrected: string|null, query: string, lang: string}|null
+	 * @var array{ids: int[], corrected: string|null, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}|null
 	 */
 	private ?array $answer = null;
 
@@ -255,7 +255,7 @@ final class ProductSearch {
 	/**
 	 * The answer for this page, or null when the page is not a ranked search.
 	 *
-	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}|null
+	 * @return array{ids: int[], corrected: string|null, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}|null
 	 */
 	public function answer(): ?array {
 		return $this->answer;

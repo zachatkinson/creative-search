@@ -51,7 +51,7 @@ add_filter(
 
 - **Since:** 0.4.0
 - **Signature:** `apply_filters( 'csearch_document', array $document, WC_Product $product, string $lang ): array`
-- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`. Every value is coerced back to its type afterwards.
+- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`, and since 1.3.0 `cart` (a simple product that can go to the cart from the panel, D-106) and `facts` (its SKUs and attribute values, each `variation_id`, `field`, `attribute`, `name`, `value`, `label`, `image_id`, D-104). Every value is coerced back to its type afterwards.
 - **Where it runs:** `Index\ProductReader::read()`, once per product and language per job.
 - **Example:**
 
@@ -189,6 +189,8 @@ add_filter( 'csearch_rate_limit', static fn( int $limit, string $route ): int =>
 | Route | Access | Returns |
 | --- | --- | --- |
 | `GET /suggest?q=&lang=&limit=&cat=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ products, terms, total, query, corrected, lang }`; `cat` (1.3.0), a product category's slug, keeps the products to it and its subcategories (D-117) |
+
+| `GET /suggest?q=&lang=&limit=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ products, terms, total, query, corrected, lang }`; since 1.3.0 each product carries `matched`, the "why this matched" line or an empty string (D-105), and its `url` and `image` are the named variation's (D-104) |
 | `GET /search?q=&lang=&page=&per_page=&orderby=relevance` | public, rate-limited, cacheable | `{ ids, total, page, pages, corrected, query, lang }` |
 | `GET /status` | `manage_woocommerce` | `{ generation, building, products, documents, terms, last_reindex, progress, backlog, errors }` |
 | `POST /click` (`q`, `lang`, `type`, `id`) | public, rate-limited | `202 { recorded }` (D-052) |
@@ -317,7 +319,7 @@ add_filter( 'csearch_content_limit', static fn( int $limit, string $context ): i
 
 - **Since:** 1.1.0
 - **Signature:** `apply_filters( 'csearch_suggestion_classes', array $classes, int $productId, ?int $imageId, array $row ): array`
-- **What it does:** CSS classes for a product's suggestion row (Skatehouse handoff item 3: Mature Content blurs flagged artwork with one). Each is passed through `sanitize_html_class()`, repeats and non-strings are dropped, and at most 8 are kept. The answer is cached: a plugin whose answer changes calls `do_action( 'csearch_flush_cache' )`.
+- **What it does:** CSS classes for a product's suggestion row (Skatehouse handoff item 3: Mature Content blurs flagged artwork with one). Each is passed through `sanitize_html_class()`, repeats and non-strings are dropped, and at most 8 are kept. Since 1.3.0 `$imageId` is the image the row shows, a named variation's own photo when it has one (D-104). The answer is cached: a plugin whose answer changes calls `do_action( 'csearch_flush_cache' )`.
 - **Where it runs:** `Search\Suggestions`, on a `/suggest` request that is not answered from the cache.
 - **Example:**
 

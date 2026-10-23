@@ -285,7 +285,11 @@ final class SearcherTest extends TestCase {
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $r ) );
 		self::assertSame( 'kazumi', $r->corrected, 'wheels matched one product, kazumi three' );
 		self::assertSame( array( 0 ), array_keys( $r->products[0]->score->tokens ), 'scored for the reduced query' );
+		self::assertSame( 'kazumi', $r->key, 'the key of the query the results answer (D-105)' );
+		self::assertSame( array( array( 'kazumi' ) ), $r->tokens, 'the terms of the tokens kept' );
 		$three = $this->search( 'kazumi dealer snowboard' );
+		self::assertSame( 'kazumi dealer', $three->key );
+		self::assertSame( array( array( 'kazumi' ), array( 'dealer' ) ), $three->tokens, 'reindexed from 0' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $three ) );
 		self::assertSame( 'kazumi dealer', $three->corrected );
 		self::assertTrue( $this->search( 'snowboard' )->isEmpty(), 'one token cannot be dropped' );
@@ -312,6 +316,8 @@ final class SearcherTest extends TestCase {
 		$exact = $this->search( 'kazumi wheels', 'en', new SearchOptions( retry: false ) );
 		self::assertSame( array(), $exact->products, 'no product matches both, and nothing is dropped' );
 		self::assertNull( $exact->corrected );
+		self::assertSame( 'kazumi wheels', $exact->key, 'nothing dropped: the whole query' );
+		self::assertSame( array( array( 'kazumi' ), array( 'wheels', 'wheel' ) ), $exact->tokens, 'each token\'s terms, its stem among them' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $this->search( 'kazumi dealer', 'en', new SearchOptions( retry: false ) ) ), 'a query that matches is unaffected' );
 	}
 

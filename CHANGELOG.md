@@ -13,6 +13,17 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 - A sort other than Relevance (price, popularity, rating, date) lists the strong matches only: every word as typed, its spellings, stem or synonyms, never a completion of an unfinished word or a typo's neighbour, so a sort never brings a weak match to the top (Baymard). When nothing is strong, every match is listed. The count and filters follow (D-118, which replaces D-057's "any other sort keeps the match set").
 
+## [1.3.0] - unreleased
+
+### Added
+- A query that names one design, colour or size of a variable product (by an attribute value only some of its variations carry, or by a variation's whole SKU) shows that variation's own photo in the panel and on the results page, and opens the product with it chosen (`?attribute_design=Fire`). Each product's SKUs and attribute values are kept beside its document in a new `facts` table (D-104).
+- "Why this matched": a suggestion row and a results-page card whose name does not show the matched words say what did, "Matches SKU MUM-FUR-ICE", "Matches Design: Fire" or "Matches the description"; nothing for a name, category, tag or brand match. Worked out for the shown products only and cached (D-105). The `/suggest` answer's products carry `matched`.
+- Documents carry `cart`: a simple product that is purchasable and in stock, for the panel's add to cart (D-106).
+
+### Changed
+- Schema 3: the `facts` table and the documents' `cart` column. A site on schema 2 upgrades in place and owes a rebuild; until it is done, the live index is read as before and no variation or reason is shown (D-107).
+- `csearch_document` gains `cart` and `facts`; `csearch_suggestion_classes` receives the image the row shows, the variation's when one is named.
+
 ## [1.2.0] - 2026-10-22
 
 Items 9 to 11 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md).

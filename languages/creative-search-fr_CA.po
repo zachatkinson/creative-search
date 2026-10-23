@@ -1690,3 +1690,26 @@ msgstr "Autres champs"
 #, php-format
 msgid "Search these product fields too, such as an Advanced Custom Fields field by its name. Separate other names with commas; up to %s fields. Rebuild the index after a change."
 msgstr "Chercher aussi dans ces champs de produit, comme un champ Advanced Custom Fields par son nom. Séparez les autres noms par des virgules ; jusqu’à %s champs. Reconstruisez l’index après un changement."
+
+#. translators: %s: a product's or variation's SKU
+#: src/Search/MatchDetails.php:134
+#, php-format
+msgid "Matches SKU %s"
+msgstr "Correspond à l’UGS %s"
+
+#. translators: %s: an attribute value, such as 8.25
+#: src/Search/MatchDetails.php:138
+#, php-format
+msgid "Matches %s"
+msgstr "Correspond à %s"
+
+#. translators: 1: an attribute's name, such as Width, 2: its value, such as 8.25
+#: src/Search/MatchDetails.php:140
+#, php-format
+msgctxt "an attribute and its value"
+msgid "Matches %1$s: %2$s"
+msgstr "Correspond à %1$s : %2$s"
+
+#: src/Search/MatchDetails.php:142
+msgid "Matches the description"
+msgstr "Correspond à la description"
