@@ -19,6 +19,11 @@ defined( 'ABSPATH' ) || exit;
 final class Fact {
 
 	/**
+	 * What a fact's terms are joined by when stored: a SKU's key term holds spaces ("=mum fur ice").
+	 */
+	public const SEPARATOR = "\t";
+
+	/**
 	 * Constructor.
 	 *
 	 * @param int      $variationId The variation, or 0 for the product itself.

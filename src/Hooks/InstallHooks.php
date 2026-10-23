@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * A network site deleted takes the plugin's seven tables with it (spec: multisite-safe, tables per site).
+ * A network site deleted takes the plugin's eight tables with it (spec: multisite-safe, tables per site).
  */
 final class InstallHooks implements Hookable {
 

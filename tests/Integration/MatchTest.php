@@ -139,8 +139,8 @@ final class MatchTest extends IndexTestCase {
 		self::assertSame( 'Design', $facts[6]['name'] );
 		self::assertSame( (string) $this->photos['Ice'], $facts[6]['image_id'], 'its own photo' );
 		self::assertNull( $facts[8]['image_id'], 'Leaf has none' );
-		self::assertContains( '=mum fur ice', explode( ' ', (string) $facts[7]['terms'] ), 'a SKU carries its key term' );
-		self::assertContains( 'ice', explode( ' ', (string) $facts[6]['terms'] ) );
+		self::assertContains( '=mum fur ice', explode( "\t", (string) $facts[7]['terms'] ), 'a SKU carries its key term' );
+		self::assertContains( 'ice', explode( "\t", (string) $facts[6]['terms'] ) );
 
 		$this->service( Indexer::class )->removeProduct( $this->grip );
 		self::assertSame( array(), $this->facts( $this->grip ), 'gone with the document' );

@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Index;
 
 use CreativeBranding\Search\Domain\Document;
+use CreativeBranding\Search\Domain\Fact;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Install\Upgrader;
@@ -458,7 +459,7 @@ final class Indexer {
 				if ( strlen( $joined ) + strlen( $term ) + 1 > self::FACT_TERMS ) {
 					break;
 				}
-				$joined .= ( '' === $joined ? '' : ' ' ) . $term;
+				$joined .= ( '' === $joined ? '' : Fact::SEPARATOR ) . $term;
 			}
 			$out[] = $fact + array( 'terms' => $joined );
 		}

@@ -80,7 +80,7 @@ final class FactRepository extends Repository {
 				(string) $row['value'],
 				(string) $row['label'],
 				$image > 0 ? $image : null,
-				array_values( array_filter( explode( ' ', (string) $row['terms'] ), static fn( string $t ): bool => '' !== $t ) )
+				array_values( array_filter( explode( Fact::SEPARATOR, (string) $row['terms'] ), static fn( string $t ): bool => '' !== $t ) )
 			);
 		}
 		return $out;

@@ -119,13 +119,14 @@ final class MatchExplainer {
 		}
 		$description = array_merge( $fields[ Fields::SHORT ] ?? array(), $fields[ Fields::LONG ] ?? array() );
 		foreach ( $outside as $terms ) {
-			$fact = array() === array_intersect( $terms, $fields[ Fields::SKU ] ?? array() ) ? null : self::first( $facts, Fields::SKU, $terms );
-			if ( null !== $fact ) {
-				return array( MatchDetail::SKU, '', $fact->label );
-			}
+			// A value the shopper can read ("Design: Fire") says more than the part of a SKU that holds the same word.
 			$fact = array() === array_intersect( $terms, $fields[ Fields::ATTRIBUTE ] ?? array() ) ? null : self::first( $facts, Fields::ATTRIBUTE, $terms );
 			if ( null !== $fact ) {
 				return array( MatchDetail::ATTRIBUTE, $fact->name, $fact->label );
+			}
+			$fact = array() === array_intersect( $terms, $fields[ Fields::SKU ] ?? array() ) ? null : self::first( $facts, Fields::SKU, $terms );
+			if ( null !== $fact ) {
+				return array( MatchDetail::SKU, '', $fact->label );
 			}
 			if ( array() !== array_intersect( $terms, $description ) ) {
 				return array( MatchDetail::DESCRIPTION, '', '' );
