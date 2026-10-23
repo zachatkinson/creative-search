@@ -3,10 +3,10 @@ import { test, expect } from '@playwright/test';
 import { axe } from './support/axe';
 
 /**
- * 1.3: search within the current category (D-117) and a sort that keeps the strong matches (D-118). The form in
- * Storefront's sidebar on the Decks page offers "Only in Decks", ticked; the suggestions and the results keep to
- * Decks; the results page says so and links to every product; unticked, the search covers the shop. On both
- * themes the spec names, the scoped results page and a price sort. Axe on each state.
+ * Search within the current category (D-117, D-130) and a sort that keeps the strong matches (D-118). On the Decks
+ * page the form in Storefront's sidebar searches the whole shop, and its panel offers "kazumi in Decks" first; that
+ * row searches in Decks, and the results page says so and links to every product. On both themes the spec names,
+ * the scoped results page and a price sort. Axe on each state.
  */
 
 function wp( command: string ): string {
@@ -93,48 +93,37 @@ test.describe( 'The form on a category page', () => {
 		}
 	} );
 
-	test( 'offers the category, suggests from it, and searches in it', async ( {
+	test( 'offers the category first in the panel, and searches in it', async ( {
 		page,
 	} ) => {
 		await page.goto( DECKS );
 		const form = page.locator( '.widget .csearch-form' ).first();
-		const scope = form.getByRole( 'checkbox', { name: 'Only in Decks' } );
-		await expect( scope ).toBeChecked();
-		await axe( page, 'the form on Decks', '.widget .csearch-form' );
-
+		await expect( form.getByRole( 'checkbox' ) ).toHaveCount( 0 );
 		const input = form.getByRole( 'combobox' );
 		await input.fill( 'kazumi' );
 		const options = form.getByRole( 'option' );
-		await expect( options.first() ).toBeVisible();
-		await expect( options.filter( { hasText: 'T-Shirt' } ) ).toHaveCount(
-			0
-		);
-		await axe( page, 'the panel kept to Decks', '.widget .csearch-form' );
-
-		await scope.uncheck();
+		// The panel searches the shop: the T-shirt is there, and Decks is offered as a scope.
 		await expect(
 			options.filter( { hasText: 'T-Shirt' } ).first()
 		).toBeVisible();
-		await scope.check();
-		await input.press( 'Enter' );
+		const decks = form.locator( '.csearch-option-scope' ).first();
+		await expect( decks ).toHaveAccessibleName( /kazumi in Decks/ );
+		await axe(
+			page,
+			'the panel on Decks with its scope',
+			'.widget .csearch-form'
+		);
+
+		await decks.click();
 		await expect( page ).toHaveURL( /[?&]product_cat=decks/ );
 		await expect( page.locator( '.csearch-results-summary' ) ).toHaveText(
 			/in Decks$/
 		);
-		await expect(
-			page
-				.locator( '.widget .csearch-form' )
-				.first()
-				.getByRole( 'checkbox', {
-					name: 'Only in Decks',
-				} )
-		).toBeChecked();
 	} );
 
-	test( 'unticked, the search covers the shop', async ( { page } ) => {
+	test( 'Enter searches the shop', async ( { page } ) => {
 		await page.goto( DECKS );
 		const form = page.locator( '.widget .csearch-form' ).first();
-		await form.getByRole( 'checkbox', { name: 'Only in Decks' } ).uncheck();
 		await form.getByRole( 'combobox' ).fill( 'kazumi' );
 		// Enter with no row chosen sends the form (Escape on a closed panel would clear the field).
 		await form.getByRole( 'combobox' ).press( 'Enter' );

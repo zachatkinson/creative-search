@@ -232,15 +232,42 @@ final class ScopeTest extends IndexTestCase {
 		self::assertSame( 400, rest_do_request( $request )->get_status() );
 	}
 
-	public function test_the_form_on_a_category_page_offers_the_category(): void {
+	public function test_on_a_category_page_the_panel_offers_the_category_first(): void {
+		// 1.3's "Only in Decks" checkbox is gone (D-130): the form carries the category, the panel offers it.
 		$link = get_term_link( 'decks', 'product_cat' );
 		$this->go_to( is_string( $link ) ? $link : '' );
 		$form = do_shortcode( '[' . Shortcode::TAG . ']' );
-		self::assertMatchesRegularExpression( '/<input type="checkbox" id="[^"]+-scope" name="product_cat" value="decks" checked/', $form );
-		self::assertStringContainsString( 'Only in Decks', $form );
+		self::assertStringNotContainsString( 'type="checkbox"', $form );
+		self::assertStringNotContainsString( 'name="product_cat"', $form, 'the form itself searches every product' );
+		self::assertStringContainsString( '"scope":"decks"', $form );
 		$this->go_to( home_url( '/' ) );
-		self::assertStringNotContainsString( 'csearch-scope', do_shortcode( '[' . Shortcode::TAG . ']' ), 'no category, no box' );
-		$this->go_to( add_query_arg( array( 's' => 'kazumi', 'post_type' => 'product', CategoryScope::ARG => 'apparel' ), home_url( '/' ) ) );
-		self::assertStringContainsString( 'Only in Apparel', do_shortcode( '[' . Shortcode::TAG . ']' ), 'a search kept to a category keeps the box' );
+		self::assertStringContainsString( '"scope":""', do_shortcode( '[' . Shortcode::TAG . ']' ) );
+
+		do_action( 'rest_api_init' );
+		$scopes = static function ( string $here ): array {
+			$request = new WP_REST_Request( 'GET', '/csearch/v1/suggest' );
+			$request->set_param( 'q', 'kazumi' );
+			if ( '' !== $here ) {
+				$request->set_param( 'here', $here );
+			}
+			$data = rest_do_request( $request )->get_data();
+			self::assertIsArray( $data );
+			self::assertCount( 2, (array) $data['products'], 'the panel still searches every product' );
+			return (array) $data['scopes'];
+		};
+		self::assertSame( array(), $scopes( '' ), 'two products are too few for a scope of their own' );
+		$decks = $scopes( 'decks' );
+		self::assertSame( array( 'Decks' ), array_column( $decks, 'name' ), 'the category the shopper is in, first' );
+		self::assertStringContainsString( 'product_cat=decks', (string) $decks[0]['url'] );
+		self::assertStringContainsString( 's=kazumi', (string) $decks[0]['url'] );
+		self::assertSame( array( 'Apparel' ), array_column( $scopes( 'apparel' ), 'name' ) );
+		self::assertSame( array(), $scopes( 'uncategorized' ), 'not a category with nothing for the query' );
+		Settings::set( 'suggest_scopes', 'no' );
+		self::assertSame( array(), $scopes( 'decks' ), 'scopes switched off' );
+
+		$request = new WP_REST_Request( 'GET', '/csearch/v1/suggest' );
+		$request->set_param( 'q', 'kazumi' );
+		$request->set_param( 'here', 'bad/slug' );
+		self::assertSame( 400, rest_do_request( $request )->get_status() );
 	}
 }

@@ -43,57 +43,67 @@ final class RankRepository extends Repository {
 	 */
 	public function rank( RankPlan $plan, int $generation, array $taxonomies ): array {
 		global $wpdb;
-		$ids = $this->termIds( $plan->terms() );
-		$q   = array();
-		$sql = array();
+		$ids  = $this->termIds( $plan->terms() );
+		$q    = array();
+		$sql  = array();
+		$dfs  = array();
+		$lead = 0;
 		foreach ( $plan->tokens as $i => $matches ) {
-			$found = false;
+			$dfs[ $i ] = 0;
 			foreach ( $matches as $match ) {
 				if ( isset( $ids[ $match->term ] ) ) {
-					$q[]   = $this->prepare( 'SELECT %d AS term_id, %d AS tok, %s + 0E0 AS m, %s + 0E0 AS idf', $ids[ $match->term ], $i, self::number( $match->weight() ), self::number( $plan->idf( $match->df ) ) );
-					$found = true;
+					$q[]        = $this->prepare( 'SELECT %d AS term_id, %d AS tok, %s + 0E0 AS m, %s + 0E0 AS idf', $ids[ $match->term ], $i, self::number( $match->weight() ), self::number( $plan->idf( $match->df ) ) );
+					$dfs[ $i ] += max( 1, $match->df );
 				}
 			}
-			if ( ! $found ) {
+			if ( 0 === $dfs[ $i ] ) {
 				return array(); // A token with no term in the dictionary: the AND finds nothing.
 			}
+			if ( $dfs[ $i ] < ( $dfs[ $lead ] ?? PHP_INT_MAX ) ) {
+				$lead = $i;
+			}
 		}
-		$w = array();
+		// Every ranked document holds every token, so the rarest token's documents are the candidates (D-132). Each
+		// is then looked up by the postings' primary key, once per term, which beats reading every term's postings
+		// whenever those lookups are fewer than the postings.
+		$led = count( $dfs ) >= 2 && $dfs[ $lead ] * count( $q ) < array_sum( $dfs );
+		$w   = array();
 		foreach ( $plan->weights as $field => $weight ) {
 			$w[] = $this->prepare( 'SELECT %d AS field, %d AS w', $field, $weight );
 		}
 		$w[]   = 'SELECT 0 AS field, 0 AS w'; // Never empty; field 0 is no field.
 		$count = count( $plan->tokens );
 
-		$sql[]   = 'WITH q AS (' . implode( ' UNION ALL ', $q ) . '), w AS (' . implode( ' UNION ALL ', $w ) . '),';
+		$sql[] = 'WITH q AS (' . implode( ' UNION ALL ', $q ) . '), w AS (' . implode( ' UNION ALL ', $w ) . '),';
+		if ( $led ) {
+			$sql[] = $this->prepare(
+				'c AS (SELECT DISTINCT p.document_id AS doc FROM q INNER JOIN %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = %d WHERE q.tok = %d),',
+				Tables::postings(),
+				$generation,
+				$plan->lang,
+				$plan->kind,
+				$lead
+			);
+		}
 		$sql[]   = $this->prepare(
-			'f AS (SELECT p.document_id AS doc, q.tok, p.field, MAX(COALESCE(w.w, 0) * q.m * (1 + LN(1 + p.tf)) * q.idf) AS best, MIN(p.first_pos) AS pos FROM q INNER JOIN %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = %d LEFT JOIN w ON w.field = p.field GROUP BY p.document_id, q.tok, p.field),',
+			'f AS (SELECT p.document_id AS doc, q.tok, p.field, MAX(COALESCE(w.w, 0) * q.m * (1 + LN(1 + p.tf)) * q.idf) AS best, MIN(p.first_pos) AS pos FROM ' . ( $led ? 'c STRAIGHT_JOIN q STRAIGHT_JOIN' : 'q INNER JOIN' ) . ' %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = %d' . ( $led ? ' AND p.document_id = c.doc' : '' ) . ' LEFT JOIN w ON w.field = p.field GROUP BY p.document_id, q.tok, p.field),',
 			Tables::postings(),
 			$generation,
 			$plan->lang,
 			$plan->kind
 		);
-		$sql[]   = $this->prepare(
-			"s AS (SELECT t.doc, SUM(t.best) AS base, GROUP_CONCAT(t.tok, ':', t.best ORDER BY t.tok SEPARATOR ',') AS bests FROM (SELECT doc, tok, MAX(best) AS best FROM f GROUP BY doc, tok) t GROUP BY t.doc HAVING COUNT(*) = %d)",
-			$count
-		);
 		$phrased = $count >= 2;
-		if ( $phrased ) {
-			$sql[] = ', ' . self::phraseTables( $count, $plan->phrases );
-		}
+		$sql[]   = self::scoreTables( $count, $phrased ? $plan->phrases : array(), $phrased );
 
 		$rules  = $this->rulePoints( $plan->boostRules, $taxonomies );
 		$names  = $plan->nameKeys();
 		$exact  = $this->prepare( '(CASE WHEN d.name_key IN (' . self::strings( count( $names ) ) . ') THEN %d ELSE 0 END) + (CASE WHEN sku.doc IS NULL THEN 0 ELSE %d END)', ...array_merge( $names, array( (int) Scorer::EXACT_NAME, (int) Scorer::EXACT_SKU ) ) );
 		$stock  = $this->prepare( '(CASE WHEN d.in_stock = 1 THEN 0 ELSE %d END)', (int) Scorer::SOLD_OUT );
 		$owner  = '(d.boost' . ( array() === $rules ? '' : ' + COALESCE(r.points, 0)' ) . ')';
-		$phrase = $phrased ? 'COALESCE(ph.bonus, 0)' : '0';
+		$phrase = $phrased ? 's.bonus' : '0';
 		$sql[]  = "SELECT d.id, d.type, d.object_id, d.lang, d.title, d.name_key, d.in_stock, d.visible, d.boost, d.total_sales, s.bests, {$phrase} AS phrase, {$exact} AS exact, {$stock} AS stock, {$owner} AS owner, (sku.doc IS NOT NULL) AS sku_hit, ROUND(s.base + {$phrase} + {$exact} + {$stock} + {$owner}, 6) AS total";
 		$sql[]  = $this->prepare( 'FROM s INNER JOIN %i d ON d.id = s.doc', Tables::documents() );
-		if ( $phrased ) {
-			$sql[] = 'LEFT JOIN ph ON ph.doc = s.doc';
-		}
-		$sql[] = $this->prepare(
+		$sql[]  = $this->prepare(
 			'LEFT JOIN (SELECT ps.document_id AS doc FROM %i ts INNER JOIN %i ps ON ps.term_id = ts.id AND ps.generation = %d AND ps.lang = %s AND ps.product = %d WHERE ts.term = %s AND ps.field = %d) sku ON sku.doc = s.doc',
 			Tables::terms(),
 			Tables::postings(),
@@ -127,7 +137,7 @@ final class RankRepository extends Repository {
 			);
 		}
 		foreach ( array_keys( $plan->phrases ) as $n ) {
-			$sql[] = 'AND ph.q' . (int) $n . ' = 1';
+			$sql[] = 'AND s.q' . (int) $n . ' = 1';
 		}
 		$sql[] = $this->prepare( 'ORDER BY total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
 
@@ -154,23 +164,36 @@ final class RankRepository extends Repository {
 	}
 
 	/**
-	 * The tables of first positions per field (`x`) and of the phrase bonus and the quoted phrases per document
-	 * (`ph`), as `Scorer::phraseBonus()` and the quoted-phrase rule read them.
+	 * The table of each token's first position and best score per field (`x`), and from it the one row per document
+	 * that holds every token (`s`): the base score, the best per token, and, with two tokens or more, the phrase
+	 * bonus and the quoted phrases, as `Scorer::phraseBonus()` and the quoted-phrase rule read them. `f` is read
+	 * once, by `x`: MariaDB works a CTE out again for each reference (D-132).
 	 *
 	 * @param int               $count   Tokens.
 	 * @param array<int, int[]> $phrases Quoted phrases' token indexes.
+	 * @param bool              $phrased Whether to work out the phrase bonus.
 	 */
-	private static function phraseTables( int $count, array $phrases ): string {
+	private static function scoreTables( int $count, array $phrases, bool $phrased ): string {
 		$columns  = array();
+		$bests    = array();
+		$named    = array();
+		$held     = array();
 		$ordered  = array();
 		$adjacent = array();
 		for ( $i = 0; $i < $count; $i++ ) {
-			$columns[] = "MIN(CASE WHEN tok = {$i} THEN pos END) AS p{$i}";
+			$columns[] = "MIN(CASE WHEN tok = {$i} THEN pos END) AS p{$i}, MAX(CASE WHEN tok = {$i} THEN best END) AS b{$i}";
+			$bests[]   = "MAX(b{$i})";
+			$named[]   = "CONCAT('{$i}:', MAX(b{$i}))";
+			$held[]    = "MAX(b{$i}) IS NOT NULL";
 			if ( $i > 0 ) {
 				$previous   = $i - 1;
 				$ordered[]  = "p{$previous} < p{$i}";
 				$adjacent[] = "p{$i} = p{$previous} + 1";
 			}
+		}
+		$scores = array( '(' . implode( ' + ', $bests ) . ') AS base', "CONCAT_WS(',', " . implode( ', ', $named ) . ') AS bests' );
+		if ( ! $phrased ) {
+			return self::scored( $columns, $scores, $held );
 		}
 		$bonus = sprintf(
 			'MAX(CASE WHEN %s THEN (CASE WHEN %s THEN %d ELSE %d END) ELSE 0 END) AS bonus',
@@ -191,7 +214,18 @@ final class RankRepository extends Repository {
 			}
 			$flags[] = 'MAX(CASE WHEN ' . implode( ' AND ', $tests ) . ' THEN 1 ELSE 0 END) AS q' . (int) $n;
 		}
-		return 'x AS (SELECT doc, field, ' . implode( ', ', $columns ) . ' FROM f GROUP BY doc, field), ph AS (SELECT doc, ' . implode( ', ', array_merge( array( $bonus ), $flags ) ) . ' FROM x GROUP BY doc)';
+		return self::scored( $columns, array_merge( $scores, array( $bonus ), $flags ), $held );
+	}
+
+	/**
+	 * The `x` and `s` tables from their columns.
+	 *
+	 * @param string[] $columns `x`'s columns.
+	 * @param string[] $scores  `s`'s columns.
+	 * @param string[] $held    The tests that a document holds every token.
+	 */
+	private static function scored( array $columns, array $scores, array $held ): string {
+		return 'x AS (SELECT doc, field, ' . implode( ', ', $columns ) . ' FROM f GROUP BY doc, field), s AS (SELECT doc, ' . implode( ', ', $scores ) . ' FROM x GROUP BY doc HAVING ' . implode( ' AND ', $held ) . ')';
 	}
 
 	/**

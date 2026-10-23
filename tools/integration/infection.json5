@@ -39,6 +39,9 @@
 	// owner's rule references, which the settings sanitiser always writes well formed. Matched by line
 	// (Infection anchors each pattern to the whole removed line, hence the `.*`), so a new mutant on any
 	// other line is still run; four small methods' early returns are ignored by method.
+	// D-132's choice of the leading word (its frequency sums and the empty-token test) changes the plan, never
+	// the answer, so its lines are ignored too, as is a tie between two words' frequencies (`<` or `<=`);
+	// RankParityTest holds which word leads and when.
 	"mutators": {
 		"@default": true,
 		"CastInt": {
@@ -48,7 +51,7 @@
 				".*=>\\s*\\(string\\)\\s*\\$row\\['lang'\\].*",
 				".*\\$out\\[\\s*\\(string\\)\\s*\\$row\\['term'\\]\\s*\\].*",
 				".*\\$exact\\s*=\\s*\\$this->prepare\\(\\s*'\\(CASE\\s*WHEN\\s*d\\.name_key\\s*IN.*",
-				".*'AND\\s*ph\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*",
+				".*'AND\\s*s\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*",
 				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
 				".*\\$before\\s*=\\s*\\(int\\)\\s*\\$indexes\\[\\s*\\$k\\s*\\].*",
 				".*\\$index\\s*=\\s*\\(int\\)\\s*\\$index;.*",
@@ -68,7 +71,7 @@
 				".*=>\\s*\\(string\\)\\s*\\$row\\['lang'\\].*",
 				".*\\$out\\[\\s*\\(string\\)\\s*\\$row\\['term'\\]\\s*\\].*",
 				".*\\$exact\\s*=\\s*\\$this->prepare\\(\\s*'\\(CASE\\s*WHEN\\s*d\\.name_key\\s*IN.*",
-				".*'AND\\s*ph\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*",
+				".*'AND\\s*s\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*",
 				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
 				".*\\$before\\s*=\\s*\\(int\\)\\s*\\$indexes\\[\\s*\\$k\\s*\\].*",
 				".*\\$index\\s*=\\s*\\(int\\)\\s*\\$index;.*",
@@ -83,6 +86,7 @@
 		},
 		"IncrementInteger": {
 			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*",
 				".*min\\(\\s*\\$(tf|position),\\s*65535\\s*\\).*",
 				".*mb_substr\\(\\s*\\$fact\\['(attribute|name|value|label)'\\],\\s*0,\\s*191,\\s*'UTF-8'\\s*\\).*",
 				".*array_fill\\(\\s*0,\\s*count\\(\\s*\\$chunk\\s*\\).*",
@@ -98,6 +102,9 @@
 		},
 		"DecrementInteger": {
 			"ignoreSourceCodeByRegex": [
+				".*\\$lead\\s*=\\s*0;.*",
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*",
+				".*0\\s*===\\s*\\$dfs\\[\\s*\\$i\\s*\\].*",
 				".*min\\(\\s*\\$(tf|position),\\s*65535\\s*\\).*",
 				".*mb_substr\\(\\s*\\$fact\\['(attribute|name|value|label)'\\],\\s*0,\\s*191,\\s*'UTF-8'\\s*\\).*",
 				".*array_fill\\(\\s*0,\\s*count\\(\\s*\\$chunk\\s*\\).*",
@@ -109,6 +116,22 @@
 				".*\\$first\\s*=\\s*\\(int\\)\\s*\\$indexes\\[0\\].*",
 				".*array_pad\\(\\s*explode\\(\\s*':',\\s*\\(string\\)\\s*\\$ref,\\s*2\\s*\\),\\s*2,\\s*''\\s*\\).*",
 				".*0\\s*!==\\s*\\(int\\)\\s*\\$points.*"
+			]
+		},
+		"Assignment": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*"
+			]
+		},
+		"PlusEqual": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*\\+=\\s*max\\(\\s*1,.*"
+			]
+		},
+		"LessThan": {
+			"ignoreSourceCodeByRegex": [
+				".*\\$dfs\\[\\s*\\$i\\s*\\]\\s*<\\s*\\(\\s*\\$dfs\\[\\s*\\$lead\\s*\\].*",
+				".*\\$led\\s*=\\s*count\\(\\s*\\$dfs\\s*\\)\\s*>=\\s*2.*"
 			]
 		},
 		"Minus": {
@@ -123,12 +146,7 @@
 		},
 		"ConcatOperandRemoval": {
 			"ignoreSourceCodeByRegex": [
-				".*'AND\\s*ph\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*"
-			]
-		},
-		"FalseValue": {
-			"ignoreSourceCodeByRegex": [
-				".*\\$found\\s*=\\s*false;.*"
+				".*'AND\\s*s\\.q'\\s*\\.\\s*\\(int\\)\\s*\\$n\\s*\\.\\s*'\\s*=\\s*1'.*"
 			]
 		},
 		"LogicalAnd": {

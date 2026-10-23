@@ -877,9 +877,9 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			}
 			const p = priv( ctx );
 			const input = document.getElementById( `${ ctx.id }-input` );
-			// A search kept to a category suggests from it alone (D-117), so each scope has its own answers.
-			const cat = ctx.scoped && ctx.scope ? ctx.scope : '';
-			const key = cat ? `${ q }\n${ cat }` : q;
+			// On a category page the answer offers that category first (D-130), so each page has its own answers.
+			const here = ctx.scope || '';
+			const key = here ? `${ q }\n${ here }` : q;
 			const cached = p.cache.get( key );
 			if ( cached ) {
 				p.cache.delete( key );
@@ -905,8 +905,8 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 				lang: pageLang( ctx.lang ),
 				limit: String( ctx.limit ),
 			} );
-			if ( cat ) {
-				params.set( 'cat', cat );
+			if ( here ) {
+				params.set( 'here', here );
 			}
 			const url =
 				ctx.suggest +
@@ -1044,13 +1044,6 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			if ( input ) {
 				input.value = '';
 				input.focus();
-			}
-		},
-		scope( event ) {
-			const ctx = getContext();
-			ctx.scoped = Boolean( event.target.checked );
-			if ( ctx.query.trim().length >= ctx.min ) {
-				actions.request();
 			}
 		},
 		submit( event ) {

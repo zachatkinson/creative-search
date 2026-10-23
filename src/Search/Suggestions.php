@@ -14,6 +14,7 @@ use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
+use WP_Term;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -47,14 +48,15 @@ final class Suggestions {
 	/**
 	 * The answer for a query, cached, logged.
 	 *
-	 * @param string      $raw   Query as received.
-	 * @param string|null $lang  Language asked for.
-	 * @param int         $limit Products, 1 to 10.
-	 * @param int[]       $scope Products of these term-taxonomy ids only: the category the form searches (D-117).
+	 * @param string       $raw   Query as received.
+	 * @param string|null  $lang  Language asked for.
+	 * @param int          $limit Products, 1 to 10.
+	 * @param int[]        $scope Products of these term-taxonomy ids only (the API's `cat`, D-117).
+	 * @param WP_Term|null $here  The category the shopper is in, offered first among the scopes (D-130).
 	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
 	 *                      `total`, `query`, `corrected`, `lang`.
 	 */
-	public function answer( string $raw, ?string $lang, int $limit, array $scope = array() ): array {
+	public function answer( string $raw, ?string $lang, int $limit, array $scope = array(), ?WP_Term $here = null ): array {
 		$query = SearchService::clean( $raw );
 		$lang  = $this->search->language( $lang );
 		$limit = max( Settings::LIMIT_MIN, min( Settings::LIMIT_MAX, $limit ) );
@@ -74,7 +76,7 @@ final class Suggestions {
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
 		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, $this->search->settingsKey(), $panel, get_locale() ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
@@ -90,7 +92,7 @@ final class Suggestions {
 				'queries'   => $this->queries->for( $query, $lang ),
 				'products'  => $this->products( array_slice( $products, 0, $limit ), $result ),
 				// A panel already limited to a category offers no other category to search within (D-113, D-117).
-				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown ) : array(),
+				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here ) : array(),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
 				'total'     => count( $products ),

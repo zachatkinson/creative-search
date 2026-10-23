@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.5.0 =
+On a category page the search box no longer has an "Only in" box: it searches the whole shop, and its suggestions offer searching within that category first.
+
 = 1.4.0 =
 The search field holds its own look inside a theme's header, and its suggestions keep to the screen in a sticky header and above a phone's keyboard. No settings change; to stop the page dimming behind the suggestions, untick it on the block.
 
@@ -76,6 +79,10 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.5.0 =
+* On a category page the search box searches the whole shop, and its suggestions offer "kazumi in Decks" first; the "Only in Decks" box is gone.
+* Faster ranking on large catalogues.
 
 = 1.4.0 =
 * The search field keeps its own look inside a theme's header: no second box from the theme's input styles, one focus ring, and no zoom on iPhone.

@@ -45,6 +45,48 @@ final class RankParityTest extends IndexTestCase {
 	}
 
 	/**
+	 * D-132: the statement starts from the rarest word when that reads fewer rows, keeps the range scans when it
+	 * does not or for one word, and finds what the PHP ranking finds either way.
+	 *
+	 * @group sql-mutation
+	 */
+	public function test_the_statement_starts_from_the_rarest_word(): void {
+		$this->catalogue->load( ( new Catalogue() )->generate( 40 ) );
+		$this->service( IndexQueue::class )->clear();
+		self::assertTrue( $this->service( Reindex::class )->runInline() );
+		$search = $this->service( SearchService::class );
+		$seen   = array();
+		$watch  = static function ( string $query ) use ( &$seen ): string {
+			if ( str_starts_with( $query, 'WITH q AS' ) ) {
+				$seen[] = $query;
+			}
+			return $query;
+		};
+		add_filter( 'query', $watch );
+		$cases = array(
+			'kazumi deck' => 0,
+			'deck kazumi' => 1,
+			'skate deck'  => null,
+			'kazumi'      => null,
+		);
+		foreach ( $cases as $q => $lead ) {
+			$seen = array();
+			$sql  = $search->run( $q, 'en', SearchService::MAX_IDS, 0 );
+			self::assertCount( 1, $seen, $q );
+			if ( null === $lead ) {
+				self::assertStringNotContainsString( 'c AS (', $seen[0], "{$q}: every word is common, or there is one" );
+			} else {
+				self::assertStringContainsString( "WHERE q.tok = {$lead})", $seen[0], "{$q}: the rare word leads" );
+				self::assertStringContainsString( 'c STRAIGHT_JOIN q STRAIGHT_JOIN', $seen[0], $q );
+				self::assertStringContainsString( 'AND p.document_id = c.doc', $seen[0], "{$q}: each candidate looked up by the key" );
+			}
+			self::assertNotSame( array(), $sql->products, $q );
+			self::assertSame( self::ranking( $search->run( $q, 'en', SearchService::MAX_IDS, 0, true, true )->products ), self::ranking( $sql->products ), $q );
+		}
+		remove_filter( 'query', $watch );
+	}
+
+	/**
 	 * Load a catalogue, rank every query both ways in each settings round, and compare.
 	 *
 	 * @param int  $products  Catalogue size.
