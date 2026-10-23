@@ -30,6 +30,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * stands aside) and the shopper is sent there on `template_redirect` (priority 5, before WooCommerce's own
  * redirect to a single result).
  *
+ * The owner's redirect for the query's words comes first (D-108), and a query the owner pinned products to is
+ * never sent to a category or filter (D-110).
+ *
  * The query is left alone when the shopper asked for every product (`csearch_all`), arrived from a redirect
  * (`csearch_from`), asked for their exact words, already filters or sorts, or is past the first page.
  */
@@ -81,7 +84,16 @@ final class QueryRouter {
 		if ( '' === $words ) {
 			return;
 		}
-		$lang  = $this->search->language( ProductSearch::lang() );
+		$lang     = $this->search->language( ProductSearch::lang() );
+		$redirect = $this->search->rules()->redirect( $words, $lang );
+		if ( null !== $redirect ) {
+			// The owner sends these words to a page (D-108): before any category or filter.
+			$this->leave( $query, $redirect, $words, $lang, count( $this->search->rankedIds( $words, $lang, '' )['ids'] ) );
+			return;
+		}
+		if ( array() !== $this->search->rules()->pins( $words, $lang ) ) {
+			return; // The owner pinned products to these words (D-110): they are shown, not a category.
+		}
 		$route = $this->routes->route( $words, $lang );
 		$term  = $this->category( $route['categories'], $words, $lang );
 		if ( null === $term && count( $route['categories'] ) > 1 ) {
@@ -109,10 +121,23 @@ final class QueryRouter {
 		if ( ! is_string( $base ) || '' === $base ) {
 			return;
 		}
-		$this->target = add_query_arg( $args, $base );
-		// The query the shopper typed, once, with what the page they land on lists: that page does not log it again.
-		$this->log->record( $words, $lang, self::count( $term, $route['filters'], $ids ), 'page' );
-		// The page is left: no ranking, no search clause, nothing fetched.
+		$this->leave( $query, add_query_arg( $args, $base ), $words, $lang, self::count( $term, $route['filters'], $ids ) );
+	}
+
+	/**
+	 * Send the query on: the target kept for `template_redirect`, the query the shopper typed logged once with what
+	 * the page they land on lists (that page does not log it again), and the page left: no ranking, no search
+	 * clause, nothing fetched.
+	 *
+	 * @param WP_Query $query  The query.
+	 * @param string   $target Where to.
+	 * @param string   $words  The query's words.
+	 * @param string   $lang   Its language.
+	 * @param int      $count  What the page lists.
+	 */
+	private function leave( WP_Query $query, string $target, string $words, string $lang, int $count ): void {
+		$this->target = $target;
+		$this->log->record( $words, $lang, $count, 'page' );
 		$query->set( 'csearch_routed', true );
 		$query->set( 'post__in', array( 0 ) );
 	}

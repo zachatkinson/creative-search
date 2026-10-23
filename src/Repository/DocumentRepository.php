@@ -92,6 +92,26 @@ final class DocumentRepository extends Repository {
 	}
 
 	/**
+	 * The document ids of some products in one generation and language, by product id (by the unique key on
+	 * generation, type, object id and language).
+	 *
+	 * @param int    $generation Generation.
+	 * @param string $lang       Language code.
+	 * @param int[]  $productIds Product ids.
+	 * @return array<int, int> Product id to document id.
+	 */
+	public function productDocumentIds( int $generation, string $lang, array $productIds ): array {
+		if ( array() === $productIds ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $this->rows( $this->prepare( 'SELECT id, object_id FROM %i WHERE generation = %d AND type = %s AND lang = %s AND object_id IN (' . self::ints( $productIds ) . ')', Tables::documents(), $generation, Document::PRODUCT, $lang ) ) as $row ) {
+			$out[ (int) $row['object_id'] ] = (int) $row['id'];
+		}
+		return $out;
+	}
+
+	/**
 	 * Delete some documents.
 	 *
 	 * @param int[] $ids Document ids.

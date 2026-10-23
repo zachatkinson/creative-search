@@ -206,6 +206,71 @@ final class QueryParserTest extends TestCase {
 		self::assertSame( array( 'x' ), $plain->synonyms );
 		self::assertSame( array( 'y' ), $plain->variants );
 		self::assertSame( array( 'y' ), $prefixed->withSynonyms( array() )->variants );
+		self::assertFalse( $word->synonym );
+		$put = new QueryToken( 'steel', 'steel', false, 0, true, false, array(), array(), true );
+		self::assertTrue( $put->withSynonyms( array( 'x' ) )->synonym, 'a copy keeps the mark' );
+		self::assertTrue( $put->withoutPrefix()->synonym );
+	}
+
+	/**
+	 * A parser with phrase synonyms (D-109).
+	 */
+	private static function phrased(): QueryParser {
+		return new QueryParser(
+			new Tokenizer(),
+			new Synonyms(
+				array(
+					new Synonym( 'en', 'ss', 'stainless steel' ),
+					new Synonym( 'en', 'skate shoes', 'sneakers', true ),
+					new Synonym( 'en', 'steel', 'inox' ),
+					new Synonym( 'en', 'grip tape', 'griptape' ),
+					new Synonym( 'en', 'bolts', 'hardware kit' ),
+					new Synonym( 'fr', 'ss', 'acier inoxydable' ),
+				)
+			)
+		);
+	}
+
+	public function test_a_phrase_synonym_gives_the_query_another_form(): void {
+		$q = self::phrased()->parse( '-rusty ss bearings', 'en' );
+		self::assertSame( array( 'ss', 'bearings P' ), self::flat( $q->tokens ), 'the query itself is unchanged' );
+		self::assertCount( 1, $q->alternatives );
+		$alt = $q->alternatives[0];
+		self::assertSame( array( 'stainless', 'steel =inox', 'bearings P' ), self::flat( $alt->tokens ), 'the meaning in place, with its own one-word synonyms; the word being typed still a prefix' );
+		self::assertSame( 'stainless steel bearings -rusty', $alt->text );
+		self::assertSame( 'en', $alt->lang );
+		self::assertCount( 1, $alt->excluded, 'the minus words stay' );
+		self::assertTrue( $alt->tokens[0]->synonym );
+		self::assertTrue( $alt->tokens[1]->synonym );
+		self::assertFalse( $alt->tokens[2]->synonym );
+		self::assertSame( array(), $alt->alternatives, 'one level only' );
+		self::assertFalse( $alt->allStopWords );
+	}
+
+	public function test_a_phrase_of_the_query_is_rewritten_where_it_stands(): void {
+		$q = self::phrased()->parse( 'black skate shoes size 9', 'en' );
+		self::assertSame( array( 'black sneakers size 9' ), array_map( static fn( Query $a ): string => implode( ' ', self::flat( $a->tokens ) ), $q->alternatives ) );
+		self::assertSame( 'black sneakers size 9', $q->alternatives[0]->text );
+		$back = self::phrased()->parse( 'sneakers ', 'en' );
+		self::assertSame( 'skate shoes', $back->alternatives[0]->text, 'both ways' );
+		self::assertSame( array( 'skate', 'shoes' ), self::flat( $back->alternatives[0]->tokens ), 'never a prefix' );
+		self::assertSame( array(), self::phrased()->parse( 'skate black shoes', 'en' )->alternatives, 'side by side only' );
+		self::assertSame( array(), self::phrased()->parse( 'skate sho', 'en' )->alternatives, 'a word still being typed matches only when complete' );
+	}
+
+	public function test_alternatives_keep_the_phrase_and_the_caps(): void {
+		$q = self::phrased()->parse( '"ss bearings" spacers', 'en' );
+		self::assertSame( array( 'stainless "1', 'steel "1 =inox', 'bearings "1', 'spacers P' ), self::flat( $q->alternatives[0]->tokens ), 'inside quotes, the words put in join the phrase' );
+		$long = self::phrased()->parse( 'a1 b1 c1 d1 e1 f1 g1 ss', 'en' );
+		self::assertSame( 8, count( $long->alternatives[0]->tokens ), 'eight tokens at most' );
+		self::assertSame( 'stainless', $long->alternatives[0]->tokens[7]->text );
+		$many = self::phrased()->parse( 'ss skate shoes grip tape bolts', 'en' );
+		self::assertCount( 3, $many->alternatives, 'three other forms at most' );
+		self::assertSame( 'stainless steel skate shoes grip tape bolts', $many->alternatives[0]->text, 'one rule a form, in the rules’ order' );
+		self::assertSame( 'ss sneakers grip tape bolts', $many->alternatives[1]->text );
+		self::assertSame( 'ss skate shoes griptape bolts', $many->alternatives[2]->text );
+		self::assertSame( 'acier inoxydable', self::phrased()->parse( 'ss', 'fr' )->alternatives[0]->text, 'per language' );
+		self::assertSame( array(), self::phrased()->parse( '-ss deck', 'en' )->alternatives, 'a minus word is not rewritten' );
 	}
 
 	public function test_default_dependencies(): void {

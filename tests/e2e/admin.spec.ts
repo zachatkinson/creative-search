@@ -71,6 +71,7 @@ test.describe( 'WooCommerce → Search', () => {
 		[ 'analytics', 'Summary' ],
 		[ 'synonyms', 'Add a synonym' ],
 		[ 'boosts', 'Boost rules' ],
+		[ 'rules', 'Redirects' ],
 		[ 'tools', 'Index' ],
 	] ) {
 		test( `the ${ tab } tab is axe-clean`, async ( { page } ) => {

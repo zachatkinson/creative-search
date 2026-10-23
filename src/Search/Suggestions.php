@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
@@ -66,12 +67,13 @@ final class Suggestions {
 		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $this->search->settingsKey(), get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
-			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms );
-			$answer = array(
-				'products'  => $this->products( array_slice( $result->products, 0, $limit ) ),
+			$result   = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms );
+			$products = $this->pinnedFirst( $result->products, $this->search->rules()->pins( $query, $lang ), $result->lang );
+			$answer   = array(
+				'products'  => $this->products( array_slice( $products, 0, $limit ) ),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
-				'total'     => count( $result->products ),
+				'total'     => count( $products ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
@@ -83,26 +85,51 @@ final class Suggestions {
 	}
 
 	/**
+	 * The ranked products' documents with the owner's pinned products first, in the pins' order (D-110): a pinned
+	 * product that is ranked moves up, one that is not is added, one hidden from search or not in the index in the
+	 * answer's language is left out.
+	 *
+	 * @param Hit[]  $hits Ranked products.
+	 * @param int[]  $pins Pinned product ids.
+	 * @param string $lang The language whose documents answered.
+	 * @return Document[]
+	 */
+	private function pinnedFirst( array $hits, array $pins, string $lang ): array {
+		$documents = array_map( static fn( Hit $h ): Document => $h->document, $hits );
+		if ( array() === $pins ) {
+			return $documents;
+		}
+		$pinned = array();
+		foreach ( $this->search->index()->productDocuments( $lang, $pins ) as $document ) {
+			if ( $document->visible ) {
+				$pinned[ $document->objectId ] = $document;
+			}
+		}
+		$rest = array_filter( $documents, static fn( Document $d ): bool => ! isset( $pinned[ $d->objectId ] ) );
+		return array_merge( array_values( $pinned ), array_values( $rest ) );
+	}
+
+	/**
 	 * Product rows.
 	 *
-	 * @param Hit[] $hits Ranked products.
+	 * @param Document[] $documents Products, in order.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $hits ): array {
-		$rows = $this->search->index()->rows( array_map( static fn( Hit $h ): int => $h->document->id, $hits ) );
+	private function products( array $documents ): array {
+		$rows = $this->search->index()->rows( array_map( static fn( Document $d ): int => $d->id, $documents ) );
 		$out  = array();
-		foreach ( $hits as $hit ) {
-			$row = $rows[ $hit->document->id ] ?? null;
+		foreach ( $documents as $document ) {
+			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {
 				continue;
 			}
 			$suggestion = array(
-				'id'         => $hit->document->objectId,
-				'name'       => $hit->document->title,
+				'id'         => $document->objectId,
+				'name'       => $document->title,
 				'url'        => Cast::str( $row['url'] ),
 				'image'      => self::image( Cast::int( $row['image_id'] ) ),
 				'price_html' => self::price( $row['price_min'], $row['price_max'] ),
-				'in_stock'   => $hit->document->inStock,
+				'in_stock'   => $document->inStock,
 				'type'       => 'product',
 			);
 			/**
@@ -117,7 +144,7 @@ final class Suggestions {
 			 * @param int|null             $imageId   Its image, or null.
 			 * @param array<string, mixed> $row       The suggestion as the panel receives it.
 			 */
-			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $hit->document->objectId, Cast::int( $row['image_id'] ) > 0 ? Cast::int( $row['image_id'] ) : null, $suggestion );
+			$classes               = apply_filters( 'csearch_suggestion_classes', array(), $document->objectId, Cast::int( $row['image_id'] ) > 0 ? Cast::int( $row['image_id'] ) : null, $suggestion );
 			$suggestion['classes'] = self::classes( $classes );
 			$out[]                 = $suggestion;
 		}

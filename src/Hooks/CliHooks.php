@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Hooks;
 
 use CreativeBranding\Search\Cli\IndexCommand;
 use CreativeBranding\Search\Cli\MaintenanceCommand;
+use CreativeBranding\Search\Cli\RulesCommand;
 use CreativeBranding\Search\Cli\SearchCommand;
 use CreativeBranding\Search\Cli\SynonymsCommand;
 use CreativeBranding\Search\Hookable;
@@ -57,6 +58,19 @@ final class CliHooks implements Hookable {
 			Plugin::container()->get( SynonymsCommand::class ),
 			array( 'shortdesc' => 'List, add, delete, import and export synonyms.' )
 		);
+		$rules = Plugin::container()->get( RulesCommand::class );
+		foreach (
+			array(
+				'csearch redirect list'   => array( 'redirects', 'List the searches sent straight to a page.' ),
+				'csearch redirect add'    => array( 'redirect', 'Send a search to a page, or change where it goes.' ),
+				'csearch redirect remove' => array( 'unredirect', 'Remove redirects by their index.' ),
+				'csearch pin list'        => array( 'pins', 'List the products pinned to searches.' ),
+				'csearch pin add'         => array( 'pin', 'Pin products to a search, in order.' ),
+				'csearch pin remove'      => array( 'unpin', 'Remove pinned products by their index.' ),
+			) as $name => [ $method, $description ]
+		) {
+			WP_CLI::add_command( $name, array( $rules, $method ), array( 'shortdesc' => $description ) );
+		}
 		$maintenance = Plugin::container()->get( MaintenanceCommand::class );
 		WP_CLI::add_command(
 			'csearch log purge',

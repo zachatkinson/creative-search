@@ -78,6 +78,7 @@ final class SynonymsTab {
 		$editing = $editId > 0 ? $this->repository->find( $editId ) : null;
 
 		echo '<p>' . esc_html__( 'A synonym makes a search for one word also find another: “board” also finds “deck”. One way, a search for the word finds what it means; both ways, each finds the other. Searches use a change at once.', 'creative-search' ) . '</p>';
+		echo '<p>' . esc_html__( 'Either side can be a few words: “ss” can mean “stainless steel”, and “skate shoes” can mean “sneakers”. A search holding those words side by side also finds what they mean, as a whole: “stainless steel”, not “steel” alone.', 'creative-search' ) . '</p>';
 
 		echo '<h2 id="csearch-synonym-form">' . ( null === $editing ? esc_html__( 'Add a synonym', 'creative-search' ) : esc_html__( 'Edit the synonym', 'creative-search' ) ) . '</h2>';
 		echo AdminPage::formStart( Actions::SYNONYM_SAVE ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts.
@@ -140,9 +141,9 @@ final class SynonymsTab {
 		$word = isset( $_GET['try'] ) && is_string( $_GET['try'] ) ? trim( sanitize_text_field( wp_unslash( $_GET['try'] ) ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a read-only test.
 		$lang = isset( $_GET['try_lang'] ) && is_string( $_GET['try_lang'] ) ? sanitize_key( wp_unslash( $_GET['try_lang'] ) ) : ( $codes[0] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a read-only test.
 		$lang = in_array( $lang, $codes, true ) ? $lang : ( $codes[0] ?? '' );
-		echo '<h2 id="csearch-try">' . esc_html__( 'Test a word', 'creative-search' ) . '</h2>';
+		echo '<h2 id="csearch-try">' . esc_html__( 'Test a search', 'creative-search' ) . '</h2>';
 		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '#csearch-try" class="csearch-inline"><input type="hidden" name="page" value="' . esc_attr( AdminPage::SLUG ) . '"><input type="hidden" name="tab" value="synonyms">';
-		echo '<label for="csearch-try-word">' . esc_html__( 'Word', 'creative-search' ) . '</label> <input type="search" id="csearch-try-word" name="try" value="' . esc_attr( $word ) . '"> ';
+		echo '<label for="csearch-try-word">' . esc_html__( 'Words', 'creative-search' ) . '</label> <input type="search" id="csearch-try-word" name="try" value="' . esc_attr( $word ) . '"> ';
 		if ( count( $codes ) > 1 ) {
 			echo '<label for="csearch-try-lang">' . esc_html__( 'Language', 'creative-search' ) . '</label> <select id="csearch-try-lang" name="try_lang">';
 			foreach ( $codes as $code ) {

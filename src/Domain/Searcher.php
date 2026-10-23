@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * stem, and the prefix terms of the unfinished last token; then typo candidates when that finds nothing,
  * D-033); AND across tokens; minus words excluded; quoted phrases enforced; the least-matched token dropped once
  * when no product matches (D-034); hidden products only for their exact SKU; every product scored and sorted;
+ * the query's other forms from the owner's phrase synonyms ranked too and merged, each product at its best (D-109);
  * the categories, tags and brands any token names, scored by name; the fallback language when nothing is found.
  * A search of the posts and pages (1.1) runs the same way over their own postings and counts (D-093).
  */
@@ -61,14 +62,17 @@ final class Searcher {
 	 */
 	private function run( Query $query, string $lang, SearchOptions $options ): SearchResult {
 		$kind      = $options->kind;
-		$widenings = array();
-		foreach ( $query->tokens as $i => $token ) {
-			$widenings[ $i ] = $this->widen( $token, $lang, $kind );
-		}
-		$excluded = $this->excludedTerms( $query, $lang );
-		$n        = $this->index->documentCount( $lang, $kind );
+		$widenings = $this->widenAll( $query, $lang, $kind );
+		$excluded  = $this->excludedTerms( $query, $lang );
+		$n         = $this->index->documentCount( $lang, $kind );
 
-		$products  = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
+		$products = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
+		$forms    = array( array( $query, $widenings ) );
+		foreach ( $query->alternatives as $alternative ) {
+			$widened  = $this->widenAll( $alternative, $lang, $kind );
+			$forms[]  = array( $alternative, $widened );
+			$products = self::merge( $products, $this->index->rank( RankPlan::of( $alternative, $widened, $lang, $n, $excluded, $options ) ), $options->limit );
+		}
 		$corrected = null;
 		if ( array() === $products && $options->retry && count( $widenings ) >= 2 ) {
 			$drop     = $this->leastMatched( $widenings, $lang, $kind );
@@ -82,14 +86,61 @@ final class Searcher {
 
 		$terms = array();
 		if ( Kind::CONTENT !== $kind ) {
-			foreach ( $this->termDocuments( $widenings, $this->excludedOthers( $excluded, $lang ) ) as $document ) {
-				$terms[] = new Hit( $document, $this->scorer->scoreTerm( $query, $document, $widenings ) );
+			$others = $this->excludedOthers( $excluded, $lang );
+			foreach ( $forms as [ $form, $widened ] ) {
+				foreach ( $this->termDocuments( $widened, $others ) as $document ) {
+					$terms[] = new Hit( $document, $this->scorer->scoreTerm( $form, $document, $widened ) );
+				}
 			}
 		}
-		usort( $terms, array( Hit::class, 'compareTerms' ) );
-		$terms = array_slice( $terms, 0, $options->termLimit );
+		$terms = array_slice( self::best( $terms, 'compareTerms' ), 0, $options->termLimit );
 
 		return new SearchResult( $products, $terms, $lang, $corrected );
+	}
+
+	/**
+	 * Widen every token of a query.
+	 *
+	 * @param Query  $query The query.
+	 * @param string $lang  Language code.
+	 * @param int    $kind  What is searched ({@see Kind}).
+	 * @return TokenWidening[] Keyed as the query's tokens are.
+	 */
+	private function widenAll( Query $query, string $lang, int $kind ): array {
+		$widenings = array();
+		foreach ( $query->tokens as $i => $token ) {
+			$widenings[ $i ] = $this->widen( $token, $lang, $kind );
+		}
+		return $widenings;
+	}
+
+	/**
+	 * Two rankings as one (a query and one of its other forms, D-109): each product once, at its better score,
+	 * in the products' order, within the limit.
+	 *
+	 * @param Hit[] $ranked One ranking.
+	 * @param Hit[] $more   Another.
+	 * @param int   $limit  At most this many.
+	 * @return Hit[]
+	 */
+	private static function merge( array $ranked, array $more, int $limit ): array {
+		return array_slice( self::best( array_merge( $ranked, $more ), 'compare' ), 0, $limit );
+	}
+
+	/**
+	 * Hits in order, each document once, where it ranks best; keyed by document id (the callers' array_slice() renumbers them).
+	 *
+	 * @param Hit[]                    $hits  Hits, a document perhaps more than once.
+	 * @param 'compare'|'compareTerms' $order {@see Hit::compare()} or {@see Hit::compareTerms()}.
+	 * @return Hit[]
+	 */
+	private static function best( array $hits, string $order ): array {
+		usort( $hits, array( Hit::class, $order ) );
+		$best = array();
+		foreach ( $hits as $hit ) {
+			$best[ $hit->document->id ] ??= $hit;
+		}
+		return $best;
 	}
 
 	/**
@@ -101,14 +152,16 @@ final class Searcher {
 	 * @param int        $kind  What is searched ({@see Kind}): its terms alone are kept.
 	 */
 	public function widen( QueryToken $token, string $lang, int $kind = Kind::PRODUCT ): TokenWidening {
-		$matches = array( $token->text => new TermMatch( $token->text, TermMatch::EXACT ) );
+		// A word a phrase synonym put in scores as a synonym, its stem too (D-109).
+		$exact   = $token->synonym ? TermMatch::SYNONYM : TermMatch::EXACT;
+		$matches = array( $token->text => new TermMatch( $token->text, $exact ) );
 		foreach ( $token->variants as $variant ) {
-			$matches[ $variant ] = new TermMatch( $variant, TermMatch::EXACT );
+			$matches[ $variant ] = new TermMatch( $variant, $exact );
 		}
 		if ( $token->stemmable() ) {
 			$stem = $this->analyzer->stemOf( $token->source, $lang );
 			if ( '' !== $stem ) {
-				$matches[ $stem ] ??= new TermMatch( $stem, TermMatch::STEM );
+				$matches[ $stem ] ??= new TermMatch( $stem, $token->synonym ? TermMatch::SYNONYM : TermMatch::STEM );
 			}
 		}
 		foreach ( $token->synonyms as $synonym ) {

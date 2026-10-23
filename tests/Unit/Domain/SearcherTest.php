@@ -562,4 +562,85 @@ final class SearcherTest extends TestCase {
 		self::assertFalse( $content->retry );
 		self::assertSame( Kind::PRODUCT, $base->kind );
 	}
+
+	/**
+	 * The phrase synonyms of the D-109 tests.
+	 */
+	private static function phraseSynonyms(): Synonyms {
+		return new Synonyms(
+			array(
+				new Synonym( 'en', 'ss', 'stainless steel' ),
+				new Synonym( 'en', 'skate shoes', 'sneakers', true ),
+			)
+		);
+	}
+
+	public function test_a_phrase_synonym_finds_what_its_meaning_names(): void {
+		$this->product( 'Zeta SS Bearings', 'BRG-ZSS-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel Bearings', 'BRG-ZST-00002', array(), true, 0, array() );
+		$this->product( 'Zeta Rusty Steel Bearings', 'BRG-ZRS-00003', array(), true, 0, array() );
+		self::assertSame( array( 'Zeta SS Bearings' ), self::titles( $this->search( 'zeta ss bearings' ) ), 'without the synonym' );
+		$found = self::titles( $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() ) );
+		sort( $found );
+		self::assertSame( array( 'Zeta SS Bearings', 'Zeta Stainless Steel Bearings' ), $found, 'the meaning as a whole: steel alone is not stainless steel' );
+		self::assertNull( $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() )->corrected );
+	}
+
+	public function test_the_forms_merge_each_product_once_at_its_best(): void {
+		$this->product( 'Zeta SS Bearings', 'BRG-ZSS-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel SS Bearings', 'BRG-ZST-00002', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel Bearings', 'BRG-ZSB-00003', array(), true, 0, array() );
+		$r = $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() );
+		// Each form's exact name earns its bonus: the first two are named exactly as one form reads.
+		self::assertSame( array( 'Zeta Stainless Steel Bearings', 'Zeta SS Bearings', 'Zeta Stainless Steel SS Bearings' ), self::titles( $r ), 'found by both forms once, in score order' );
+		$scores = array_map( static fn( Hit $h ): float => $h->score->total(), $r->products );
+		$sorted = $scores;
+		rsort( $sorted );
+		self::assertSame( $sorted, $scores );
+		$plain = $this->search( 'zeta ss bearings' );
+		self::assertSame( 'Zeta Stainless Steel SS Bearings', $plain->products[1]->document->title );
+		self::assertGreaterThan( $plain->products[1]->score->total(), $r->products[2]->score->total(), 'the better of its two scores: the other form names more of it' );
+		$capped = $this->search( 'zeta ss bearings', 'en', new SearchOptions( limit: 2 ), self::phraseSynonyms() );
+		self::assertSame( array( 'Zeta Stainless Steel Bearings', 'Zeta SS Bearings' ), self::titles( $capped ), 'the limit holds over the merged list' );
+	}
+
+	public function test_without_other_forms_the_ranking_is_the_store_order(): void {
+		$this->product( 'Zeta Deck B', 'ZET-DEB-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Deck A', 'ZET-DEA-00002', array(), true, 0, array() );
+		self::assertSame( self::titles( $this->search( 'zeta deck' ) ), self::titles( $this->search( 'zeta deck', 'en', null, self::phraseSynonyms() ) ) );
+	}
+
+	public function test_the_words_a_phrase_synonym_puts_in_score_as_a_synonym(): void {
+		$searcher = new Searcher( $this->index );
+		$put      = $searcher->widen( new QueryToken( 'bearings', 'bearings', false, 0, false, false, array(), array( 'kazumi' ), true ), 'en' );
+		self::assertSame( TermMatch::SYNONYM, $put->matches['bearings']->kind );
+		self::assertSame( TermMatch::SYNONYM, $put->matches['kazumi']->kind, 'its spellings too' );
+		self::assertSame( TermMatch::SYNONYM, $put->matches['bear']->kind, 'and its stem' );
+		$typed = $searcher->widen( new QueryToken( 'bearings', 'bearings' ), 'en' );
+		self::assertSame( TermMatch::EXACT, $typed->matches['bearings']->kind );
+		self::assertSame( TermMatch::STEM, $typed->matches['bear']->kind );
+	}
+
+	public function test_the_forms_reach_their_own_categories(): void {
+		$this->term( Document::CATEGORY, 'Sneakers', 12 );
+		$this->term( Document::CATEGORY, 'Stainless Steel Bearings', 4 );
+		$this->product( 'Zeta Sneakers', 'SNK-ZET-00001', array(), true, 0, array() );
+		$r = $this->search( 'skate shoes', 'en', null, self::phraseSynonyms() );
+		self::assertSame( array( 'Sneakers' ), self::terms( $r ), 'the category the meaning names' );
+		self::assertSame( array( 'Zeta Sneakers' ), self::titles( $r ) );
+		$plain = $this->search( 'ss bearings' );
+		$alt   = $this->search( 'ss bearings', 'en', null, self::phraseSynonyms() );
+		self::assertSame( array( 'Stainless Steel Bearings' ), self::terms( $alt ) );
+		self::assertSame( array( 'Stainless Steel Bearings' ), self::terms( $plain ) );
+		$scores = array();
+		foreach ( array( $plain, $alt ) as $result ) {
+			foreach ( $result->terms as $hit ) {
+				if ( 'Stainless Steel Bearings' === $hit->document->title ) {
+					$scores[] = $hit->score->total();
+				}
+			}
+		}
+		self::assertCount( 2, $scores );
+		self::assertGreaterThan( $scores[0], $scores[1], 'a category reached by both forms keeps its better score' );
+	}
 }

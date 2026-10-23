@@ -413,6 +413,32 @@ add_filter( 'csearch_query_filters', static fn( array $filters ): array => array
 add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $query ): ?WP_Term => 'sale' === strtolower( $query ) ? null : $term, 10, 2 );
 ```
 
+### `csearch_query_redirect` (filter)
+
+- **Since:** 1.3.0
+- **Signature:** `apply_filters( 'csearch_query_redirect', ?string $url, string $words, string $lang ): ?string`
+- **What it does:** where a results-page search goes instead of the results (D-108): the owner's redirect for the query's words in its language, or null. Return an address to send it there, null to show the results. The address must be on this site: it goes through `wp_validate_redirect()` after the filter, and one that fails is ignored.
+- **Where it runs:** `Search\OwnerRules::redirect()`, called by `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), before the filters and categories of D-101 and D-102.
+- **Example:**
+
+```php
+// Send "returns" to the returns page in every language.
+add_filter( 'csearch_query_redirect', static fn( ?string $url, string $words ): ?string => 'returns' === strtolower( trim( $words ) ) ? home_url( '/returns/' ) : $url, 10, 2 );
+```
+
+### `csearch_pinned_products` (filter)
+
+- **Since:** 1.3.0
+- **Signature:** `apply_filters( 'csearch_pinned_products', int[] $ids, string $words, string $lang ): int[]`
+- **What it does:** the products shown first for a search, in order (D-110): the owner's pins for the query's words in its language, or none. At most five are used; a product that is not published, is hidden from search or has no document in the language is still left out.
+- **Where it runs:** `Search\OwnerRules::pins()`, called by `SearchService::rankedIds()` (results page and `/search`), `Suggestions` (the panel) and `Results\QueryRouter` (a pinned search is not routed).
+- **Example:**
+
+```php
+// Pin a seasonal product to "gift".
+add_filter( 'csearch_pinned_products', static fn( array $ids, string $words ): array => 'gift' === $words ? array_merge( array( 4321 ), $ids ) : $ids, 10, 2 );
+```
+
 ### Query arguments
 
 - `csearch_from` and `csearch_sig`: set on the page a query was sent to (a category, or the search with its filters); the query as typed and the site's hash of it (`wp_hash`, 12 characters). Without a matching signature `csearch_from` is ignored. That page shows "Showing Wheels. Search all products for “wheels”." (`.csearch-results-routed`), keeps the typed query in the search field, does not log the query again, does not route again, and is not replaced by WooCommerce's single-result redirect.

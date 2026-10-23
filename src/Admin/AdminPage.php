@@ -35,6 +35,7 @@ final class AdminPage {
 	 * @param AnalyticsTab $analytics The Analytics tab.
 	 * @param SynonymsTab  $synonyms  The Synonyms tab.
 	 * @param BoostsTab    $boosts    The Boosts and exclusions tab.
+	 * @param RulesTab     $rules     The Redirects and pins tab.
 	 * @param ToolsTab     $tools     The Tools tab.
 	 * @param Notices      $notices   The warnings.
 	 */
@@ -42,6 +43,7 @@ final class AdminPage {
 		private AnalyticsTab $analytics,
 		private SynonymsTab $synonyms,
 		private BoostsTab $boosts,
+		private RulesTab $rules,
 		private ToolsTab $tools,
 		private Notices $notices
 	) {
@@ -57,6 +59,7 @@ final class AdminPage {
 			'analytics' => __( 'Analytics', 'creative-search' ),
 			'synonyms'  => __( 'Synonyms', 'creative-search' ),
 			'boosts'    => __( 'Boosts and exclusions', 'creative-search' ),
+			'rules'     => __( 'Redirects and pins', 'creative-search' ),
 			'tools'     => __( 'Tools', 'creative-search' ),
 		);
 	}
@@ -197,6 +200,9 @@ final class AdminPage {
 				break;
 			case 'boosts':
 				$this->boosts->render();
+				break;
+			case 'rules':
+				$this->rules->render();
 				break;
 			case 'tools':
 				$this->tools->render();
