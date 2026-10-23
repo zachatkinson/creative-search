@@ -347,7 +347,7 @@ final class IndexRepository implements IndexStore {
 
 	/**
 	 * Which of some terms some product documents of a language carry, field by field, in the live generation
-	 * (D-105).
+	 * (D-105); none until schema 3's rebuild has gone live.
 	 *
 	 * @param int[]    $documentIds Product document ids.
 	 * @param string[] $terms       Terms.
@@ -355,17 +355,18 @@ final class IndexRepository implements IndexStore {
 	 * @return array<int, array<int, string[]>> Document id to field id to terms.
 	 */
 	public function fieldsOf( array $documentIds, array $terms, string $lang ): array {
-		return Upgrader::below( '3' ) ? array() : $this->postings->fieldsOf( $documentIds, $terms, $this->generation(), $lang );
+		return ! Upgrader::rebuilt() ? array() : $this->postings->fieldsOf( $documentIds, $terms, $this->generation(), $lang );
 	}
 
 	/**
-	 * The SKUs and attribute values of some product documents (D-104); none until the schema has them.
+	 * The SKUs and attribute values of some product documents (D-104); none until the schema has them and the
+	 * rebuild it owes has gone live.
 	 *
 	 * @param int[] $documentIds Product document ids.
 	 * @return array<int, Fact[]> Document id to its facts.
 	 */
 	public function facts( array $documentIds ): array {
-		return Upgrader::below( '3' ) ? array() : $this->facts->of( $documentIds );
+		return ! Upgrader::rebuilt() ? array() : $this->facts->of( $documentIds );
 	}
 
 	/**

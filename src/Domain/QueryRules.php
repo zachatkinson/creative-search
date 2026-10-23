@@ -37,16 +37,41 @@ final class QueryRules {
 	 */
 	public function match( array $rules, string $query, string $lang ): ?int {
 		$lang = StopWords::code( $lang );
-		$key  = $this->key( $query, $lang );
+		return self::find( $this->keys( $rules, $lang ), $this->key( $query, $lang ) );
+	}
+
+	/**
+	 * What each rule that applies in a language is matched by, by its key in the list: a rule for every language
+	 * is read with that language's stop words, a rule for another language is left out. Worked out once and
+	 * kept, so a query is matched against 200 rules by one lookup (1.3 review M7).
+	 *
+	 * @param array<int, array{query: string, lang: string}> $rules The rules, in the owner's order.
+	 * @param string                                         $lang  The query's language.
+	 * @return array<int, string>
+	 */
+	public function keys( array $rules, string $lang ): array {
+		$lang = StopWords::code( $lang );
+		$keys = array();
+		foreach ( $rules as $i => $rule ) {
+			if ( '' === $rule['lang'] || StopWords::code( $rule['lang'] ) === $lang ) {
+				$keys[ $i ] = $this->key( $rule['query'], $lang );
+			}
+		}
+		return $keys;
+	}
+
+	/**
+	 * The first rule matched by a query's key, or null; an empty key (a query of stop words) matches none.
+	 *
+	 * @param array<int, string> $keys From {@see QueryRules::keys()}.
+	 * @param string             $key  The query's, from {@see QueryRules::key()}.
+	 */
+	public static function find( array $keys, string $key ): ?int {
 		if ( '' === $key ) {
 			return null;
 		}
-		foreach ( $rules as $i => $rule ) {
-			if ( ( '' === $rule['lang'] || StopWords::code( $rule['lang'] ) === $lang ) && $this->key( $rule['query'], $lang ) === $key ) {
-				return $i;
-			}
-		}
-		return null;
+		$at = array_search( $key, $keys, true );
+		return false === $at ? null : $at;
 	}
 
 	/**

@@ -497,24 +497,12 @@ final class Actions {
 	 * @return int[]
 	 */
 	private static function products( string $refs ): array {
-		$ids     = array();
-		$unknown = array();
-		foreach ( array_filter( array_map( 'trim', explode( ',', sanitize_text_field( $refs ) ) ) ) as $ref ) {
-			$id = wc_get_product_id_by_sku( $ref );
-			if ( 0 === $id && ctype_digit( $ref ) && wc_get_product( (int) $ref ) instanceof \WC_Product ) {
-				$id = (int) $ref;
-			}
-			if ( $id > 0 ) {
-				$ids[] = $id;
-			} else {
-				$unknown[] = $ref;
-			}
-		}
-		if ( array() !== $unknown ) {
+		$found = OwnerRules::products( explode( ',', $refs ) );
+		if ( array() !== $found['unknown'] ) {
 			/* translators: %s: the SKUs or ids not found */
-			self::$warning = sprintf( __( 'No product has the SKU or ID %s.', 'creative-search' ), wp_sprintf_l( '%l', $unknown ) );
+			self::$warning = sprintf( __( 'No product has the SKU or ID %s.', 'creative-search' ), wp_sprintf_l( '%l', $found['unknown'] ) );
 		}
-		return Settings::sanitizeIds( $ids );
+		return $found['ids'];
 	}
 
 	/**

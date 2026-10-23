@@ -255,6 +255,21 @@ final class OwnerRulesTest extends IndexTestCase {
 		$command->unredirect( array( '0' ) );
 		$command->unpin( array( '0', '3' ) );
 		self::assertSame( array( 'success: 1 rule removed.', 'success: 1 rule removed.' ), WP_CLI::$lines );
+
+		WP_CLI::$lines = array();
+		$sku           = WooCommerceCatalogue::get( $this->ids[15] )->get_sku();
+		$command->pin( array( 'wax', $sku, (string) $this->ids[0], 'NOPE-1' ), array() );
+		self::assertSame( array( 'warning: No product has the SKU or ID NOPE-1.', 'success: Products pinned.' ), WP_CLI::$lines, 'a SKU pins its product (D-110)' );
+		self::assertSame( array( $this->ids[15], $this->ids[0] ), OwnerRules::pinned()[0]['ids'] );
+		foreach ( array( array( 'abc' ), array( '0', '-1' ), array( '7' ) ) as $indexes ) {
+			try {
+				$command->unpin( $indexes );
+				self::fail( 'a bad or missing index exits non-zero' );
+			} catch ( RuntimeException $e ) {
+				self::assertNotSame( '', $e->getMessage() );
+			}
+			self::assertCount( 1, OwnerRules::pinned(), 'and removes nothing' );
+		}
 		$this->expectException( RuntimeException::class );
 		$command->redirect( array( 'away', 'https://example.org/' ), array() );
 	}

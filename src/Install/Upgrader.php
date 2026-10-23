@@ -81,6 +81,17 @@ final class Upgrader {
 	}
 
 	/**
+	 * Whether the index holds what schema 3 added: the schema is 3 or later and no rebuild it owes is pending, so
+	 * every live document has its facts and its field postings (D-104, D-107). While the rebuild runs, a match is
+	 * not explained rather than explained wrongly.
+	 *
+	 * @phpstan-impure The rebuild going live changes the answer.
+	 */
+	public static function rebuilt(): bool {
+		return ! self::below( '3' ) && false === get_option( Options::REBUILD_OWED, false );
+	}
+
+	/**
 	 * The stored schema version, '0' when none.
 	 */
 	public static function stored(): string {

@@ -180,10 +180,7 @@ final class QueryRouter {
 		if ( ! is_string( $base ) || '' === $base ) {
 			return;
 		}
-		$this->target = add_query_arg( $args, $base );
-		$this->log->record( $words, $lang, self::count( $term, $route['filters'], $ids ), 'page' );
-		$query->set( 'csearch_routed', true );
-		$query->set( 'post__in', array( 0 ) );
+		$this->leave( $query, add_query_arg( $args, $base ), $words, $lang, self::count( $term, $route['filters'], $ids ) );
 	}
 
 	/**

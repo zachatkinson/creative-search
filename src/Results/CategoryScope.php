@@ -84,10 +84,19 @@ final class CategoryScope {
 		if ( ! isset( self::$ttIds[ $term->term_id ] ) ) {
 			$ids      = array( $term->term_taxonomy_id );
 			$children = get_term_children( $term->term_id, self::TAXONOMY );
-			foreach ( is_array( $children ) ? $children : array() as $childId ) {
-				$child = get_term( (int) $childId, self::TAXONOMY );
-				if ( $child instanceof WP_Term ) {
-					$ids[] = $child->term_taxonomy_id;
+			if ( is_array( $children ) && array() !== $children ) {
+				// One query for every subcategory, not one each (1.3 review S4).
+				$found = get_terms(
+					array(
+						'taxonomy'               => self::TAXONOMY,
+						'include'                => array_map( 'intval', $children ),
+						'hide_empty'             => false,
+						'fields'                 => 'tt_ids',
+						'update_term_meta_cache' => false,
+					)
+				);
+				foreach ( is_array( $found ) ? $found : array() as $ttId ) {
+					$ids[] = (int) $ttId;
 				}
 			}
 			sort( $ids );

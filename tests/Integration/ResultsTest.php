@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Index\Reindex;
+use CreativeBranding\Search\Results\CategoryScope;
+use CreativeBranding\Search\Results\MatchDecorations;
 use CreativeBranding\Search\Results\ProductSearch;
 use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
@@ -129,8 +131,36 @@ final class ResultsTest extends IndexTestCase {
 		self::assertSame( '', $this->service( ResultsView::class )->noResults(), 'only when nothing matched' );
 	}
 
-	public function test_a_results_page_costs_one_extra_query_when_warm(): void {
-		$this->visit( array( 's' => 'kazumi', 'post_type' => 'product' ) );
+	/**
+	 * A results page, its sorted page and a search kept to a category (D-117, D-118), each with its cards' match
+	 * lines and photos (MatchDecorations, D-107).
+	 *
+	 * @return array<string, array{0: array<string, string>}>
+	 */
+	public static function warm_pages(): array {
+		return array(
+			'relevance' => array( array( 's' => 'kazumi', 'post_type' => 'product' ) ),
+			'sorted'    => array( array( 's' => 'kazumi', 'post_type' => 'product', 'orderby' => 'price' ) ),
+			'scoped'    => array( array( 's' => 'kazumi', 'post_type' => 'product', 'product_cat' => 'decks' ) ),
+		);
+	}
+
+	/**
+	 * @dataProvider warm_pages
+	 *
+	 * @param array<string, string> $args The page's query arguments.
+	 */
+	public function test_a_results_page_costs_one_extra_query_when_warm( array $args ): void {
+		$ids   = $this->visit( $args );
+		$cards = $this->service( MatchDecorations::class );
+		self::assertNotSame( array(), $ids );
+		$render = static function () use ( $cards, $ids ): void {
+			foreach ( $ids as $id ) {
+				$cards->line( $id );
+				$cards->imageId( 0, wc_get_product( $id ) );
+			}
+		};
+		$render(); // The cold page fills the caches.
 		$ours = array();
 		$spy  = static function ( string $sql ) use ( &$ours ): string {
 			$ours[] = $sql; // Every query the plugin's part of the page runs, whatever the table.
@@ -139,8 +169,11 @@ final class ResultsTest extends IndexTestCase {
 		// The suite's go_to() flushes the object cache; run the plugin's part of the page again on the same main
 		// query instead, which is all a warm page adds.
 		$this->service( ProductSearch::class )->reset();
+		$cards->reset();
+		CategoryScope::reset();
 		add_filter( 'query', $spy );
 		$this->service( ProductSearch::class )->apply( $GLOBALS['wp_the_query'] );
+		$render();
 		remove_filter( 'query', $spy );
 		self::assertNotNull( $this->service( ProductSearch::class )->answer() );
 		self::assertCount( 1, $ours, "one extra query: the live generation\n" . implode( "\n", $ours ) );

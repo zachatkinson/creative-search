@@ -40,13 +40,14 @@ const LIST_ID = 'csearch_suggestions';
 const LIST_NAME = 'Search suggestions';
 // Frames fit() waits for the rows to render before it gives up measuring.
 const FIT_TRIES = 10;
+const REDACTED = '[redacted]';
 // Panels fit() re-measures when their size changes (a web font arriving, an image loading).
 const watched = new WeakSet();
 
 /**
  * Per-instance bookkeeping the context should not carry (timers, the abort controller, the cache).
  *
- * @type {Map<string, {seq: number, timer: number, slow: number, ctrl: AbortController|null, cache: Map<string, Object>, last: Object|null, adding: boolean, silent: string}>}
+ * @type {Map<string, {seq: number, timer: number, slow: number, ctrl: AbortController|null, cache: Map<string, Object>, last: Object|null, adding: boolean, emptyFor: string|null, personal: RegExp[]|null, unsafe: boolean}>}
  */
 const privates = new Map();
 
@@ -61,7 +62,9 @@ function priv( ctx ) {
 			cache: new Map(),
 			last: null,
 			adding: false,
-			silent: '',
+			emptyFor: null,
+			personal: null,
+			unsafe: false,
 		};
 		privates.set( ctx.id, p );
 	}
@@ -220,6 +223,32 @@ function moveTo( ctx, index ) {
  * @param {Object}      detail What the event carries.
  * @param {Object|null} layer  The dataLayer entry, or null for none.
  */
+/**
+ * The words an analytics tag may hear: `[redacted]` when they look like an e-mail address, a phone or card number
+ * or a postal code, by the log's own rules (the spec's privacy rule; the patterns come from `Domain\Scrub`). A
+ * browser that cannot compile one of them hears `[redacted]` for every search rather than risk one.
+ *
+ * @param {Object} ctx   The block's context.
+ * @param {string} words What the shopper typed.
+ * @return {string} The words, or `[redacted]`.
+ */
+function told( ctx, words ) {
+	const p = priv( ctx );
+	if ( ! p.personal ) {
+		p.personal = [];
+		for ( const source of ctx.personal || [] ) {
+			try {
+				p.personal.push( new RegExp( source, 'u' ) );
+			} catch {
+				p.unsafe = true;
+			}
+		}
+	}
+	return p.unsafe || p.personal.some( ( re ) => re.test( words ) )
+		? REDACTED
+		: words;
+}
+
 function emit( ctx, name, detail, layer = null ) {
 	if ( ! ctx.events ) {
 		return;
@@ -568,17 +597,9 @@ function showAnswer( ctx, data, input ) {
 	setActive( ctx, -1 );
 	openPanel( ctx, input );
 	fit( ctx );
-	const p = priv( ctx );
-	if ( count === 0 && p.silent !== ctx.answered ) {
-		// Once per query: the same words answered from the cache again say nothing new.
-		p.silent = ctx.answered;
-		emit(
-			ctx,
-			'no-results',
-			{ query: ctx.answered },
-			{ event: 'csearch_no_results', search_term: ctx.answered }
-		);
-	}
+	// Remembered for the search the shopper sends: an answer while typing is a prefix, not a search, so it says
+	// nothing on its own.
+	priv( ctx ).emptyFor = count === 0 ? ctx.answered : null;
 }
 
 function showRecent( ctx, input ) {
@@ -887,12 +908,21 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			closePanel( ctx );
 			const words = ctx.query.trim();
 			if ( words ) {
+				const term = told( ctx, words );
 				emit(
 					ctx,
 					'search',
-					{ query: words },
-					{ event: 'search', search_term: words }
+					{ query: term },
+					{ event: 'search', search_term: term }
 				);
+				if ( priv( ctx ).emptyFor === words ) {
+					emit(
+						ctx,
+						'no-results',
+						{ query: term },
+						{ event: 'csearch_no_results', search_term: term }
+					);
+				}
 			}
 			const form = event?.target;
 			if ( pushed( ctx ) && form?.action ) {
@@ -983,7 +1013,7 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 				ctx,
 				'select',
 				{
-					query: ctx.answered,
+					query: told( ctx, ctx.answered ),
 					type,
 					id,
 					name: row.name,

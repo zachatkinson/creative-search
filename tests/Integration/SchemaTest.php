@@ -272,6 +272,13 @@ final class SchemaTest extends IntegrationTestCase {
 		self::assertSame( '3', get_option( Options::DB_VERSION ) );
 		self::assertContains( 'cart', $this->columns( Tables::documents() ) );
 		self::assertSame( '0', (string) get_option( Options::REBUILD_OWED ), 'the rebuild fills the facts and the cart flags (D-104, D-106)' );
+		self::assertFalse( Upgrader::rebuilt(), 'schema 3, but no facts are read until the rebuild goes live (D-107)' );
+
+		delete_option( Options::REBUILD_OWED );
+		self::assertTrue( Upgrader::rebuilt() );
+		update_option( Options::DB_VERSION, '2' );
+		self::assertFalse( Upgrader::rebuilt(), 'nor below schema 3' );
+		update_option( Options::DB_VERSION, Schema::DB_VERSION );
 	}
 
 	public function test_activation_does_not_migrate_beside_a_running_upgrade(): void {

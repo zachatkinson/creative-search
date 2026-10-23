@@ -15,7 +15,6 @@ use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Repository\IndexRepository;
 use CreativeBranding\Search\Repository\LogRepository;
 use CreativeBranding\Search\Settings\Settings;
-use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Clock;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -85,6 +84,8 @@ final class QuerySuggestions {
 		 * @param string   $lang   Language code.
 		 */
 		$filtered = apply_filters( 'csearch_suggested_searches', $picked, $query, $lang );
-		return array_slice( array_values( array_filter( Cast::strings( $filtered ), static fn( string $q ): bool => '' !== trim( $q ) ) ), 0, Completions::MOST );
+		// Searches are words: a number or anything else a filter returns is not one.
+		$searches = array_filter( is_array( $filtered ) ? $filtered : array(), static fn( mixed $q ): bool => is_string( $q ) && '' !== trim( $q ) );
+		return array_slice( array_values( $searches ), 0, Completions::MOST );
 	}
 }

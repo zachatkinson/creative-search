@@ -51,7 +51,7 @@ add_filter(
 
 - **Since:** 0.4.0
 - **Signature:** `apply_filters( 'csearch_document', array $document, WC_Product $product, string $lang ): array`
-- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`, and since 1.3.0 `cart` (a simple product that can go to the cart from the panel, D-106) and `facts` (its SKUs and attribute values, each `variation_id`, `field`, `attribute`, `name`, `value`, `label`, `image_id`, D-104). Every value is coerced back to its type afterwards.
+- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`, and since 1.3.0 `cart` (a simple product that can go to the cart from the panel, D-106) and `facts` (its SKUs and attribute values, each `variation_id`, `field`, `attribute`, `name`, `value`, `label`, `image_id`, D-104; as the shop wrote them, the same on every language's document, so a language plugin translates `name` and `label` here). Every value is coerced back to its type afterwards.
 - **Where it runs:** `Index\ProductReader::read()`, once per product and language per job.
 - **Example:**
 
@@ -188,9 +188,7 @@ add_filter( 'csearch_rate_limit', static fn( int $limit, string $route ): int =>
 
 | Route | Access | Returns |
 | --- | --- | --- |
-| `GET /suggest?q=&lang=&limit=&cat=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ products, terms, total, query, corrected, lang }`; `cat` (1.3.0), a product category's slug, keeps the products to it and its subcategories (D-117) |
-
-| `GET /suggest?q=&lang=&limit=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ products, terms, total, query, corrected, lang }`; since 1.3.0 each product carries `matched`, the "why this matched" line or an empty string (D-105), and its `url` and `image` are the named variation's (D-104) |
+| `GET /suggest?q=&lang=&limit=&cat=` | public, rate-limited, `Cache-Control: public, max-age=60`, ETag | `{ queries, products, scopes, terms, content, total, query, corrected, lang }`. Since 1.3.0: `queries`, the suggested searches (D-112); `scopes`, `{ id, name, url }` to search within a category (D-113); `cat`, a product category's slug, keeps the products to it and its subcategories (D-117); each product carries `matched` (the "why this matched" line or an empty string, D-105), `price` (its lowest price as a number, or null, D-116) and `cart` (whether the panel can add it to the cart, D-115), and its `url` and `image` are the named variation's (D-104); `corrected` also names a typo's correction (D-114) |
 | `GET /search?q=&lang=&page=&per_page=&orderby=relevance` | public, rate-limited, cacheable | `{ ids, total, page, pages, corrected, query, lang }` |
 | `GET /status` | `manage_woocommerce` | `{ generation, building, products, documents, terms, last_reindex, progress, backlog, errors }` |
 | `POST /click` (`q`, `lang`, `type`, `id`) | public, rate-limited | `202 { recorded }` (D-052) |
@@ -415,6 +413,14 @@ add_filter( 'csearch_query_filters', static fn( array $filters ): array => array
 add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $query ): ?WP_Term => 'sale' === strtolower( $query ) ? null : $term, 10, 2 );
 ```
 
+### Query arguments
+
+- `csearch_from` and `csearch_sig`: set on the page a query was sent to (a category, or the search with its filters); the query as typed and the site's hash of it (`wp_hash`, 12 characters). Without a matching signature `csearch_from` is ignored. That page shows "Showing Wheels. Search all products for “wheels”." (`.csearch-results-routed`), keeps the typed query in the search field, does not log the query again, does not route again, and is not replaced by WooCommerce's single-result redirect.
+- `csearch_all=1`: the ranked results page for the words as typed, never sent to a category or a filter (the link in that line).
+- A search that already carries a `filter_*`, `query_type_*`, price or rating filter, an `orderby`, `csearch_exact` or a page past the first is never routed.
+
+## 1.3: owner rules, the panel and the results page (1.3.0)
+
 ### `csearch_query_redirect` (filter)
 
 - **Since:** 1.3.0
@@ -443,22 +449,12 @@ add_filter( 'csearch_pinned_products', static fn( array $ids, string $words ): a
 
 ### Query arguments
 
-- `csearch_from` and `csearch_sig`: set on the page a query was sent to (a category, or the search with its filters); the query as typed and the site's hash of it (`wp_hash`, 12 characters). Without a matching signature `csearch_from` is ignored. That page shows "Showing Wheels. Search all products for “wheels”." (`.csearch-results-routed`), keeps the typed query in the search field, does not log the query again, does not route again, and is not replaced by WooCommerce's single-result redirect.
-- `csearch_all=1`: the ranked results page for the words as typed, never sent to a category or a filter (the link in that line).
-- A search that already carries a `filter_*`, `query_type_*`, price or rating filter, an `orderby`, `csearch_exact` or a page past the first is never routed.
-
-## 1.3: the polish (1.3.0)
-
-### Query arguments
-
 - `product_cat=<slug>` beside `s` and `post_type=product`: the search kept to a category and its subcategories (D-117), ranked within it (not ranked over the shop and then cut). The results page reads "3 results for “kazumi” in Decks" and links to "Search all products for “kazumi”." (`.csearch-results-scope`, with `csearch_all=1`). Such a search is never sent to another category; a size in it becomes the filter in the same category (D-101). The form on a category page, and on a search kept to one, offers the category as a ticked "Only in Decks" box (`.csearch-scope`, `name="product_cat"`); unticked, it sends nothing.
 - `orderby=` anything but `relevance` (price, popularity, rating, date): only the strong matches are listed, every word as typed, its spellings, stem or the owner's synonyms, never a word it begins or a typo's neighbour; when nothing is strong, every match is (D-118).
 
 ### Custom fields
 
 The `custom_fields` setting (Tools → What to index) names product meta keys searched as the `custom` field (id 9, weight 4; `csearch_fields` can change it). An ACF field is read through `get_field_object()` when ACF is active: choices add their labels, post fields their titles, taxonomy fields their term names; image, file, gallery, user, map, colour, password, URL, e-mail, oEmbed and true/false fields are skipped. A change to one of those keys on a product (`added_post_meta`, `updated_post_meta`, `deleted_post_meta`) queues the product's reindex (D-119). `csearch_product_fields` sees the texts under `Domain\Fields::CUSTOM`.
-
-## 1.3: the panel (1.3.0)
 
 ### `csearch_suggested_searches` (filter)
 

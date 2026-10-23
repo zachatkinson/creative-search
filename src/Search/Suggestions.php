@@ -79,7 +79,7 @@ final class Suggestions {
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
 			// A panel limited to a category leaves out the pins: one may sit outside it (D-110, D-117).
-			$products = $this->pinnedFirst( $result->products, array() === $scope ? $this->search->rules()->pins( $query, $lang ) : array(), $result->lang );
+			$products = $this->pinnedFirst( $result->products, array() === $scope ? $this->search->pinnedDocuments( $query, $lang, $result->lang ) : array() );
 			$shown    = array();
 			foreach ( $result->terms as $hit ) {
 				if ( Document::CATEGORY === $hit->document->type ) {
@@ -106,24 +106,16 @@ final class Suggestions {
 
 	/**
 	 * The ranked products' documents with the owner's pinned products first, in the pins' order (D-110): a pinned
-	 * product that is ranked moves up, one that is not is added, one hidden from search or not in the index in the
-	 * answer's language is left out.
+	 * product that is ranked moves up, one that is not is added.
 	 *
-	 * @param Hit[]  $hits Ranked products.
-	 * @param int[]  $pins Pinned product ids.
-	 * @param string $lang The language whose documents answered.
+	 * @param Hit[]                $hits   Ranked products.
+	 * @param array<int, Document> $pinned Pinned products' documents, by product id ({@see SearchService::pinnedDocuments()}).
 	 * @return Document[]
 	 */
-	private function pinnedFirst( array $hits, array $pins, string $lang ): array {
+	private function pinnedFirst( array $hits, array $pinned ): array {
 		$documents = array_map( static fn( Hit $h ): Document => $h->document, $hits );
-		if ( array() === $pins ) {
+		if ( array() === $pinned ) {
 			return $documents;
-		}
-		$pinned = array();
-		foreach ( $this->search->index()->productDocuments( $lang, $pins ) as $document ) {
-			if ( $document->visible ) {
-				$pinned[ $document->objectId ] = $document;
-			}
 		}
 		$rest = array_filter( $documents, static fn( Document $d ): bool => ! isset( $pinned[ $d->objectId ] ) );
 		return array_merge( array_values( $pinned ), array_values( $rest ) );

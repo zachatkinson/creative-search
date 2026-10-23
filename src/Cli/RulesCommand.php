@@ -119,22 +119,27 @@ final class RulesCommand {
 	 * <query>
 	 * : The search.
 	 *
-	 * <ids>...
-	 * : Product ids, first first; five at most.
+	 * <products>...
+	 * : SKUs or product ids, first first; five at most.
 	 *
 	 * [--lang=<lang>]
 	 * : One language only; every language without it.
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp csearch pin add "grip tape" 512 498
+	 *     wp csearch pin add "grip tape" 512 GRIP-MOB
 	 *
 	 * @param string[]              $args  Positional arguments.
 	 * @param array<string, string> $assoc Options.
 	 */
 	public function pin( array $args, array $assoc ): void {
+		$found = OwnerRules::products( array_map( Cast::str( ... ), array_slice( $args, 1 ) ) );
+		if ( array() !== $found['unknown'] ) {
+			/* translators: %s: the SKUs or ids not found */
+			WP_CLI::warning( sprintf( __( 'No product has the SKU or ID %s.', 'creative-search' ), wp_sprintf_l( '%l', $found['unknown'] ) ) );
+		}
 		try {
-			$this->rules->addPins( Cast::str( $args[0] ?? '' ), Cast::str( $assoc['lang'] ?? '' ), array_map( 'intval', array_slice( $args, 1 ) ) );
+			$this->rules->addPins( Cast::str( $args[0] ?? '' ), Cast::str( $assoc['lang'] ?? '' ), $found['ids'] );
 		} catch ( PluginException $e ) {
 			WP_CLI::error( $e->getMessage() );
 		}
@@ -152,7 +157,7 @@ final class RulesCommand {
 	 * @param string[] $args Positional arguments.
 	 */
 	public function unredirect( array $args ): void {
-		self::removed( $this->rules->remove( OwnerRules::REDIRECTS, array_map( 'intval', $args ) ) );
+		self::removed( $this->rules->remove( OwnerRules::REDIRECTS, self::indexes( $args ) ) );
 	}
 
 	/**
@@ -166,15 +171,37 @@ final class RulesCommand {
 	 * @param string[] $args Positional arguments.
 	 */
 	public function unpin( array $args ): void {
-		self::removed( $this->rules->remove( OwnerRules::PINS, array_map( 'intval', $args ) ) );
+		self::removed( $this->rules->remove( OwnerRules::PINS, self::indexes( $args ) ) );
 	}
 
 	/**
-	 * Say how many rules went.
+	 * The indexes given, each a whole number; anything else stops the command before a rule is removed.
+	 *
+	 * @param string[] $args Positional arguments.
+	 * @return int[]
+	 */
+	private static function indexes( array $args ): array {
+		$indexes = array();
+		foreach ( $args as $arg ) {
+			$arg = Cast::str( $arg );
+			if ( ! ctype_digit( $arg ) ) {
+				/* translators: %s: what was typed */
+				WP_CLI::error( sprintf( __( '%s is not an index from the list.', 'creative-search' ), $arg ) );
+			}
+			$indexes[] = (int) $arg;
+		}
+		return $indexes;
+	}
+
+	/**
+	 * Say how many rules went; none is an error.
 	 *
 	 * @param int $count Rules removed.
 	 */
 	private static function removed( int $count ): void {
+		if ( 0 === $count ) {
+			WP_CLI::error( __( 'No rule has that index.', 'creative-search' ) );
+		}
 		/* translators: %s: number of rules */
 		WP_CLI::success( sprintf( _n( '%s rule removed.', '%s rules removed.', $count, 'creative-search' ), number_format_i18n( $count ) ) );
 	}

@@ -1391,6 +1391,15 @@ test( 'the page hears searches, choices and an empty panel when the shop asks', 
 		} );
 	type( 'zzzz' );
 	await settle();
+	const typed = dom.events.length;
+	assert.equal(
+		dom.events.at( -1 )?.type === 'csearch:no-results',
+		false,
+		'an empty answer while typing is a prefix, not a search'
+	);
+	actions.submit( {} );
+	assert.equal( dom.events.length, typed + 2 );
+	assert.equal( dom.events.at( -2 ).type, 'csearch:search' );
 	assert.equal( dom.events.at( -1 ).type, 'csearch:no-results' );
 	assert.deepEqual( dom.events.at( -1 ).detail, { query: 'zzzz' } );
 	assert.deepEqual( window.dataLayer.at( -1 ), {
@@ -1398,18 +1407,56 @@ test( 'the page hears searches, choices and an empty panel when the shop asks', 
 		search_term: 'zzzz',
 	} );
 	const told = dom.events.length;
-	type( 'zzz' );
-	type( 'zzzz' );
-	await settle();
-	assert.equal(
-		dom.events.length,
-		told,
-		'the same empty answer is told once'
-	);
-
 	actions.clear();
 	actions.submit( {} );
 	assert.equal( dom.events.length, told, 'an empty field is no search' );
+} );
+
+test( 'what looks like personal details reaches the page redacted, by the log’s rules', async () => {
+	window.dataLayer = [];
+	dom.fetch = () =>
+		respond( {
+			...ANSWER,
+			products: [],
+			terms: [],
+			total: 0,
+			query: 'jean.tremblay@gmail.com',
+		} );
+	scope.ctx = context( {
+		events: true,
+		personal: [ '[^\\s@]+@[^\\s@]', '(?<!\\d)\\d{5}-\\d{4}(?!\\d)' ],
+	} );
+	type( 'jean.tremblay@gmail.com' );
+	await settle();
+	actions.submit( {} );
+	assert.deepEqual( dom.events.at( -2 ).detail, { query: '[redacted]' } );
+	assert.deepEqual( window.dataLayer.at( -2 ), {
+		event: 'search',
+		search_term: '[redacted]',
+	} );
+	assert.deepEqual( window.dataLayer.at( -1 ), {
+		event: 'csearch_no_results',
+		search_term: '[redacted]',
+	} );
+	type( 'deck 12345-6789' );
+	actions.submit( {} );
+	assert.equal( window.dataLayer.at( -1 ).search_term, '[redacted]' );
+	type( 'deck 8.25' );
+	actions.submit( {} );
+	assert.equal( window.dataLayer.at( -1 ).search_term, 'deck 8.25' );
+
+	scope.ctx = context( {
+		id: 'csearch-unsafe',
+		events: true,
+		personal: [ '(' ],
+	} );
+	type( 'deck' );
+	actions.submit( {} );
+	assert.equal(
+		window.dataLayer.at( -1 ).search_term,
+		'[redacted]',
+		'a pattern the browser cannot compile redacts everything'
+	);
 } );
 
 test( 'with the setting off, or no dataLayer, the page hears only what it asked for', async () => {

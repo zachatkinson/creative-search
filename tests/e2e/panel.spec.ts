@@ -32,6 +32,8 @@ test.beforeAll( () => {
 test.afterAll( () => {
 	wp( 'theme activate twentytwentyfive' );
 	wp( 'option patch update csearch_settings suggest_cart no' );
+	wp( 'option patch update csearch_settings suggest_queries no' );
+	wp( 'csearch log purge --days=0' );
 	wp( 'eval "do_action( \'csearch_flush_cache\' );"' );
 } );
 

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Block;
 
+use CreativeBranding\Search\Domain\Scrub;
 use CreativeBranding\Search\Results\CategoryScope;
 use CreativeBranding\Search\Results\QueryRouter;
 use CreativeBranding\Search\Results\ResultsView;
@@ -256,6 +257,8 @@ final class SearchForm {
 			'cartPage'  => '' !== $this->cartUrl() && 'yes' === get_option( 'woocommerce_cart_redirect_after_add' ) && function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
 			'currency'  => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : '',
 			'events'    => Settings::isOn( 'analytics_events' ),
+			// The log's redaction rules, so what an analytics tag hears is redacted the same way (D-116).
+			'personal'  => Settings::isOn( 'analytics_events' ) ? Scrub::sources() : array(),
 			'i18n'      => array(
 				'counts'     => $counts,
 				'recents'    => $recent,

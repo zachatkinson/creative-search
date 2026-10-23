@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,7 +28,7 @@ No external service, no API key, no outbound requests. French and English stem a
 
 = Does it send anything off the site? =
 
-No. The index, the suggestions and the analytics are all on the server; nothing leaves it.
+No. The index, the suggestions and the analytics are all on the server, and the plugin sends nothing to any other service. With "Analytics events" on (the default), the search bar also tells the page's own tag manager (its `dataLayer`, when the page has one) what was searched and chosen, with a search that looks like an email address, a phone number, a card number or a postal code sent as "[redacted]" instead; turn it off under WooCommerce → Search → Tools.
 
 = What does it keep about shoppers? =
 
@@ -52,6 +52,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.3.0 =
+Adds a table for each product's variations and SKUs, so the index is rebuilt once in the background after the update. Searches keep working meanwhile; the variation photos and "Matches" lines appear once it is done.
+
 = 1.2.0 =
 A search that names a category now opens it, and sizes can become your shop's filters (Tools tab). Turn the first off under WooCommerce → Search → Tools if you prefer the results page.
 
@@ -62,6 +65,16 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.3.0 =
+* A search that names one design, colour or size of a product shows that variation's photo and opens the product with it chosen.
+* A result found by its SKU, an attribute or its description says so: "Matches SKU KZ-825".
+* On a category page the search box offers "Only in Decks", and the panel suggests searching within the categories most results are in.
+* The panel suggests searches other shoppers made that found products, says when it corrected a typo, and can add a simple product to the cart (off by default).
+* Sorting by price, popularity, rating or date lists only the products that match every word.
+* Redirect a search to a page, pin products to the top of a search, and synonyms of several words ("ss" means "stainless steel"): the new Redirects and pins tab.
+* Search your products' custom fields, ACF's included (Tools tab).
+* Search events for Google Tag Manager, in the page only.
 
 = 1.2.0 =
 * A search that names a category, such as "wheels", opens that category, with a line to search every product instead (on by default; Tools tab).

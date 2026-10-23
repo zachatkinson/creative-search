@@ -57,9 +57,10 @@ final class CategoryScopes {
 		$ids     = array_values( array_unique( array_merge( array(), ...array_values( $ranks ) ) ) );
 		$terms   = array() === $ids ? array() : get_terms(
 			array(
-				'taxonomy'   => self::TAXONOMY,
-				'include'    => $ids,
-				'hide_empty' => false,
+				'taxonomy'               => self::TAXONOMY,
+				'include'                => $ids,
+				'hide_empty'             => false,
+				'update_term_meta_cache' => false,
 			)
 		);
 		$byId    = array();

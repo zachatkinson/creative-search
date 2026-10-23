@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\QueryParser;
@@ -234,6 +235,30 @@ final class SearchService {
 	}
 
 	/**
+	 * The owner's pinned products for a query (D-110), in the pins' order, as documents of the language that
+	 * answered: one hidden from search, or not in the index in that language, is left out. The panel and the
+	 * results page both put them first.
+	 *
+	 * @param string $query  The query, cleaned.
+	 * @param string $lang   Its language.
+	 * @param string $answer The language whose documents answered.
+	 * @return array<int, Document> Product id to document.
+	 */
+	public function pinnedDocuments( string $query, string $lang, string $answer ): array {
+		$pins = $this->rules->pins( $query, $lang );
+		if ( array() === $pins ) {
+			return array();
+		}
+		$pinned = array();
+		foreach ( $this->index->productDocuments( $answer, $pins ) as $document ) {
+			if ( $document->visible ) {
+				$pinned[ $document->objectId ] = $document;
+			}
+		}
+		return $pinned;
+	}
+
+	/**
 	 * The ranked product ids for a results page, cached, logged, with what a page needs to say which variation
 	 * the query named and why each product matched (D-104, D-105): each product's document, the terms each token
 	 * reached, the query's key and the language whose documents answered.
@@ -277,12 +302,7 @@ final class SearchService {
 			// The owner's pinned products first, in their order (D-110). One hidden from search is left out here: the
 			// ranked query lifts WooCommerce's search exclusion (a hidden product's exact SKU may be ranked), and
 			// WooCommerce's query still leaves out one that is not published.
-			$pins = array();
-			foreach ( $this->index->productDocuments( $result->lang, $this->rules->pins( $query, $lang ) ) as $document ) {
-				if ( $document->visible ) {
-					$pins[] = $document->objectId;
-				}
-			}
+			$pins   = array_keys( $this->pinnedDocuments( $query, $lang, $result->lang ) );
 			$cached = array(
 				'ids'       => array_slice( array_values( array_unique( array_merge( $pins, $result->productIds() ) ) ), 0, self::MAX_IDS ),
 				'corrected' => $result->corrected,
