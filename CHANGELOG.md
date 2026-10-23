@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-22
+
+Items 9 to 11 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md).
+
+### Added
+- A product search whose words name a category with products, every word of its name and nothing else (by stem, synonyms counting), opens the category instead of the results page; not when a product is named exactly as the query reads. The category page says "Showing Wheels. Search all products for “wheels”." When two categories share the name, the results page leads with "Categories: A and B". Setting `category_redirect` (on), filter `csearch_category_redirect` (D-102).
+- A size or other attribute value in a search becomes WooCommerce's own filter for the attributes ticked on the Tools tab (`filter_attributes`, none by default): "deck 8.25" opens Decks filtered to Width 8.25, "philly 8.75" searches "philly" filtered to 8.75, with a line saying so and a link back to every product. A word two attributes share stays a word. Filter `csearch_query_filters`; option `csearch_attribute_terms` (D-101).
+- Query arguments `csearch_from` with its signature `csearch_sig` (the page a query was sent to: not logged again, not routed again, the field keeps the query as typed, WooCommerce's single-result redirect off) and `csearch_all=1` (the results page for the words as typed).
+- `tests/Support/SkatehouseCopy`, `SkatehouseCopyTest` and the `skatehouse` test group (`composer test:skatehouse`): the handoff's golden queries on a copy of the shop exported into the gitignored `tests/fixtures/skatehouse/` (D-103). docs/BENCHMARK.md explains loading the same copy for D-081's FiboSearch run.
+
+### Changed
+- `pre_get_posts` gains the router at priority 4 and `template_redirect` a 302 at priority 5; a routed query is logged once, as typed, with what the page it lands on lists; the routed request runs no search of its own.
+- The owner's synonyms are read once a request and kept with the cached answers.
+- The 10,000-product CI job loads its catalogue quietly: WordPress's term counts deferred to the end and the plugin's index hooks detached, so the cost a product stays flat as the catalogue grows (about 63 ms locally, where it rose from 77 ms to 105 ms over 1,000). Its timeout drops from 300 to 90 minutes, and a new push to a branch or pull request cancels the CI run it replaces.
+
+### Not yet done
+- Handoff item 11 needs Zach's export: the `skatehouse` group skips until `tests/fixtures/skatehouse/` holds it, and D-081's FiboSearch run on the copy waits on the same files.
+
 ## [1.1.0] - 2026-10-22
 
 Posts and pages in the search (the spec's 1.1), items 1 to 8 of the Skatehouse handoff (docs/research/SKATEHOUSE-HANDOFF-2026-10.md), and the Baymard autocomplete fixes.

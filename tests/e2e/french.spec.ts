@@ -76,7 +76,8 @@ test( 'accents fold: vetements finds Vêtements', async ( { page } ) => {
 test( 'the results page in French, with French stems and prices', async ( {
 	page,
 } ) => {
-	await page.goto( '/?s=planches&post_type=product' );
+	// csearch_all: the results page, not the Decks category the word names (D-102; routing.spec.ts).
+	await page.goto( '/?s=planches&post_type=product&csearch_all=1' );
 	await expect( page.locator( '.csearch-results-summary' ) ).toHaveText(
 		new RegExp( `^\\d+ résultats pour «${ S }planches${ S }»$` )
 	);
@@ -91,7 +92,7 @@ test( 'the results page in French, with French stems and prices', async ( {
 test( 'a word only the English documents hold falls back to them', async ( {
 	page,
 } ) => {
-	await page.goto( '/?s=deck&post_type=product' );
+	await page.goto( '/?s=deck&post_type=product&csearch_all=1' );
 	await expect( page.locator( '.csearch-results-summary' ) ).toHaveText(
 		new RegExp( `^\\d+ résultats pour «${ S }deck${ S }»$` )
 	);

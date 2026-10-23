@@ -96,7 +96,13 @@ add_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual'
 Plugin::container()->get( \CreativeBranding\Search\Index\Languages::class )->flush();
 Plugin::container()->get( \CreativeBranding\Search\Index\AnalyzerFactory::class )->flush();
 
+// A size in a query becomes the shop's Width filter (D-101).
+if ( array( 'pa_width' ) !== Settings::get( 'filter_attributes' ) ) {
+	Settings::set( 'filter_attributes', array( 'pa_width' ) );
+}
+
 if ( wc_get_product_id_by_sku( 'KAZ-DEA-00001' ) ) {
+	Plugin::container()->get( \CreativeBranding\Search\Index\AttributeTerms::class )->rebuild();
 	if ( $csearch_french_new || $csearch_content_new ) {
 		Plugin::container()->get( Reindex::class )->runInline();
 		echo "present, reindexed\n";
@@ -111,5 +117,6 @@ foreach ( array( 0, 1, 2, 4, 6, 7, 15, 16, 21, 22 ) as $i ) {
 	$ids[ $i ] = $loader->product( WooCommerceCatalogue::spec( $i ) );
 }
 Settings::set( 'fallback_products', array( $ids[15], $ids[6] ) );
+Plugin::container()->get( \CreativeBranding\Search\Index\AttributeTerms::class )->rebuild();
 Plugin::container()->get( Reindex::class )->runInline();
 echo 'loaded ' . count( $ids ) . "\n";

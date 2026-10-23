@@ -16,6 +16,7 @@
 	<groups>
 		<exclude>
 			<group>benchmark</group>
+			<group>skatehouse</group>
 		</exclude>
 	</groups>
 	<php>

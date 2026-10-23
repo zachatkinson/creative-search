@@ -10,8 +10,12 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Hooks;
 
 use CreativeBranding\Search\Hookable;
+use CreativeBranding\Search\Index\AttributeTerms;
 use CreativeBranding\Search\Results\ProductSearch;
+use CreativeBranding\Search\Results\QueryRouter;
 use CreativeBranding\Search\Results\ResultsView;
+use CreativeBranding\Search\Search\QueryRoutes;
+use CreativeBranding\Search\Support\Options;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -46,18 +50,35 @@ final class ResultsHooks implements Hookable {
 	private bool $contentShown = false;
 
 	/**
+	 * Whether the line on the page a query was sent to has been printed.
+	 *
+	 * @var bool
+	 */
+	private bool $routedShown = false;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param ProductSearch $products The ranked search.
-	 * @param ResultsView   $view     The lines.
+	 * @param ProductSearch  $products   The ranked search.
+	 * @param ResultsView    $view       The lines.
+	 * @param QueryRouter    $router     Sends a query that names a category or a filter there.
+	 * @param AttributeTerms $attributes The values a query may filter by, rebuilt when one changes.
 	 */
-	public function __construct( private ProductSearch $products, private ResultsView $view ) {
+	public function __construct( private ProductSearch $products, private ResultsView $view, private QueryRouter $router, private AttributeTerms $attributes ) {
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	public function register(): void {
+		add_action( 'pre_get_posts', array( $this->router, 'route' ), 4 );
+		add_action( 'template_redirect', array( $this->router, 'redirect' ), 5 );
+		foreach ( array( 'created_term', 'edited_term', 'delete_term' ) as $hook ) {
+			add_action( $hook, array( $this->attributes, 'termChanged' ), 10, 3 );
+			add_action( $hook, array( QueryRoutes::class, 'forget' ), 10, 3 );
+		}
+		add_action( 'csearch_index_switched', array( QueryRoutes::class, 'forget' ), 10, 0 );
+		add_action( 'update_option_' . Options::SETTINGS, array( $this->attributes, 'settingsChanged' ), 10, 2 );
 		add_action( 'pre_get_posts', array( $this->products, 'apply' ), 5 );
 		add_action( 'pre_get_posts', array( $this->products, 'enforce' ), 20 );
 		add_action( 'pre_get_posts', array( $this->products, 'order' ), 1000 );
@@ -67,6 +88,7 @@ final class ResultsHooks implements Hookable {
 		add_filter( 'woocommerce_get_filtered_term_product_counts_query', array( $this->products, 'filterCounts' ) );
 		add_filter( 'woocommerce_price_filter_sql', array( $this->products, 'priceRange' ) );
 		add_action( 'woocommerce_before_shop_loop', array( $this, 'printSummary' ), 5 );
+		add_action( 'woocommerce_no_products_found', array( $this, 'printRouted' ), 4 );
 		add_action( 'woocommerce_no_products_found', array( $this, 'leadWithContent' ), 5 );
 		add_action( 'woocommerce_no_products_found', array( $this, 'printNoResults' ), 20 );
 		add_action( 'woocommerce_after_shop_loop', array( $this, 'printContentAfter' ), 5 );
@@ -80,7 +102,14 @@ final class ResultsHooks implements Hookable {
 	 * The count and corrected-query line above a classic shop loop.
 	 */
 	public function printSummary(): void {
-		echo $this->summaryOnce(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped where it is built, in ResultsView.
+		echo $this->routedOnce() . $this->summaryOnce(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped where it is built, in ResultsView.
+	}
+
+	/**
+	 * On the page a query was sent to, the line saying so, above WooCommerce's "No products were found".
+	 */
+	public function printRouted(): void {
+		echo $this->routedOnce(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped where it is built, in ResultsView.
 	}
 
 	/**
@@ -97,11 +126,11 @@ final class ResultsHooks implements Hookable {
 	 * @return string|mixed
 	 */
 	public function blockSummary( $content ) {
-		// With nothing to show, the no-results block carries the line (inside the no-results state).
-		if ( ! is_string( $content ) || 0 === $this->products->shown() ) {
+		if ( ! is_string( $content ) ) {
 			return $content;
 		}
-		return $this->summaryOnce() . $content;
+		// With nothing to show, the no-results block carries the line (inside the no-results state).
+		return $this->routedOnce() . ( 0 === $this->products->shown() ? '' : $this->summaryOnce() ) . $content;
 	}
 
 	/**
@@ -115,7 +144,7 @@ final class ResultsHooks implements Hookable {
 			return $content;
 		}
 		// When a page matches, it leads: the block's bare "No products were found" goes.
-		return $this->view->contentLeads() ? $this->noResultsOnce() : $content . $this->noResultsOnce();
+		return $this->routedOnce() . ( $this->view->contentLeads() ? $this->noResultsOnce() : $content . $this->noResultsOnce() );
 	}
 
 	/**
@@ -146,13 +175,14 @@ final class ResultsHooks implements Hookable {
 	}
 
 	/**
-	 * WooCommerce opens the product when a search finds exactly one; not when a post or page was found too.
+	 * WooCommerce opens the product when a search finds exactly one; not when a post or page was found too, nor
+	 * on the page a query was sent to, where the shopper is to see the filter it applied (D-101).
 	 *
 	 * @param bool|mixed $redirect WooCommerce's choice.
 	 * @return bool|mixed
 	 */
 	public function singleRedirect( $redirect ) {
-		return array() !== $this->view->content() ? false : $redirect;
+		return array() !== $this->view->content() || QueryRouter::arrived() ? false : $redirect;
 	}
 
 	/**
@@ -164,6 +194,18 @@ final class ResultsHooks implements Hookable {
 		}
 		$html               = $this->view->contentAfter();
 		$this->contentShown = '' !== $html;
+		return $html;
+	}
+
+	/**
+	 * The line on the page a query was sent to, the first time it is asked for on a page.
+	 */
+	private function routedOnce(): string {
+		if ( $this->routedShown ) {
+			return '';
+		}
+		$html              = $this->view->routedLine();
+		$this->routedShown = '' !== $html;
 		return $html;
 	}
 
@@ -201,7 +243,9 @@ final class ResultsHooks implements Hookable {
 		$this->summaryShown = false;
 		$this->emptyShown   = false;
 		$this->contentShown = false;
+		$this->routedShown  = false;
 		$this->view->reset();
+		$this->router->reset();
 		add_action( 'woocommerce_no_products_found', 'wc_no_products_found' );
 	}
 }

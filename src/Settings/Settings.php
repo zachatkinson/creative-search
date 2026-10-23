@@ -85,6 +85,10 @@ final class Settings {
 			'help_text'                    => '',
 			'guide_page'                   => 0,
 			'guide_text'                   => '',
+			// The results page (D-101, D-102): attributes whose values a query turns into the shop's filter, and
+			// whether a query that names a category opens it.
+			'filter_attributes'            => array(),
+			'category_redirect'            => 'yes',
 			// The suggestion panel's defaults (a block instance can override each).
 			'suggest_limit'                => self::LIMIT_DEFAULT,
 			'suggest_terms'                => self::TERMS_DEFAULT,
@@ -213,7 +217,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}
@@ -230,6 +234,9 @@ final class Settings {
 		}
 		if ( isset( $input['fallback_products'] ) && is_array( $input['fallback_products'] ) ) {
 			$out['fallback_products'] = self::sanitizeIds( $input['fallback_products'] );
+		}
+		if ( isset( $input['filter_attributes'] ) && is_array( $input['filter_attributes'] ) ) {
+			$out['filter_attributes'] = self::sanitizeTaxonomies( $input['filter_attributes'] );
 		}
 		foreach ( array( 'help', 'guide' ) as $link ) {
 			if ( isset( $input[ $link . '_page' ] ) ) {
@@ -322,6 +329,23 @@ final class Settings {
 				'term_id'  => $termId,
 				'boost'    => self::clamp( (int) $rule['boost'], self::BOOST_MIN, self::BOOST_MAX ),
 			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Attribute taxonomy names (`pa_width`): unique, in the order given; anything else dropped.
+	 *
+	 * @param array<mixed, mixed> $input Raw names.
+	 * @return string[]
+	 */
+	public static function sanitizeTaxonomies( array $input ): array {
+		$out = array();
+		foreach ( $input as $name ) {
+			$name = is_string( $name ) ? sanitize_key( $name ) : '';
+			if ( 1 === preg_match( '/^pa_[a-z0-9_-]{1,29}$/', $name ) && ! in_array( $name, $out, true ) ) {
+				$out[] = $name;
+			}
 		}
 		return $out;
 	}

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Block;
 
+use CreativeBranding\Search\Results\QueryRouter;
 use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
 
@@ -267,9 +268,14 @@ final class SearchForm {
 
 	/**
 	 * On a search page, the query it answers: the shopper sees what they searched for and can refine it (Baymard,
-	 * "persist search queries"; D-094). Empty everywhere else.
+	 * "persist search queries"; D-094); on the page a query was sent to (a category, a filter), the query as typed
+	 * (D-101, D-102). Empty everywhere else.
 	 */
 	private function current(): string {
+		$from = QueryRouter::from();
+		if ( '' !== $from ) {
+			return $from;
+		}
 		return is_search() ? get_search_query( false ) : '';
 	}
 

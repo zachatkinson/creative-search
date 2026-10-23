@@ -26,7 +26,8 @@ use WP_REST_Request;
 /**
  * The spec's budgets, on one catalogue loaded once (`CSEARCH_BENCH_PRODUCTS`, default 300, the shop's size):
  * loading 10,000 products through WooCommerce's CRUD takes far longer than anything it measures, so the two
- * measurements share it rather than each loading its own.
+ * measurements share it, and it is loaded quietly ({@see WooCommerceCatalogue::load()}): term counts deferred to
+ * the end and the plugin's index hooks detached, which keeps the cost a product flat as the catalogue grows.
  *
  * 1. A full reindex in English within 5 minutes for 10,000 products, scaled linearly (30 ms a product, so 9 s
  *    for 300). The one-product budget (50 ms) is an assertion in the regular suite.
@@ -54,7 +55,7 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 
 		$start = hrtime( true );
 		$specs = ( new Catalogue() )->generate( $count );
-		$ids   = $this->catalogue->load( $specs );
+		$ids   = $this->catalogue->load( $specs, true, true );
 		$this->service( IndexQueue::class )->clear();
 		$this->phase( sprintf( 'loaded %d products through WooCommerce', $count ), $start );
 

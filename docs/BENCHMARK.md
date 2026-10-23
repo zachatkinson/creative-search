@@ -101,6 +101,15 @@ Two parts, as D-005 decided: what FiboSearch documents, and a measured run again
 
 **Not yet done: the run on a copy of Skatehouse.** The spec asks for the measured run on a copy of the real shop. That copy needs Zach. The run below is an interim one, on the generated 300-product catalogue (`tests/Fixtures/Catalogue.php`, the heroes plus generated products, English and French), in wp-env on the same Mac, on 2026-10-21. It should be repeated on the Skatehouse copy with the shop's own top queries before the comparison is quoted to anyone.
 
+**The harness for the Skatehouse run (1.2, D-103).** Put the export in `tests/fixtures/skatehouse/` (the products CSV from WooCommerce's exporter, all columns; the pages from Tools → Export), then load it into the development site, where FiboSearch can be installed beside the plugin:
+
+```sh
+npx wp-env run cli -- wp eval 'use CreativeBranding\Search\Tests\Support\SkatehouseCopy; print_r( SkatehouseCopy::loadProducts( SkatehouseCopy::productsFile() ) ); print_r( SkatehouseCopy::loadPages( SkatehouseCopy::pagesFile() ) );'
+npx wp-env run cli -- wp csearch reindex --inline
+```
+
+`composer test:skatehouse` runs the handoff's golden queries on the same files in the test site. The FiboSearch run then repeats the method below with the shop's own top queries.
+
 ### Measured: the 50 golden queries against FiboSearch free 1.34.3
 
 FiboSearch free 1.34.3 was installed from wordpress.org beside Creative Search and set to the most it can do for free: search in SKU, short description and description, show categories and tags. Each of the 50 queries in `tests/Fixtures/queries.yml` went to both engines over HTTP (`/wp-json/csearch/v1/suggest` and `/?wc-ajax=dgwt_wcas_ajax_search`), four times each with 0.4 s between requests. Each answer was graded against the query's expectations: the right product first, the expected products and terms present, the excluded ones absent, nothing for a query that must find nothing. Creative Search's `hidden_by_sku` was turned on for the one query that tests it. FiboSearch was removed afterwards. The script and the raw answers are not shipped; the method is here so it can be repeated.

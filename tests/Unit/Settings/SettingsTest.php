@@ -49,7 +49,22 @@ final class SettingsTest extends TestCase {
 		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'show_prices', 'show_stock', 'show_terms', 'label_visible' ) as $on ) {
 			self::assertSame( 'yes', $d[ $on ], $on );
 		}
-		self::assertCount( 28, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertSame( 'yes', $d['category_redirect'], 'a category name opens the category (D-102)' );
+		self::assertSame( array(), $d['filter_attributes'], 'no attribute filters until the owner ticks one (D-101)' );
+		self::assertCount( 30, $d, 'every key is documented in docs/SETTINGS.md' );
+	}
+
+	public function test_the_filter_attributes_are_attribute_taxonomies(): void {
+		$out = Settings::sanitize(
+			array(
+				'filter_attributes' => array( 'pa_width', 'pa_width', 'PA_Size', 'product_cat', 'pa_', '', 7, array( 'pa_x' ), 'pa_' . str_repeat( 'a', 29 ), 'pa_' . str_repeat( 'a', 30 ) ),
+				'category_redirect' => 'no',
+			)
+		);
+		self::assertSame( array( 'pa_width', 'pa_size', 'pa_' . str_repeat( 'a', 29 ) ), $out['filter_attributes'], 'unique, lower-cased, pa_ and at most 32 characters' );
+		self::assertSame( 'no', $out['category_redirect'] );
+		self::assertSame( 'yes', Settings::sanitize( array( 'category_redirect' => 'yes' ) )['category_redirect'] );
+		self::assertSame( array(), Settings::sanitize( array( 'filter_attributes' => 'pa_width' ) )['filter_attributes'], 'not a list' );
 	}
 
 	public function test_the_no_results_links_keep_a_page_id_and_plain_wording(): void {

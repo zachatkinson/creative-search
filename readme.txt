@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -52,6 +52,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.2.0 =
+A search that names a category now opens it, and sizes can become your shop's filters (Tools tab). Turn the first off under WooCommerce → Search → Tools if you prefer the results page.
+
 = 1.1.0 =
 Sizes are now read one way however they are written, so the index is rebuilt once in the background after the update. Searches keep working meanwhile.
 
@@ -59,6 +62,12 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.2.0 =
+* A search that names a category, such as "wheels", opens that category, with a line to search every product instead (on by default; Tools tab).
+* A size in a search, such as "deck 8.25", becomes WooCommerce's own filter for the attributes you choose on the Tools tab, so shoppers see it and can remove it.
+* When two categories share the name searched, the results page links to both.
+* Tests on a copy of your shop: products and pages exported from WooCommerce and WordPress load into the test site.
 
 = 1.1.0 =
 * Posts and pages can be searched (off by default; Tools tab), shown after the products in the suggestions and above them on the results page, with an "Exclude from search" box in the editor.

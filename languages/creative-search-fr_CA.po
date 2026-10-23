@@ -863,224 +863,224 @@ msgstr "UGS des variantes"
 msgid "Find a variable product by any of its variations’ SKUs."
 msgstr "Trouver un produit variable par l’UGS de n’importe laquelle de ses variantes."
 
-#: src/Admin/ToolsTab.php:205
+#: src/Admin/ToolsTab.php:220
 msgid "Stop words"
 msgstr "Mots vides"
 
-#: src/Admin/ToolsTab.php:205
+#: src/Admin/ToolsTab.php:220
 msgid "Words a search ignores unless they are all it has, besides the built-in list. One per line or separated by commas."
 msgstr "Mots qu’une recherche ignore à moins qu’ils soient tout ce qu’elle contient, en plus de la liste intégrée. Un par ligne ou séparés par des virgules."
 
 #. translators: %s: language code
-#: src/Admin/ToolsTab.php:210
+#: src/Admin/ToolsTab.php:225
 #, php-format
 msgid "Stop words (%s)"
 msgstr "Mots vides (%s)"
 
 #. translators: %s: number of words
-#: src/Admin/ToolsTab.php:212
+#: src/Admin/ToolsTab.php:227
 #, php-format
 msgid "The built-in list has %s word."
 msgid_plural "The built-in list has %s words."
 msgstr[0] "La liste intégrée compte %s mot."
 msgstr[1] "La liste intégrée compte %s mots."
 
-#: src/Admin/ToolsTab.php:216
+#: src/Admin/ToolsTab.php:231
 msgid "Search log"
 msgstr "Journal des recherches"
 
-#: src/Admin/ToolsTab.php:217
+#: src/Admin/ToolsTab.php:232
 msgid "Keep searches for (days)"
 msgstr "Conserver les recherches (jours)"
 
-#: src/Admin/ToolsTab.php:218
+#: src/Admin/ToolsTab.php:233
 msgid "Searches are anonymous; older ones are deleted each night. The daily counts are kept for the charts."
 msgstr "Les recherches sont anonymes; les plus anciennes sont supprimées chaque nuit. Les totaux quotidiens sont gardés pour les graphiques."
 
-#: src/Admin/ToolsTab.php:220
+#: src/Admin/ToolsTab.php:235
 msgid "Search bar defaults"
 msgstr "Réglages par défaut de la barre de recherche"
 
-#: src/Admin/ToolsTab.php:220
+#: src/Admin/ToolsTab.php:235
 msgid "For the shortcode, the widget, the theme’s own search form and new search blocks; a block can change each."
 msgstr "Pour le code court, le widget, le formulaire de recherche du thème et les nouveaux blocs de recherche; un bloc peut changer chacun."
 
-#: src/Admin/ToolsTab.php:221
+#: src/Admin/ToolsTab.php:236
 msgid "Products suggested"
 msgstr "Produits suggérés"
 
-#: src/Admin/ToolsTab.php:222
+#: src/Admin/ToolsTab.php:237
 msgid "Categories, tags and brands suggested"
 msgstr "Catégories, étiquettes et marques suggérées"
 
-#: src/Admin/ToolsTab.php:223
+#: src/Admin/ToolsTab.php:238
 msgid "Characters before suggesting"
 msgstr "Caractères avant de suggérer"
 
-#: src/Admin/ToolsTab.php:224
+#: src/Admin/ToolsTab.php:239
 msgid "Prices"
 msgstr "Prix"
 
-#: src/Admin/ToolsTab.php:224
+#: src/Admin/ToolsTab.php:239
 msgid "Show each suggestion’s price."
 msgstr "Afficher le prix de chaque suggestion."
 
-#: src/Admin/ToolsTab.php:225
+#: src/Admin/ToolsTab.php:240
 msgid "Stock"
 msgstr "Stock"
 
-#: src/Admin/ToolsTab.php:225
+#: src/Admin/ToolsTab.php:240
 msgid "Show whether each suggestion is in stock."
 msgstr "Indiquer si chaque suggestion est en stock."
 
-#: src/Admin/ToolsTab.php:226
+#: src/Admin/ToolsTab.php:241
 msgid "Categories, tags and brands"
 msgstr "Catégories, étiquettes et marques"
 
-#: src/Admin/ToolsTab.php:226
+#: src/Admin/ToolsTab.php:241
 msgid "Suggest categories, tags and brands after the products."
 msgstr "Suggérer des catégories, étiquettes et marques après les produits."
 
-#: src/Admin/ToolsTab.php:227
+#: src/Admin/ToolsTab.php:242
 msgid "Label"
 msgstr "Libellé"
 
-#: src/Admin/ToolsTab.php:227
+#: src/Admin/ToolsTab.php:242
 msgid "Show the search field’s label (it is always there for screen readers)."
 msgstr "Afficher le libellé du champ de recherche (il est toujours là pour les lecteurs d’écran)."
 
-#: src/Admin/ToolsTab.php:228
+#: src/Admin/ToolsTab.php:243
 #: src/Block/Widget.php:115
 #: build/block/editor.js:1
 msgid "Placeholder"
 msgstr "Texte indicatif"
 
-#: src/Admin/ToolsTab.php:228
+#: src/Admin/ToolsTab.php:243
 msgid "Empty uses “Search products…” in the shopper’s language."
 msgstr "Vide, on utilise « Rechercher des produits… » dans la langue du client."
 
-#: src/Admin/ToolsTab.php:229
+#: src/Admin/ToolsTab.php:244
 msgid "Suggestions open"
 msgstr "Ouverture des suggestions"
 
-#: src/Admin/ToolsTab.php:232
+#: src/Admin/ToolsTab.php:247
 msgid "Below, or above when a phone’s keyboard would cover them"
 msgstr "En dessous, ou au-dessus quand le clavier d’un téléphone les cacherait"
 
-#: src/Admin/ToolsTab.php:233
+#: src/Admin/ToolsTab.php:248
 #: build/block/editor.js:1
 msgid "Below the field"
 msgstr "Sous le champ"
 
-#: src/Admin/ToolsTab.php:234
+#: src/Admin/ToolsTab.php:249
 #: build/block/editor.js:1
 msgid "Above the field"
 msgstr "Au-dessus du champ"
 
-#: src/Admin/ToolsTab.php:240
+#: src/Admin/ToolsTab.php:255
 msgid "Recent searches"
 msgstr "Recherches récentes"
 
-#: src/Admin/ToolsTab.php:240
+#: src/Admin/ToolsTab.php:255
 msgid "Offer the shopper’s own last searches, kept in their browser only."
 msgstr "Proposer les dernières recherches du client, gardées dans son navigateur seulement."
 
-#: src/Admin/ToolsTab.php:241
+#: src/Admin/ToolsTab.php:256
 msgid "Theme search form"
 msgstr "Formulaire de recherche du thème"
 
-#: src/Admin/ToolsTab.php:241
+#: src/Admin/ToolsTab.php:256
 msgid "Replace the theme’s own search form with this search bar."
 msgstr "Remplacer le formulaire de recherche du thème par cette barre de recherche."
 
-#: src/Admin/ToolsTab.php:243
+#: src/Admin/ToolsTab.php:258
 msgid "Save settings"
 msgstr "Enregistrer les réglages"
 
-#: src/Block/SearchForm.php:64
+#: src/Block/SearchForm.php:65
 msgid "Search products"
 msgstr "Rechercher des produits"
 
-#: src/Block/SearchForm.php:68
+#: src/Block/SearchForm.php:69
 msgctxt "the search field placeholder"
 msgid "Search products…"
 msgstr "Rechercher des produits…"
 
-#: src/Block/SearchForm.php:93
+#: src/Block/SearchForm.php:94
 msgid "Clear search"
 msgstr "Effacer la recherche"
 
-#: src/Block/SearchForm.php:97
+#: src/Block/SearchForm.php:98
 msgctxt "the submit button"
 msgid "Search"
 msgstr "Rechercher"
 
-#: src/Block/SearchForm.php:103
+#: src/Block/SearchForm.php:104
 msgid "Searching…"
 msgstr "Recherche en cours…"
 
-#: src/Block/SearchForm.php:104
-#: src/Block/SearchForm.php:198
+#: src/Block/SearchForm.php:105
+#: src/Block/SearchForm.php:199
 msgid "No suggestions"
 msgstr "Aucune suggestion"
 
-#: src/Block/SearchForm.php:106
+#: src/Block/SearchForm.php:107
 #: build/block/editor.js:1
 msgid "Suggestions"
 msgstr "Suggestions"
 
 #. translators: used between the parts of a suggestion's accessible name (name, price, stock); there is a space after the comma
-#: src/Block/SearchForm.php:182
-#: src/Block/SearchForm.php:237
+#: src/Block/SearchForm.php:183
+#: src/Block/SearchForm.php:238
 msgctxt "between the parts of a suggestion name"
 msgid ", "
 msgstr ", "
 
 #. translators: %s: number of suggestions in the panel
-#: src/Block/SearchForm.php:200
+#: src/Block/SearchForm.php:201
 #, php-format
 msgid "%s suggestion"
 msgid_plural "%s suggestions"
 msgstr[0] "%s suggestion"
 msgstr[1] "%s suggestions"
 
-#: src/Block/SearchForm.php:205
+#: src/Block/SearchForm.php:206
 msgid "No recent searches"
 msgstr "Aucune recherche récente"
 
 #. translators: %s: number of recent searches shown
-#: src/Block/SearchForm.php:207
+#: src/Block/SearchForm.php:208
 #, php-format
 msgid "%s recent search"
 msgid_plural "%s recent searches"
 msgstr[0] "%s recherche récente"
 msgstr[1] "%s recherches récentes"
 
-#: src/Block/SearchForm.php:232
+#: src/Block/SearchForm.php:233
 msgid "In stock"
 msgstr "En stock"
 
-#: src/Block/SearchForm.php:233
+#: src/Block/SearchForm.php:234
 msgid "Out of stock"
 msgstr "En rupture de stock"
 
 #. translators: 1: a category, tag or brand name, 2: "Category", "Tag" or "Brand", 3: the number of products in it
-#: src/Block/SearchForm.php:239
+#: src/Block/SearchForm.php:240
 #, php-format
 msgid "%1$s, %2$s (%3$s)"
 msgstr "%1$s, %2$s (%3$s)"
 
-#: src/Block/SearchForm.php:241
+#: src/Block/SearchForm.php:242
 msgctxt "a suggestion row"
 msgid "Category"
 msgstr "Catégorie"
 
-#: src/Block/SearchForm.php:242
+#: src/Block/SearchForm.php:243
 msgctxt "a suggestion row"
 msgid "Tag"
 msgstr "Étiquette"
 
-#: src/Block/SearchForm.php:243
+#: src/Block/SearchForm.php:244
 msgctxt "a suggestion row"
 msgid "Brand"
 msgstr "Marque"
@@ -1312,7 +1312,7 @@ msgid "Products to return, 1 to 10."
 msgstr "Produits à renvoyer, de 1 à 10."
 
 #. translators: 1: number of products found, 2: the search query
-#: src/Results/ResultsView.php:78
+#: src/Results/ResultsView.php:80
 #, php-format
 msgid "%1$s result for “%2$s”"
 msgid_plural "%1$s results for “%2$s”"
@@ -1320,16 +1320,16 @@ msgstr[0] "%1$s résultat pour « %2$s »"
 msgstr[1] "%1$s résultats pour « %2$s »"
 
 #. translators: 1: the query the results are for, 2: a link to search the shopper's words exactly
-#: src/Results/ResultsView.php:88
+#: src/Results/ResultsView.php:90
 #, php-format
 msgid "Showing results for %1$s; search instead for %2$s"
 msgstr "Résultats pour %1$s; chercher plutôt %2$s"
 
-#: src/Results/ResultsView.php:252
+#: src/Results/ResultsView.php:350
 msgid "Try one of these categories:"
 msgstr "Essayez une de ces catégories :"
 
-#: src/Results/ResultsView.php:270
+#: src/Results/ResultsView.php:368
 msgid "You might like"
 msgstr "Vous aimerez peut-être"
 
@@ -1380,8 +1380,8 @@ msgid "suggestions"
 msgstr "suggestions"
 
 #. translators: 1: number of results, 2: the query typed
-#: src/Block/SearchForm.php:228
-#: src/Block/SearchForm.php:230
+#: src/Block/SearchForm.php:229
+#: src/Block/SearchForm.php:231
 #, php-format
 msgid "See %1$s result for %2$s"
 msgid_plural "See all %1$s results for %2$s"
@@ -1478,7 +1478,7 @@ msgid "Leave the wording empty to use the default shown."
 msgstr "Laissez le libellé vide pour utiliser celui affiché par défaut."
 
 #: src/Admin/ToolsTab.php:201
-#: src/Results/ResultsView.php:146
+#: src/Results/ResultsView.php:244
 msgid "Posts"
 msgstr "Articles"
 
@@ -1487,7 +1487,7 @@ msgid "Search the blog’s posts too, shown apart from the products."
 msgstr "Chercher aussi dans les articles du blogue, affichés à part des produits."
 
 #: src/Admin/ToolsTab.php:202
-#: src/Results/ResultsView.php:144
+#: src/Results/ResultsView.php:242
 msgid "Pages"
 msgstr "Pages"
 
@@ -1499,32 +1499,32 @@ msgstr "Chercher aussi dans les pages du site, affichées à part des produits."
 msgid "A change to the product settings applies to products as they are next indexed; rebuild the index to apply it to all of them. Posts and pages are added or removed in the background as soon as you save."
 msgstr "Un changement aux réglages des produits s’applique aux produits à leur prochaine indexation; reconstruisez l’index pour l’appliquer à tous. Les articles et les pages sont ajoutés ou retirés en arrière-plan dès l’enregistrement."
 
-#: src/Block/SearchForm.php:142
+#: src/Block/SearchForm.php:143
 msgctxt "the button that opens the search"
 msgid "Search"
 msgstr "Rechercher"
 
-#: src/Block/SearchForm.php:143
+#: src/Block/SearchForm.php:144
 msgctxt "the search dialog"
 msgid "Search"
 msgstr "Recherche"
 
-#: src/Block/SearchForm.php:145
+#: src/Block/SearchForm.php:146
 msgid "Close search"
 msgstr "Fermer la recherche"
 
 #. translators: %1$s: the query the suggestions are for, after a word that matched nothing was left out
-#: src/Block/SearchForm.php:235
+#: src/Block/SearchForm.php:236
 #, php-format
 msgid "Showing results for %1$s"
 msgstr "Résultats pour %1$s"
 
-#: src/Block/SearchForm.php:247
+#: src/Block/SearchForm.php:248
 msgctxt "a suggestion row"
 msgid "Post"
 msgstr "Article"
 
-#: src/Block/SearchForm.php:248
+#: src/Block/SearchForm.php:249
 msgctxt "a suggestion row"
 msgid "Page"
 msgstr "Page"
@@ -1549,30 +1549,30 @@ msgid_plural "%1$d of %2$d ids indexed."
 msgstr[0] "%1$d identifiant sur %2$d indexé."
 msgstr[1] "%1$d identifiants sur %2$d indexés."
 
-#: src/Results/ResultsView.php:146
+#: src/Results/ResultsView.php:244
 msgid "Pages and posts"
 msgstr "Pages et articles"
 
-#: src/Results/ResultsView.php:155
+#: src/Results/ResultsView.php:253
 msgid "Can’t find what you need? Contact us"
 msgstr "Vous ne trouvez pas ce qu’il vous faut? Écrivez-nous"
 
-#: src/Results/ResultsView.php:155
+#: src/Results/ResultsView.php:253
 msgid "Need help choosing? Read our guides"
 msgstr "Besoin d’aide pour choisir? Lisez nos guides"
 
 #. translators: %s: the search query
-#: src/Results/ResultsView.php:241
+#: src/Results/ResultsView.php:339
 #, php-format
 msgid "No products match “%s”, but these do:"
 msgstr "Aucun produit ne correspond à « %s », mais ceci oui :"
 
-#: src/Results/ResultsView.php:308
+#: src/Results/ResultsView.php:406
 msgid "Try one word:"
 msgstr "Essayez un seul mot :"
 
 #. translators: 1: a word of the shopper's query, 2: how many products it finds alone
-#: src/Results/ResultsView.php:320
+#: src/Results/ResultsView.php:418
 #, php-format
 msgid "%1$s (%2$s result)"
 msgid_plural "%1$s (%2$s results)"
@@ -1594,3 +1594,67 @@ msgstr "Un champ de recherche"
 #: build/block/editor.js:1
 msgid "A search button (icon)"
 msgstr "Un bouton de recherche (icône)"
+
+#: src/Admin/ToolsTab.php:205
+msgid "Results page"
+msgstr "Page de résultats"
+
+#: src/Admin/ToolsTab.php:206
+msgid "Categories"
+msgstr "Catégories"
+
+#: src/Admin/ToolsTab.php:206
+msgid "Open a category when a search names it, such as “wheels”."
+msgstr "Ouvrir une catégorie quand une recherche la nomme, comme « roues »."
+
+#: src/Admin/ToolsTab.php:210
+msgid "Filters"
+msgstr "Filtres"
+
+#: src/Admin/ToolsTab.php:216
+msgid "A search that names one of these attributes’ values, such as “deck 8.25”, shows the products with that filter applied, so the shopper can see it and remove it."
+msgstr "Une recherche qui nomme une valeur de l’un de ces attributs, comme « planche 8,25 », affiche les produits avec ce filtre appliqué, pour que le client le voie et puisse le retirer."
+
+#. translators: %s: a list of links to categories
+#: src/Results/ResultsView.php:133
+#, php-format
+msgid "Categories: %s"
+msgstr "Catégories : %s"
+
+#. translators: %s: a category
+#: src/Results/ResultsView.php:152
+#, php-format
+msgid "Showing %s."
+msgstr "Affichage de %s."
+
+#. translators: 1: a category, 2: the filters applied, such as "Width 8.25"
+#: src/Results/ResultsView.php:154
+#, php-format
+msgid "Showing %1$s with %2$s."
+msgstr "Affichage de %1$s avec %2$s."
+
+#. translators: %s: the filters applied, such as "Width 8.25"
+#: src/Results/ResultsView.php:157
+#, php-format
+msgid "Showing products with %s."
+msgstr "Affichage des produits avec %s."
+
+#. translators: %s: the query the shopper typed
+#: src/Results/ResultsView.php:172
+#, php-format
+msgid "Search all products for “%s”."
+msgstr "Chercher « %s » dans tous les produits."
+
+#. translators: 1: a category, 2: the category it is in
+#: src/Results/ResultsView.php:127
+#, php-format
+msgctxt "a category and its parent"
+msgid "%1$s (%2$s)"
+msgstr "%1$s (%2$s)"
+
+#. translators: 1: an attribute, such as Width, 2: its values, such as 8.25
+#: src/Results/ResultsView.php:191
+#, php-format
+msgctxt "an attribute and its values, such as Width 8.25"
+msgid "%1$s %2$s"
+msgstr "%1$s %2$s"
