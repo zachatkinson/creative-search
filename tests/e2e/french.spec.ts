@@ -184,8 +184,14 @@ test.describe( 'scripts blocked, in French', () => {
 			.getByRole( 'button', { name: 'Rechercher', exact: true } )
 			.first()
 			.click();
-		await expect( page.locator( '.csearch-results-summary' ) ).toHaveText(
-			new RegExp( `^\\d+ résultats pour «${ S }planche${ S }»$` )
+		// "planche" names the Decks category (1.2, D-102), so the search lands there, the line in French.
+		await expect( page ).toHaveURL(
+			/\/product-category\/skateboards\/decks\/\?csearch_from=planche&csearch_sig=/
+		);
+		await expect( page.locator( '.csearch-results-routed' ) ).toContainText(
+			new RegExp(
+				`Chercher «${ S }planche${ S }» dans tous les produits`
+			)
 		);
 	} );
 } );
