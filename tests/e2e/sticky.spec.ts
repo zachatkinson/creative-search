@@ -264,3 +264,93 @@ test( 'the colour hooks colour the field, the panel, the button and the focus ri
 		ring: 'rgb(200, 0, 0)',
 	} );
 } );
+
+// Kadence's button states, as global.min.css writes them, and a site's own header rules (Skatehouse's Additional CSS).
+const THEME_BUTTONS = `button:hover, button:focus, button:active {
+	color: rgb(244, 241, 234);
+	background: rgb(18, 18, 18);
+	box-shadow: rgb(0 0 0 / 10%) 0 15px 25px -7px;
+}`;
+
+test( "a theme's button states leave the clear and submit buttons as they are, and a site's own rules still win", async ( {
+	page,
+	isMobile,
+} ) => {
+	test.skip( isMobile, 'hover is a pointer state' );
+	await page.goto( '/sticky-header/' );
+	await page.addStyleTag( {
+		content: `${ THEME_BUTTONS }
+		.csearch-test-header .csearch-submit { background: rgb(1, 2, 3); color: rgb(250, 250, 250); }`,
+	} );
+	await openPanel( page );
+	const clear = page.locator( '.csearch-clear' ).first();
+	const submit = page.locator( '.csearch-submit' ).first();
+	const look = ( el: Element ) => {
+		const c = getComputedStyle( el );
+		return {
+			color: c.color,
+			background: c.backgroundColor,
+			shadow: c.boxShadow,
+		};
+	};
+	const field = await page
+		.locator( '.csearch-field' )
+		.first()
+		.evaluate( ( el ) => getComputedStyle( el ).color );
+	await clear.hover();
+	// The X keeps the field's colour on no background: not the theme's dark block.
+	expect( await clear.evaluate( look ) ).toEqual( {
+		color: field,
+		background: 'rgba(0, 0, 0, 0)',
+		shadow: 'none',
+	} );
+	await submit.hover();
+	expect( await submit.evaluate( look ) ).toEqual( {
+		color: 'rgb(250, 250, 250)',
+		background: 'rgb(1, 2, 3)',
+		shadow: 'none',
+	} );
+	// A site's own hover colour for the X, at the same weight, comes later and wins.
+	await page.addStyleTag( {
+		content:
+			'.csearch-test-header .csearch-clear:hover { color: rgb(200, 0, 0); }',
+	} );
+	await clear.hover();
+	expect( ( await clear.evaluate( look ) ).color ).toBe( 'rgb(200, 0, 0)' );
+	// Focused from the keyboard: no theme background, and the plugin's one focus ring.
+	await page.mouse.move( 0, 300 );
+	await page.getByRole( 'combobox', { name: 'Search products' } ).focus();
+	// WebKit on macOS tabs to buttons with Option held, as admin.spec.ts does.
+	await page.keyboard.press(
+		page.context().browser()?.browserType().name() === 'webkit'
+			? 'Alt+Tab'
+			: 'Tab'
+	);
+	await expect( clear ).toBeFocused();
+	const focused = await clear.evaluate( ( el ) => ( {
+		background: getComputedStyle( el ).backgroundColor,
+		outline: getComputedStyle( el ).outlineStyle,
+	} ) );
+	expect( focused ).toEqual( {
+		background: 'rgba(0, 0, 0, 0)',
+		outline: 'solid',
+	} );
+} );
+
+test( "a theme's button states leave Button mode's icon as it is", async ( {
+	page,
+	isMobile,
+} ) => {
+	test.skip( isMobile, 'hover is a pointer state' );
+	await page.goto( '/search-button/' );
+	await page.addStyleTag( { content: THEME_BUTTONS } );
+	const open = page.locator( '.csearch-open' ).first();
+	const color = await open.evaluate( ( el ) => getComputedStyle( el ).color );
+	await open.hover();
+	expect(
+		await open.evaluate( ( el ) => {
+			const c = getComputedStyle( el );
+			return [ c.color, c.backgroundColor, c.boxShadow ];
+		} )
+	).toEqual( [ color, 'rgba(0, 0, 0, 0)', 'none' ] );
+} );

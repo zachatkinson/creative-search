@@ -986,3 +986,14 @@ Product names went into the index as `get_name()` returns them. A name an import
 Ranking is otherwise unchanged: a name stored as `Philly&#8217;s Hoodie` now scores exactly as `Philly’s Hoodie` does (GoldenQueriesTest), and the 50 golden queries and the ranking parity test pass as before.
 
 **Why:** an entity is how the text was stored, not what the shop wrote. Decoding it where every text becomes tokens means no reader can forget it, and the query and the index are always cut the same way.
+
+### D-134 · The block's buttons resist a theme's button states, at one class's weight · 2026-10-27
+
+From the Skatehouse header: once something is typed, hovering the clear button (the X) showed a dark square. Kadence's `global.min.css` colours every `button:hover`, `button:focus` and `button:active` (`color: var(--global-palette-btn-hover); background: var(--global-palette-btn-bg-hover)`, with a shadow), specificity 0,1,1, which beats `.csearch-clear`'s `background: transparent` at 0,1,0. The site's Additional CSS then set `.wp-block-kadence-header .csearch-clear:hover { color: var(--global-palette3) }`, the same `#121212` as the theme's hover background, so the X disappeared into it. Button mode's open and close buttons had the same exposure. D-125 had hardened the input only.
+
+Each button's states are now `.csearch-clear:is(:hover, :focus, :active)` (and the same for `.csearch-submit`, `.csearch-open`, `.csearch-close`), 0,2,0, which set the button's own colour (`inherit`, the submit's `--csearch-submit-fg`), its own background (none, the submit's `--csearch-submit-bg`), no border and no shadow. Outline is not touched, so `:focus-visible` keeps the one focus ring.
+
+The weight is deliberate, and lower than D-125's 0,4,0. A site styles the block in its header as `.site-header .csearch-submit` (0,2,0; Skatehouse's submit has its own background that way). At 0,2,0 the plugin's state rules beat the theme's `button:hover` but only tie with such a rule, and the site's CSS loads after the block's (Additional CSS prints last), so the site keeps its look on hover; a heavier selector would have turned Skatehouse's submit transparent whenever it was hovered. A theme selector heavier than 0,2,0 on buttons would still reach them; none is known. The panel's add to cart is a `<span>`, which theme button rules do not reach.
+
+**Why:** the block has to look like itself in a theme that styles buttons, without the site writing overrides, and without undoing the overrides a site does write.
+
