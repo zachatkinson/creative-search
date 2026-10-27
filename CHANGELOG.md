@@ -12,6 +12,9 @@ HTML entities in indexed text and in the query.
 - A name, attribute value, category, tag or brand stored with HTML entities (`Philly&#8217;s Hoodie` from an import or a feed, `Rock &amp; Roll` as WordPress saves a term name) is indexed as the text it shows: "phillys", "Philly's" and "Philly’s" find it by its name as they find a name written with a real apostrophe, and "8217" or "amp" are no longer words in the index. A query is decoded the same way. Text encoded twice reads as text encoded once (D-133).
 - The panel showed such names with their entities (`Rock &amp; Roll` as a category row and a scope row); suggestion titles, "Matches" lines and scope rows are now text, and the results page escapes them once (D-133).
 
+### Fixed before release (build)
+- The zip keeps `composer.json` beside `vendor/` (Composer's autoloader only), so Plugin Check run on the installed zip no longer warns `missing_composer_json_file`.
+
 ### Upgrade
 - The tokenizer reads text differently (`Tokenizer::VERSION` 3), so the index is rebuilt once in the background after the update, as after 1.1.0. Searches keep working meanwhile. Ranking is otherwise unchanged.
 
