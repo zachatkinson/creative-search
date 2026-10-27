@@ -9,12 +9,14 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Tests\Unit\Fixtures;
 
+use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\Searcher;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Domain\Synonyms;
+use CreativeBranding\Search\Domain\TermMatch;
 use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Fixtures\GoldenQueries;
@@ -131,6 +133,45 @@ final class GoldenQueriesTest extends TestCase {
 		self::assertContains( 'ORB-CLA-00007', $skus( '54 wheels' ), 'a bare 54 finds the 54 mm wheels' );
 		self::assertSame( 'ORB-CLA-00007', $skus( '54 mm wheels' )[0] );
 		self::assertNotContains( 'RSC-SBA-00005', $skus( '8.25 in' ), '8.125 is not 8.25' );
+	}
+
+	/**
+	 * A name stored with an entity, as an import or a feed leaves one (D-133): every spelling of the apostrophe
+	 * finds the product by its name's own terms, never by a typo or a prefix, with the very score of the same
+	 * name stored with a real ’; and the entity's number is no word.
+	 */
+	public function test_a_name_stored_with_an_entity_is_found_exactly(): void {
+		$products = ( new Catalogue() )->generate( 300 );
+		$hoodie   = current( array_filter( $products, static fn( array $p ): bool => in_array( 'hoodies', $p['categories'], true ) && 'publish' === $p['status'] ) );
+		self::assertIsArray( $hoodie );
+		$next  = max( array_column( $products, 'id' ) );
+		$named = array();
+		foreach ( array( 'Philly&#8217;s Hoodie', 'Philly’s Hoodie' ) as $i => $name ) {
+			$named[ $name ] = $next + 1 + $i;
+			$products[]     = array( 'id' => $named[ $name ], 'sku' => 'PHL-HOO-0099' . $i, 'name' => $name, 'name_fr' => $name, 'variations' => array() ) + $hoodie;
+		}
+		$searcher = new Searcher( ( new CatalogueIndexer() )->index( $products ) );
+		$parser   = self::parser();
+		$score    = static function ( string $q, int $id ) use ( $searcher, $parser ): array {
+			foreach ( $searcher->search( $parser->parse( $q, 'en' ), new SearchOptions( limit: 300 ) )->products as $hit ) {
+				if ( $id === $hit->document->objectId ) {
+					return array( $hit->document->title, $hit->score->tokens, $hit->score->exact, $hit->score->phrase );
+				}
+			}
+			return array();
+		};
+		foreach ( array( 'phillys', "Philly's", 'Philly’s', 'phillys hoodie', "Philly's Hoodie" ) as $q ) {
+			$found = $score( $q, $named['Philly&#8217;s Hoodie'] );
+			self::assertNotSame( array(), $found, "{$q} finds the product" );
+			self::assertSame( 'Philly&#8217;s Hoodie', $found[0], 'the document keeps the title it was given' );
+			foreach ( $found[1] as $token ) {
+				self::assertNotContains( $token['kind'], array( TermMatch::PREFIX, TermMatch::TYPO1, TermMatch::TYPO2 ), "{$q}: {$token['token']} matched {$token['term']} as it is" );
+				self::assertSame( Fields::NAME, $token['field'], "{$q}: {$token['token']} matched in the name" );
+			}
+			self::assertSame( array_slice( $score( $q, $named['Philly’s Hoodie'] ), 1 ), array_slice( $found, 1 ), "{$q} scores the entity's name as the real apostrophe's" );
+		}
+		self::assertGreaterThan( 0.0, $score( "Philly's Hoodie", $named['Philly&#8217;s Hoodie'] )[2], 'the whole name, typed, earns the exactness bonus' );
+		self::assertTrue( $searcher->search( $parser->parse( '8217', 'en' ), new SearchOptions( limit: 300 ) )->isEmpty(), 'the entity\'s number is not a word' );
 	}
 
 	public function test_the_in_memory_index_has_the_catalogue_shape(): void {

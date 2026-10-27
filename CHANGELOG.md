@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-27
+
+HTML entities in indexed text and in the query.
+
+### Fixed
+- A name, attribute value, category, tag or brand stored with HTML entities (`Philly&#8217;s Hoodie` from an import or a feed, `Rock &amp; Roll` as WordPress saves a term name) is indexed as the text it shows: "phillys", "Philly's" and "Philly’s" find it by its name as they find a name written with a real apostrophe, and "8217" or "amp" are no longer words in the index. A query is decoded the same way. Text encoded twice reads as text encoded once (D-133).
+- The panel showed such names with their entities (`Rock &amp; Roll` as a category row and a scope row); suggestion titles, "Matches" lines and scope rows are now text, and the results page escapes them once (D-133).
+
+### Upgrade
+- The tokenizer reads text differently (`Tokenizer::VERSION` 3), so the index is rebuilt once in the background after the update, as after 1.1.0. Searches keep working meanwhile. Ranking is otherwise unchanged.
+
 ## [1.5.0] - 2026-10-23
 
 Search within a category without being kept in it, and a faster ranking.

@@ -87,6 +87,10 @@ final class QueryParserTest extends TestCase {
 			'pair attached'             => array( '9x33 grip', array( '9', '33', 'grip P' ), array() ),
 			'minus a size'              => array( 'wheels -54 mm', array( 'wheels' ), array( '54mm N |54' ) ),
 			'french inches'             => array( 'planche 8,25 po', array( 'planche', '8.25' ), array(), 'fr' ),
+			// D-133: entities decoded as the indexed text's are, before the query is cut into chunks.
+			'entity apostrophe'         => array( 'Philly&#8217;s hoodie', array( 'phillys |philly', 'hoodie P' ), array() ),
+			'entity ampersand'          => array( 'rock &amp; roll', array( 'rock', 'roll P' ), array() ),
+			'entity quotes'             => array( '&quot;horror party&quot;', array( 'horror "1', 'party "1' ), array() ),
 		);
 	}
 

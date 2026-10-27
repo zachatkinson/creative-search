@@ -12,7 +12,8 @@ namespace CreativeBranding\Search\Domain;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Cuts text into tokens (spec: Indexing → Cutting text into tokens): lower-case; accents folded with a table;
+ * Cuts text into tokens (spec: Indexing → Cutting text into tokens): HTML entities decoded ({@see decode()},
+ * D-133); lower-case; accents folded with a table;
  * sizes read one way whatever way they are written ({@see units()}, D-098); digits kept with their decimal
  * point and inch mark as one token (`8.25`, `8.25″`, `54mm`, with `54` beside it); a split on
  * everything else that is not a letter or digit; an apostrophe folded, with each side of two or more characters
@@ -30,9 +31,9 @@ final class Tokenizer {
 
 	/**
 	 * What a text becomes: raised when the rules change what is indexed, so an index built under older rules is
-	 * rebuilt once (2: the size rules of D-098).
+	 * rebuilt once (2: the size rules of D-098; 3: entities decoded, D-133).
 	 */
-	public const VERSION = 2;
+	public const VERSION = 3;
 
 	/**
 	 * A word: letters, digits and combining marks, joined across an apostrophe or a decimal point between digits,
@@ -126,10 +127,27 @@ final class Tokenizer {
 	 * @return string[]
 	 */
 	public static function words( string $text, string $lang = 'en' ): array {
-		$lower = self::units( mb_strtolower( $text, 'UTF-8' ), $lang );
+		$lower = self::units( mb_strtolower( self::decode( $text ), 'UTF-8' ), $lang );
 		$lower = str_replace( array( '’', '‘', 'ʼ', '`', '´' ), "'", $lower );
 		preg_match_all( self::WORD, $lower, $matches );
 		return $matches[0];
+	}
+
+	/**
+	 * Text with its HTML entities decoded (D-133): `Philly&#8217;s` is `Philly’s`, `Rock &amp; Roll` is
+	 * `Rock & Roll`, as WordPress stores a term name, an import or a feed may store a product's. Repeated until
+	 * nothing changes, so text encoded twice reads as text encoded once and decoding again changes nothing: the
+	 * indexed text, a document's title and the query all come out the same however often they pass through.
+	 *
+	 * @param string $text Text.
+	 */
+	public static function decode( string $text ): string {
+		// Each pass that changes the text removes an `&` or shortens an `&amp;`, so the loop ends.
+		do {
+			$before = $text;
+			$text   = html_entity_decode( $before, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		} while ( $text !== $before );
+		return $text;
 	}
 
 	/**

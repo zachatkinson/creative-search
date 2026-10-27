@@ -51,7 +51,7 @@ add_filter(
 
 - **Since:** 0.4.0
 - **Signature:** `apply_filters( 'csearch_document', array $document, WC_Product $product, string $lang ): array`
-- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`, and since 1.3.0 `cart` (a simple product that can go to the cart from the panel, D-106) and `facts` (its SKUs and attribute values, each `variation_id`, `field`, `attribute`, `name`, `value`, `label`, `image_id`, D-104; as the shop wrote them, the same on every language's document, so a language plugin translates `name` and `label` here). Every value is coerced back to its type afterwards.
+- **What it does:** the document about to be written for one product in one language: `title` (what the suggestion shows), `fields`, `skus`, `url`, `image_id`, `price_min`, `price_max`, `in_stock`, `visible`, `boost` (-10 to 10), `total_sales`, `lang`, and since 1.3.0 `cart` (a simple product that can go to the cart from the panel, D-106) and `facts` (its SKUs and attribute values, each `variation_id`, `field`, `attribute`, `name`, `value`, `label`, `image_id`, D-104; as the shop wrote them, the same on every language's document, so a language plugin translates `name` and `label` here). Every value is coerced back to its type afterwards. Since 1.5.1 the `title` and each fact's `label` and `name` are written with their HTML entities decoded, and every text is decoded before it is tokenised, so a filter may return either `Philly&#8217;s` or `Philly’s` (D-133).
 - **Where it runs:** `Index\ProductReader::read()`, once per product and language per job.
 - **Example:**
 

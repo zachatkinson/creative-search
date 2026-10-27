@@ -13,6 +13,7 @@ use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fact;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Kind;
+use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Install\Upgrader;
 use CreativeBranding\Search\Repository\ContentIdRepository;
 use CreativeBranding\Search\Repository\DocumentRepository;
@@ -397,7 +398,9 @@ final class Indexer {
 			}
 			$postings[ self::SKU_KEY_PREFIX . mb_substr( $key, 0, 63, 'UTF-8' ) ][ Fields::SKU ] = array( 1, 0 );
 		}
-		$title      = mb_substr( $text->title, 0, 255, 'UTF-8' );
+		// The title is shown as text, never markup (the panel builds it as nodes, a page escapes it once): decoded here,
+		// whichever reader or `csearch_document` filter it came from (D-133).
+		$title      = mb_substr( Tokenizer::decode( $text->title ), 0, 255, 'UTF-8' );
 		$documentId = $this->documents->insert(
 			array(
 				'generation'  => $generation,
@@ -461,7 +464,10 @@ final class Indexer {
 				}
 				$joined .= ( '' === $joined ? '' : Fact::SEPARATOR ) . $term;
 			}
-			$out[] = $fact + array( 'terms' => $joined );
+			// The label and the attribute's name are shown as text; the value stays as stored, for the query argument.
+			$fact['label'] = Tokenizer::decode( $fact['label'] );
+			$fact['name']  = Tokenizer::decode( $fact['name'] );
+			$out[]         = $fact + array( 'terms' => $joined );
 		}
 		return $out;
 	}
