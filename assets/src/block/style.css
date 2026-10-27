@@ -136,6 +136,27 @@
 	background: var(--csearch-submit-bg, transparent);
 }
 
+/*
+ * Themes colour every button:hover, :focus and :active (Kadence: its button background and text colours and a
+ * shadow), which made the clear button a dark block. Each state keeps the button's own look. One class and the
+ * state, 0,2,0: above the theme's `button:hover` (0,1,1), and level with a site's `.site-header .csearch-submit`,
+ * which loads later and so still wins (D-134). The outline is left to :focus-visible below. The same for
+ * Button mode's open and close buttons, further down.
+ */
+.csearch-clear:is(:hover, :focus, :active) {
+	color: inherit;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+}
+
+.csearch-submit:is(:hover, :focus, :active) {
+	color: var(--csearch-submit-fg, inherit);
+	background: var(--csearch-submit-bg, transparent);
+	border: 0;
+	box-shadow: none;
+}
+
 .csearch-clear:focus-visible,
 .csearch-submit:focus-visible {
 	outline: 2px solid var(--csearch-focus-ring, currentcolor);
@@ -412,6 +433,15 @@
 	background: transparent;
 	border: 0;
 	border-radius: var(--csearch-radius);
+}
+
+/* A theme's button states stay out (D-134). */
+.csearch-open:is(:hover, :focus, :active),
+.csearch-close:is(:hover, :focus, :active) {
+	color: inherit;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
 }
 
 .csearch-open:focus-visible,

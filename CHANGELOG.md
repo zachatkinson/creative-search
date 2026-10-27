@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-27
+
+The search block's buttons keep their own look inside a theme's styles.
+
+### Fixed
+- In a theme that colours every `button:hover`, `:focus` and `:active` (Kadence), hovering the field's clear button (the X) once something was typed turned it into a dark block: the theme's dark background with, in the Skatehouse header, a dark X. The clear and submit buttons, and Button mode's open and close buttons, now keep their own colours, no background (the submit its `--csearch-submit-*` colours) and no shadow in every state. A site's own rules for them, such as `.site-header .csearch-clear:hover`, still win; the focus ring is unchanged (D-134).
+
 ## [1.5.1] - 2026-10-27
 
 HTML entities in indexed text and in the query.

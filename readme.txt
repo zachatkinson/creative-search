@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.5.1
+Stable tag: 1.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.5.2 =
+The search field's clear button no longer turns into a dark block on hover in themes that style every button's hover, such as Kadence.
+
 = 1.5.1 =
 Product and category names stored with HTML entities (such as Philly&#8217;s) are now searched and shown as the text they display, so the index is rebuilt once in the background after the update. Searches keep working meanwhile.
 
@@ -82,6 +85,9 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.5.2 =
+* The search block's buttons (clear, submit, and Button mode's open and close) keep their own look on hover and focus in themes that style every button, such as Kadence; the clear button no longer turns into a dark block.
 
 = 1.5.1 =
 * Names stored with HTML entities, such as an imported "Philly&#8217;s Hoodie" or a "Rock &amp; Roll" category, are found by every spelling of the apostrophe and shown correctly in the suggestions. The index is rebuilt once after the update.
