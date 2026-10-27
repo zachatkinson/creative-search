@@ -42,8 +42,9 @@ final class QueryParser {
 	public function parse( string $raw, string $lang ): Query {
 		$text = trim( mb_substr( trim( $raw ), 0, Query::MAX_CHARS, 'UTF-8' ) );
 		$lang = StopWords::code( $lang );
-		// Sizes first: a unit may follow its number after a space, which the chunks below would split (D-098).
-		$prepared = Tokenizer::units( mb_strtolower( self::prepare( $text ), 'UTF-8' ), $lang );
+		// Entities decoded as the indexed text's are (D-133), then sizes: a unit may follow its number after a
+		// space, which the chunks below would split (D-098).
+		$prepared = Tokenizer::units( mb_strtolower( self::prepare( Tokenizer::decode( $text ) ), 'UTF-8' ), $lang );
 		// A size whose unit was typed (`8.25 in`, `8.25″`) is finished: it is no prefix.
 		$endsOpen = 1 !== preg_match( '/\s$/u', $raw ) && mb_strlen( trim( $raw ), 'UTF-8' ) <= Query::MAX_CHARS && ! str_ends_with( $prepared, '″' );
 

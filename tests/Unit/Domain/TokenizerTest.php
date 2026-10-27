@@ -77,6 +77,16 @@ final class TokenizerTest extends TestCase {
 			'a sku keeps its x'     => array( 'KZ825X2', array( 'kz825x2@0' ), 'en' ),
 			'french decimal comma'  => array( 'Planche 8,25 po', array( 'planche@0', '8.25@1' ), 'fr' ),
 			'english keeps a comma' => array( '8,25', array( '8@0', '25@1' ), 'en' ),
+			// D-133: entities decoded before anything else, so no entity's number becomes a word.
+			'numeric right quote'   => array( 'Philly&#8217;s Hoodie', array( 'phillys@0', 'philly@0', 'hoodie@1' ), 'en' ),
+			'numeric apostrophe'    => array( 'Philly&#039;s', array( 'phillys@0', 'philly@0' ), 'en' ),
+			'named right quote'     => array( 'Philly&rsquo;s', array( 'phillys@0', 'philly@0' ), 'en' ),
+			'html5 apostrophe'      => array( 'Philly&apos;s', array( 'phillys@0', 'philly@0' ), 'en' ),
+			'ampersand'             => array( 'Rock &amp; Roll', array( 'rock@0', 'roll@1' ), 'en' ),
+			'en dash'               => array( 'Deck &#8211; 8.25', array( 'deck@0', '8.25@1' ), 'en' ),
+			'encoded twice'         => array( 'Philly&amp;#8217;s', array( 'phillys@0', 'philly@0' ), 'en' ),
+			'encoded inch mark'     => array( '8.25&quot; deck', array( '8.25@0', 'deck@1' ), 'en' ),
+			'encoded accent'        => array( 'Qu&eacute;bec', array( 'quebec@0' ), 'en' ),
 		);
 	}
 
@@ -224,6 +234,17 @@ final class TokenizerTest extends TestCase {
 		self::assertSame( array( 'oo@0' ), self::flat( ( new Tokenizer() )->tokenize( "o'o", 'en' ) ) );
 		// A word whose joined form equals a side is listed once.
 		self::assertSame( array( 'deck@0' ), self::flat( ( new Tokenizer() )->tokenize( "deck'", 'en' ) ) );
+	}
+
+	public function test_entities_are_decoded_until_nothing_changes(): void {
+		self::assertSame( 'Philly’s Hoodie', Tokenizer::decode( 'Philly&#8217;s Hoodie' ) );
+		self::assertSame( "Philly's", Tokenizer::decode( 'Philly&#039;s' ) );
+		self::assertSame( 'Rock & Roll – 8.25', Tokenizer::decode( 'Rock &amp; Roll &#8211; 8.25' ) );
+		self::assertSame( 'Philly’s', Tokenizer::decode( 'Philly&amp;amp;#8217;s' ), 'encoded three times' );
+		self::assertSame( 'AT&T 3 < 4', Tokenizer::decode( 'AT&T 3 < 4' ), 'a bare ampersand is text' );
+		self::assertSame( Tokenizer::decode( 'Rock &amp;amp; Roll' ), Tokenizer::decode( Tokenizer::decode( 'Rock &amp;amp; Roll' ) ), 'decoding again changes nothing' );
+		self::assertSame( Tokenizer::words( "Philly's Hoodie" ), Tokenizer::words( 'Philly&#8217;s Hoodie' ) );
+		self::assertSame( 'phillys hoodie', ( new Tokenizer() )->key( 'Philly&#8217;s Hoodie' ) );
 	}
 
 	public function test_key_is_one_text_per_position(): void {

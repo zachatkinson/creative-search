@@ -9,7 +9,8 @@ stage="$(mktemp -d)/creative-search"
 mkdir -p "$stage"
 rsync -a --exclude-from=.distignore ./ "$stage/"
 cp composer.json composer.lock "$stage/"
-( cd "$stage" && composer install --no-dev --no-interaction --quiet --optimize-autoloader && rm -f composer.json composer.lock )
+# composer.json stays beside vendor/ so a reviewer (and Plugin Check's missing_composer_json_file) can see what it holds.
+( cd "$stage" && composer install --no-dev --no-interaction --quiet --optimize-autoloader && rm -f composer.lock )
 mkdir -p tmp
 rm -f "tmp/creative-search-${version}.zip"
 ( cd "$(dirname "$stage")" && zip -qr "$OLDPWD/tmp/creative-search-${version}.zip" creative-search )

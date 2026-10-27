@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Search;
 
 use CreativeBranding\Search\Domain\Scopes;
+use CreativeBranding\Search\Domain\Tokenizer;
 use CreativeBranding\Search\Repository\DocumentRepository;
 use CreativeBranding\Search\Repository\RankRepository;
 use CreativeBranding\Search\Results\CategoryScope;
@@ -56,7 +57,7 @@ final class CategoryScopes {
 		$first = null !== $here && array() !== $this->rank->scopedObjects( $productIds, CategoryScope::ttIds( $here ) )
 			? array(
 				'id'   => $here->term_id,
-				'name' => $here->name,
+				'name' => Tokenizer::decode( $here->name ),
 				'url'  => self::url( $query, $here->slug ),
 			)
 			: null;
@@ -91,7 +92,7 @@ final class CategoryScopes {
 			if ( isset( $byId[ $id ] ) && count( $out ) < Scopes::MOST && ( null === $first || $id !== $first['id'] ) ) {
 				$out[] = array(
 					'id'   => $id,
-					'name' => $byId[ $id ]->name,
+					'name' => Tokenizer::decode( $byId[ $id ]->name ),
 					'url'  => self::url( $query, $byId[ $id ]->slug ),
 				);
 			}
