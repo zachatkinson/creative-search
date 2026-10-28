@@ -68,6 +68,7 @@ final class ActivationTest extends IntegrationTestCase {
 		self::assertSame( '8.5', $data['RequiresPHP'] );
 		self::assertSame( 'woocommerce', $data['RequiresPlugins'] );
 		self::assertSame( CSEARCH_VERSION, $data['Version'] );
+		self::assertLessThan( 140, mb_strlen( $data['Description'], 'UTF-8' ), 'under the Plugin Handbook limit, as WordPress reads it (D-135)' );
 	}
 
 	public function test_woocommerce_is_the_supported_version(): void {
