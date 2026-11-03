@@ -32,6 +32,11 @@ final class Updater {
 	public const SLUG = 'creative-search';
 
 	/**
+	 * Where the agency's release zips are published: a package under it is this plugin's to check (D-144).
+	 */
+	public const RELEASES = 'https://github.com/zachatkinson/creative-releases/';
+
+	/**
 	 * How a package is downloaded to a temporary file.
 	 *
 	 * @var callable(string): (string|WP_Error)
@@ -153,12 +158,16 @@ final class Updater {
 	 * @return mixed The downloaded file's path, a WP_Error, or $reply for other packages.
 	 */
 	public function verify( $reply, $package ) {
-		if ( false !== $reply || ! is_string( $package ) ) {
+		if ( false !== $reply || ! is_string( $package ) || ! $this->ours( $package ) ) {
 			return $reply;
 		}
 		$manifest = $this->source->latest();
 		if ( null === $manifest || $manifest->package !== $package ) {
-			return $reply;
+			// Published since WordPress last checked, or unreadable a moment ago: read it again, once (D-144).
+			$manifest = $this->source->fresh();
+		}
+		if ( null === $manifest || $manifest->package !== $package ) {
+			return new WP_Error( 'csearch_package_unknown', __( 'This Creative Search update could not be checked against its published release, so it was not installed. Check for updates again, then update.', 'creative-search' ) );
 		}
 		$file = ( $this->download )( $package );
 		if ( ! is_string( $file ) ) {
@@ -170,6 +179,21 @@ final class Updater {
 			return new WP_Error( 'csearch_package_mismatch', __( 'The Creative Search update did not match its published checksum, so it was not installed.', 'creative-search' ) );
 		}
 		return $file;
+	}
+
+	/**
+	 * Whether a package is this plugin's: the one WordPress's update data offers for it, or any under the
+	 * agency's releases (D-144).
+	 *
+	 * @param string $package The package's address.
+	 */
+	private function ours( string $package ): bool {
+		if ( str_starts_with( $package, self::RELEASES ) ) {
+			return true;
+		}
+		$updates = get_site_transient( 'update_plugins' );
+		$offer   = is_object( $updates ) && isset( $updates->response ) && is_array( $updates->response ) ? ( $updates->response[ $this->basename ] ?? null ) : null;
+		return is_object( $offer ) && isset( $offer->package ) && $package === $offer->package;
 	}
 
 	/**

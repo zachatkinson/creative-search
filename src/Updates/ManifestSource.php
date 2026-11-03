@@ -23,4 +23,9 @@ interface ManifestSource {
 	 * The latest release, or null when it can't be read.
 	 */
 	public function latest(): ?Manifest;
+
+	/**
+	 * The latest release read again now, past any cache, or null when it can't be read (D-144).
+	 */
+	public function fresh(): ?Manifest;
 }

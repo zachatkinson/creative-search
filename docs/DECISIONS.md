@@ -1071,6 +1071,8 @@ The spec says "No external service, no API key, no outbound requests", and gate 
 
 **Why:** without updates, every fix waits on someone uploading a zip to each shop; with a pinned host, a pinned hash and an off switch, the one request costs a shop less than an unpatched plugin.
 
+*1.6.2: a package offered for this plugin that the cached manifest doesn't name is checked against the manifest read again, and refused when it still doesn't match (D-144).*
+
 ### D-141 · The browser suite marks every request to the shop as a test run · 2026-11-03
 
 The demo's top searches were this suite's own ("kazumi", "xyzzy"), from runs pointed at it with `WP_BASE_URL`. Zach approved sending `X-Creative-Test: 1` (D-139) from the suite. Every spec now imports `test` from `tests/e2e/support/test.ts`, which adds the header to each request for the base URL's origin through a context route, on every run, local or not. It isn't Playwright's `extraHTTPHeaders`, because that option sends the header to every origin. Then Twenty Twenty-Five's Google Fonts requests needed a CORS preflight that fonts.gstatic.com refused, the page fell back to another font, the field moved, and the panel's height budget (D-092) dropped the "kazumi in Decks" row (scope.spec.ts failed only with it). panel.spec.ts builds the log it needs through WP-CLI, so nothing depends on the browser's searches being logged.
@@ -1098,4 +1100,16 @@ The panel filled with pages last (D-136), so once products reached the cap no pa
 4. **The split.** Each product row in `/suggest` carries `described` (D-142's flag; pinned products count as named). The panel splits the products only when there is a page asked for; otherwise they stay in the order they came, as before.
 
 **Why:** a shopper who types the name of a page wants that page; it is one row, and a product that only mentions the words is a weaker answer than the page they name.
+
+### D-144 · Only a package that matches the manifest is installed · 2026-11-03
+
+`Updater::verify()` checked a package only when it was the cached manifest's, and returned `false` otherwise, so WordPress installed it unchecked. That happened when a newer release was published after WordPress's last check, or when the manifest had been unreadable and was cached that way for an hour. Low risk (the address had come from a trusted manifest), but it skipped the one check that catches a replaced release asset.
+
+1. **Whose package.** A package under `https://github.com/zachatkinson/creative-releases/`, or the one WordPress's update data (`update_plugins`) offers for this plugin's basename, is checked. Every other package is left to core.
+2. **The check.** When the cached manifest doesn't name it, the manifest is read again past the cache (`ManifestSource::fresh()`, once; the answer replaces the cached one). It is installed only when the manifest names that package and the download's SHA-256 matches. Otherwise `csearch_package_unknown`, a `WP_Error` that asks the user to check for updates again; a mismatched hash is still `csearch_package_mismatch`.
+3. **Tests.** The brief asks for unit tests. The Updater needs WordPress (`WP_Error`, site transients, file deletion), so its cases are in the integration `UpdaterTest` beside the 1.6.1 ones, as in the sibling plugins: a package the manifest no longer names (read again, then installed or refused), an unreadable manifest, the package core offers for this plugin, a match, a mismatched hash. `Manifest` stays in the unit suite.
+
+The sibling plugins use the same `Updater`; the brief carries this fix to each of their next briefs.
+
+**Why:** a check that can be skipped by timing is not a check; refusing costs the owner one "Check again".
 

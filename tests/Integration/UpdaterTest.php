@@ -21,17 +21,44 @@ final class UpdaterTest extends IntegrationTestCase {
 	private const BASENAME = 'creative-search/creative-search.php';
 	private const PACKAGE  = 'https://github.com/zachatkinson/creative-releases/releases/download/creative-search-9.0.0/creative-search-9.0.0.zip';
 
-	private function source( ?Manifest $manifest ): ManifestSource {
-		return new class( $manifest ) implements ManifestSource {
-			public function __construct( private ?Manifest $manifest ) {}
+	/**
+	 * A manifest source: `latest()` answers the cached manifest, `fresh()` the one read again (the same unless given).
+	 *
+	 * @param Manifest|null $manifest The cached manifest.
+	 * @param Manifest|null $fresh    The manifest read again; false for the cached one.
+	 */
+	private function source( ?Manifest $manifest, Manifest|null|false $fresh = false ): ManifestSource {
+		return new class( $manifest, false === $fresh ? $manifest : $fresh ) implements ManifestSource {
+			public int $fresh = 0;
+			public function __construct( private ?Manifest $manifest, private ?Manifest $again ) {}
 			public function latest(): ?Manifest {
 				return $this->manifest;
+			}
+			public function fresh(): ?Manifest {
+				++$this->fresh;
+				$this->manifest = $this->again;
+				return $this->again;
 			}
 		};
 	}
 
-	private function manifest( string $sha = '' ): Manifest {
-		return new Manifest( '9.0.0', self::PACKAGE, '' !== $sha ? $sha : str_repeat( 'a', 64 ), '7.0', '8.5', '7.1', 'https://github.com/zachatkinson/creative-releases', array( 'New <b>things</b>.' ) );
+	/**
+	 * A downloader that copies some bytes to a temporary file, counting its calls.
+	 *
+	 * @param string $bytes The package's bytes.
+	 * @param int    $calls Set to the number of downloads.
+	 */
+	private static function downloader( string $bytes, int &$calls ): callable {
+		return static function ( string $url ) use ( $bytes, &$calls ): string {
+			++$calls;
+			$file = wp_tempnam( 'csearch' );
+			file_put_contents( $file, $bytes ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			return $file;
+		};
+	}
+
+	private function manifest( string $sha = '', string $package = self::PACKAGE ): Manifest {
+		return new Manifest( '9.0.0', $package, '' !== $sha ? $sha : str_repeat( 'a', 64 ), '7.0', '8.5', '7.1', 'https://github.com/zachatkinson/creative-releases', array( 'New <b>things</b>.' ) );
 	}
 
 	public function test_header_and_filter_host_agree(): void {
@@ -122,6 +149,87 @@ final class UpdaterTest extends IntegrationTestCase {
 		$this->assertSame( '9.0.0', $source->latest()?->version );
 		$this->assertSame( '9.0.0', $source->latest()?->version );
 		$this->assertSame( 2, $calls );
+		HttpManifestSource::flush();
+	}
+
+	public function test_a_package_the_manifest_no_longer_names_is_checked_against_it_read_again(): void {
+		$newer = 'https://github.com/zachatkinson/creative-releases/releases/download/creative-search-9.0.1/creative-search-9.0.1.zip';
+		$calls = 0;
+		$stale = $this->source( $this->manifest( hash( 'sha256', 'zip bytes' ) ), $this->manifest( hash( 'sha256', 'zip bytes' ), $newer ) );
+		$path  = ( new Updater( $stale, self::BASENAME, self::downloader( 'zip bytes', $calls ) ) )->verify( false, $newer );
+		$this->assertIsString( $path, 'published since the last check: the manifest read again names it, and its hash matches' );
+		$this->assertSame( 1, $stale->fresh );
+		wp_delete_file( $path );
+
+		$calls   = 0;
+		$unknown = $this->source( $this->manifest() );
+		$result  = ( new Updater( $unknown, self::BASENAME, self::downloader( 'zip bytes', $calls ) ) )->verify( false, $newer );
+		$this->assertInstanceOf( WP_Error::class, $result, 'a package the manifest does not name is refused, not passed through (D-144)' );
+		$this->assertSame( 'csearch_package_unknown', $result->get_error_code() );
+		$this->assertStringContainsString( 'Check for updates again', $result->get_error_message() );
+		$this->assertSame( 1, $unknown->fresh, 'read again once' );
+		$this->assertSame( 0, $calls, 'nothing downloaded' );
+	}
+
+	public function test_an_unreadable_manifest_refuses_the_package(): void {
+		$calls  = 0;
+		$source = $this->source( null );
+		$result = ( new Updater( $source, self::BASENAME, self::downloader( 'zip bytes', $calls ) ) )->verify( false, self::PACKAGE );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'csearch_package_unknown', $result->get_error_code() );
+		$this->assertSame( 1, $source->fresh );
+		$this->assertSame( 0, $calls );
+	}
+
+	public function test_the_package_core_offers_for_this_plugin_is_checked_wherever_it_points(): void {
+		$elsewhere = 'https://example.com/creative-search.zip';
+		$updates   = (object) array(
+			'response' => array(
+				self::BASENAME => (object) array( 'package' => $elsewhere ),
+			),
+		);
+		set_site_transient( 'update_plugins', $updates );
+		$calls  = 0;
+		$result = ( new Updater( $this->source( $this->manifest() ), self::BASENAME, self::downloader( 'zip bytes', $calls ) ) )->verify( false, $elsewhere );
+		$this->assertInstanceOf( WP_Error::class, $result, 'offered for this plugin, so it must match the manifest' );
+		$this->assertSame( 'csearch_package_unknown', $result->get_error_code() );
+		$this->assertFalse( ( new Updater( $this->source( $this->manifest() ), 'other/other.php' ) )->verify( false, $elsewhere ), "another plugin's package is left to core" );
+		delete_site_transient( 'update_plugins' );
+	}
+
+	public function test_a_matching_package_and_hash_is_installed_without_reading_again(): void {
+		$calls  = 0;
+		$source = $this->source( $this->manifest( hash( 'sha256', 'zip bytes' ) ) );
+		$path   = ( new Updater( $source, self::BASENAME, self::downloader( 'zip bytes', $calls ) ) )->verify( false, self::PACKAGE );
+		$this->assertIsString( $path );
+		$this->assertSame( 0, $source->fresh, 'the cached manifest names it' );
+		$this->assertSame( 1, $calls );
+		wp_delete_file( $path );
+	}
+
+	public function test_the_manifest_read_again_replaces_the_cached_one(): void {
+		HttpManifestSource::flush();
+		$body = (string) wp_json_encode( array( 'version' => '9.0.0', 'package' => self::PACKAGE, 'sha256' => str_repeat( 'b', 64 ) ) );
+		$hits = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$hits, &$body ) {
+				++$hits;
+				return array(
+					'headers'  => array(),
+					'body'     => $body,
+					'response' => array( 'code' => 200, 'message' => '' ),
+					'cookies'  => array(),
+				);
+			}
+		);
+		$source = new HttpManifestSource( Updater::MANIFEST_URL );
+		$this->assertSame( '9.0.0', $source->latest()?->version );
+		$body = (string) wp_json_encode( array( 'version' => '9.0.1', 'package' => self::PACKAGE, 'sha256' => str_repeat( 'b', 64 ) ) );
+		$this->assertSame( '9.0.0', $source->latest()?->version, 'cached' );
+		$this->assertSame( '9.0.1', $source->fresh()?->version, 'read again, past the cache' );
+		$this->assertSame( '9.0.1', $source->latest()?->version, 'and cached in its place' );
+		$this->assertSame( 2, $hits );
 		HttpManifestSource::flush();
 	}
 }
