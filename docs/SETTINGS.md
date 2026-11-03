@@ -30,7 +30,7 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `hidden_by_sku` | `no` | yes/no | A hidden product (catalogue visibility hidden) appears for an exact SKU match. Off until the owner answers the hidden-products question (docs/DECISIONS.md D-018). |
-| `in_stock_first` | `no` | yes/no | Products that can be bought (in stock or on backorder, WooCommerce's `is_in_stock()`) come before sold-out ones in the panel, on the results page and in `/search`, each part in score order; pinned products keep their place first. Off, the score alone decides, a sold-out product losing 6 points (D-138). Set on the Boosts and exclusions tab. |
+| `in_stock_first` | `no` | yes/no | Products that can be bought (in stock or on backorder, WooCommerce's `is_in_stock()`) come before sold-out ones among products that match as well, in the panel, on the results page and in `/search`: first the products every searched word reaches outside the description (name, SKU, attributes, category, tag, brand, custom fields), then those some word reaches only in the short or long description, each group in stock first and each part in score order; pinned products keep their place first. Off, the score alone decides, a sold-out product losing 6 points (D-138, D-142). Set on the Boosts and exclusions tab. |
 | `boost_rules` | `[]` | `{taxonomy, term_id, boost -10..10}` | A number added to every product in a category, brand or tag. |
 | `fallback_products` | `[]` | product ids | Shown on the results page when nothing matches. |
 | `help_page` | `0` | a page id, 0 for none | The no-results page's first link (D-096): a published page, such as the contact page. Filter: `csearch_no_results_links`. |

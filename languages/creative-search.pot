@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Creative Search 1.6.1\n"
+"Project-Id-Version: Creative Search 1.6.2\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/creative-search\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-03T18:38:08+00:00\n"
+"POT-Creation-Date: 2026-11-03T20:19:50+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: creative-search\n"
@@ -27,7 +27,7 @@ msgstr ""
 
 #. Description of the plugin
 #: creative-search.php
-#: src/Updates/Updater.php:142
+#: src/Updates/Updater.php:147
 msgid "Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, its own index, analytics, an accessible search bar."
 msgstr ""
 
@@ -554,7 +554,7 @@ msgid "Show products that can be bought first"
 msgstr ""
 
 #: src/Admin/BoostsTab.php:121
-msgid "In the suggestions, on the results page and through the API, products in stock or on backorder come before sold-out ones, each in order of relevance. Pinned products keep their place. Off, a sold-out product only ranks a little lower."
+msgid "In the suggestions, on the results page and through the API, products in stock or on backorder come before sold-out ones among products that match as well: products found by their name, SKU, attributes, brand or category still come before products that only mention the search in their description. Each part stays in order of relevance, and pinned products keep their place. Off, a sold-out product only ranks a little lower."
 msgstr ""
 
 #: src/Admin/BoostsTab.php:122
@@ -2008,6 +2008,10 @@ msgid "There are already %s rules of this kind; remove one first."
 msgstr ""
 
 #: src/Updates/Updater.php:170
+msgid "This Creative Search update could not be checked against its published release, so it was not installed. Check for updates again, then update."
+msgstr ""
+
+#: src/Updates/Updater.php:179
 msgid "The Creative Search update did not match its published checksum, so it was not installed."
 msgstr ""
 

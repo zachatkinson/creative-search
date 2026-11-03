@@ -28,6 +28,13 @@ final class Fields {
 	public const CUSTOM    = 9;
 
 	/**
+	 * The description fields: a product found by a searched word only here "only mentions" it (D-142).
+	 *
+	 * @var int[]
+	 */
+	public const DESCRIPTIONS = array( self::SHORT, self::LONG );
+
+	/**
 	 * Field names by id, in id order.
 	 *
 	 * @var array<int, string>

@@ -13,6 +13,7 @@ use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Domain\Query;
 use CreativeBranding\Search\Domain\QueryToken;
+use CreativeBranding\Search\Domain\Score;
 use CreativeBranding\Search\Domain\Scorer;
 use CreativeBranding\Search\Domain\RankPlan;
 use CreativeBranding\Search\Domain\SearchOptions;
@@ -57,6 +58,11 @@ final class ScorerTest extends TestCase {
 
 	private static function doc( string $nameKey = 'kazumi deck', array $skuKeys = array(), bool $inStock = true, int $boost = 0, array $refs = array() ): Document {
 		return new Document( 1, Document::PRODUCT, 1, 'en', 'KAZUMI Deck', $nameKey, $skuKeys, $inStock, true, $boost, 0, 0, $refs );
+	}
+
+	public function test_a_score_is_not_description_only_unless_told(): void {
+		self::assertFalse( ( new Score( array() ) )->descriptionOnly, 'a category, tag or brand score, and the SQL row unless it says so (D-142)' );
+		self::assertTrue( ( new Score( array(), descriptionOnly: true ) )->descriptionOnly );
 	}
 
 	public function test_one_token_in_one_field(): void {

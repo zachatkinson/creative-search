@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-03
+
+Names before descriptions, the page asked for, and only checked packages installed, from the 3 November check of 1.6.1 on the demo.
+
+### Changed
+- `in_stock_first` now orders among products that match alike: products every searched word reaches outside the description first, then products some word reaches only in the short or long description; in each group what can be bought first, each part in order of relevance. Pinned products keep their place (D-142).
+- The page the shopper asked for (the panel's best page, its title holding every word searched) gets a row after the first products named for the search and before products found only by their description, also on a phone whatever `suggest_pages_phone` says. The other pages keep their place at the end (D-143).
+- Each product in `/suggest` carries `described` (D-142, D-143).
+
+### Fixed
+- An update package the cached release manifest doesn't name is no longer installed unchecked: the manifest is read again once, and the package is installed only when it is named there and its SHA-256 matches; otherwise `csearch_package_unknown` asks to check for updates again (D-144).
+
 ## [1.6.1] - 2026-11-03
 
 Updates through wp-admin, from the agency's releases.

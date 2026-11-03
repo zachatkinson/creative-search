@@ -624,7 +624,7 @@ test( 'the panel stops at its cap: eight rows on a desktop, five on a phone, See
 	);
 } );
 
-test( 'for “hood”: one suggested search, three products, a category, the other products, then pages (D-136)', async () => {
+test( 'for “hood”: one suggested search, three products, a category, the other products (D-136); no page has the word in its title', async () => {
 	const hood = {
 		...ANSWER,
 		queries: [ 'hoodie', 'hoody', 'hood black' ],
@@ -636,7 +636,7 @@ test( 'for “hood”: one suggested search, three products, a category, the oth
 		terms: [
 			{ ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Hoodies' },
 		],
-		content: PAGES,
+		content: [],
 		total: 6,
 	};
 	dom.fetch = () => respond( hood );
@@ -677,13 +677,22 @@ test( 'for “hood”: one suggested search, three products, a category, the oth
 	type( 'hood' );
 	await settle();
 	const rows = scope.ctx.rows.filter( ( r ) => ! r.all );
-	assert.equal( rows.length, 12 );
-	assert.equal(
-		rows.filter( ( r ) => r.content ).length,
-		2,
-		'pages take what is left'
+	assert.deepEqual(
+		rows.map( ( r ) => r.key ),
+		[
+			'qhoodie',
+			'qhoody',
+			'qhood black',
+			'p300',
+			'p301',
+			'p302',
+			'p303',
+			'p304',
+			'p305',
+			'tcategoryHoodies',
+		],
+		'a raised cap shows every row the answer has, and no page'
 	);
-	assert.equal( rows[ rows.length - 1 ].content, true, 'pages last' );
 } );
 
 test( 'the backdrop closes the panel', async () => {
@@ -723,17 +732,17 @@ const PAGES = [
 	},
 ];
 
-test( 'posts and pages follow the terms, two at most, the first under the group heading', async () => {
+test( 'the page asked for follows the products named for the search; the other page stays last, two at most (D-143)', async () => {
 	dom.fetch = () => respond( { ...ANSWER, content: PAGES } );
 	type( 'kazumi' );
 	await settle();
 	const ctx = scope.ctx;
 	const pages = ctx.rows.filter( ( r ) => r.content );
 	assert.equal( pages.length, 2 );
-	assert.equal(
-		ctx.rows.indexOf( pages[ 0 ] ),
-		ctx.rows.findLastIndex( ( r ) => r.term ) + 1,
-		'after the terms'
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'p11', 'p12', 'c70', 'tbrandKAZUMI', 'c71', 'all' ],
+		'the first page after the products, the other after the terms'
 	);
 	assert.equal( pages[ 0 ].heading, 'Pages' );
 	assert.equal( pages[ 1 ].heading, null );
@@ -759,14 +768,18 @@ test( 'posts and pages follow the terms, two at most, the first under the group 
 	assert.equal( sent.get( 'id' ), '70' );
 } );
 
-test( 'a phone leaves the pages out unless the form allows them (D-137)', async () => {
+test( 'a phone shows the page asked for, and leaves the other pages out unless the form allows them (D-137, D-143)', async () => {
 	dom.fetch = () => respond( { ...ANSWER, terms: [], content: PAGES } );
 	const matchMedia = window.matchMedia;
 	window.matchMedia = () => ( { matches: true } );
 	scope.ctx = context( { pagesPhone: false } );
 	type( 'kazumi' );
 	await settle();
-	assert.equal( scope.ctx.rows.filter( ( r ) => r.content ).length, 0 );
+	assert.deepEqual(
+		scope.ctx.rows.filter( ( r ) => r.content ).map( ( r ) => r.key ),
+		[ 'c70' ],
+		'only the page asked for'
+	);
 	form++;
 	input = dom.element( `csearch-${ form }-input` );
 	scope.ctx = context( { pagesPhone: true } );
@@ -786,7 +799,7 @@ test( 'a phone leaves the pages out unless the form allows them (D-137)', async 
 	);
 } );
 
-test( 'pages come last: they get only the room the cap leaves', async () => {
+test( 'the page asked for gets its row at the cap; the other pages only the room the cap leaves (D-143)', async () => {
 	dom.fetch = () =>
 		respond( {
 			...ANSWER,
@@ -802,14 +815,168 @@ test( 'pages come last: they get only the room the cap leaves', async () => {
 	await settle();
 	let rows = scope.ctx.rows.filter( ( r ) => ! r.all );
 	assert.equal( rows.length, 8 );
-	assert.equal( rows.filter( ( r ) => r.content ).length, 0 );
+	assert.deepEqual(
+		rows.map( ( r ) => r.key ),
+		[
+			'p100',
+			'p101',
+			'p102',
+			'p103',
+			'p104',
+			'p105',
+			'c70',
+			'tbrandKAZUMI',
+		],
+		'six products, the page, the brand; no room for the other pages'
+	);
 
 	scope.ctx = context( { limit: 6 } );
 	type( 'kazumi d' );
 	await settle();
 	rows = scope.ctx.rows.filter( ( r ) => ! r.all );
 	assert.equal( rows.filter( ( r ) => r.product ).length, 6 );
-	assert.equal( rows.filter( ( r ) => r.content ).length, 1 );
+	assert.deepEqual(
+		rows.filter( ( r ) => r.content ).map( ( r ) => r.key ),
+		[ 'c70' ]
+	);
+} );
+
+const described = ( from, n ) =>
+	Array.from( { length: n }, ( _, i ) => ( {
+		...ANSWER.products[ 0 ],
+		id: from + i,
+		matched: 'Matches the description',
+		described: true,
+	} ) );
+
+test( 'for “size guide”: the Size guides page before the wheels that only mention it (D-143)', async () => {
+	dom.fetch = () =>
+		respond( {
+			...ANSWER,
+			products: described( 400, 6 ),
+			terms: [
+				{ ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Wheels' },
+				{ ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Guides' },
+			],
+			content: [ PAGES[ 1 ] ],
+			total: 6,
+		} );
+	scope.ctx = context();
+	type( 'size guide' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[
+			'c71',
+			'p400',
+			'p401',
+			'p402',
+			'p403',
+			'p404',
+			'p405',
+			'tcategoryWheels',
+			'all',
+		],
+		'no product matches by name: the page right after where a suggested search would be'
+	);
+	assert.equal( scope.ctx.rows[ 0 ].heading, 'Pages' );
+} );
+
+test( 'the page asked for sits between the products named for the search and those that only mention it, on a phone too (D-143)', async () => {
+	const answer = {
+		...ANSWER,
+		queries: [ 'hood black' ],
+		products: [
+			{ ...ANSWER.products[ 0 ], id: 500, described: false },
+			{ ...ANSWER.products[ 0 ], id: 501, described: true },
+			{ ...ANSWER.products[ 0 ], id: 502, described: false },
+			...described( 503, 3 ),
+		],
+		terms: [
+			{ ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Guides' },
+		],
+		content: [ PAGES[ 1 ], PAGES[ 0 ] ],
+		total: 6,
+	};
+	dom.fetch = () => respond( answer );
+	scope.ctx = context();
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[
+			'qhood black',
+			'p500',
+			'p502',
+			'c71',
+			'p501',
+			'p503',
+			'p504',
+			'tcategoryGuides',
+			'all',
+		],
+		'each kind in its own order; the other page has no room'
+	);
+
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { pagesPhone: false } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'qhood black', 'p500', 'p502', 'c71', 'p501', 'all' ],
+		'a phone: the search, the two named products, the page, then the third product'
+	);
+
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context();
+	dom.fetch = () => respond( { ...answer, content: [] } );
+	type( 'kazumi d' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows
+			.filter( ( r ) => r.product )
+			.map( ( r ) => r.key )
+			.slice( 0, 3 ),
+		[ 'p500', 'p501', 'p502' ],
+		'no page asked for: the products in the order they came'
+	);
+} );
+
+test( 'for “returns” on a phone: the Shipping and returns page, with no product (D-143)', async () => {
+	dom.fetch = () =>
+		respond( {
+			...ANSWER,
+			products: [],
+			terms: [],
+			content: [
+				{
+					id: 80,
+					type: 'page',
+					name: 'Shipping and returns',
+					parent: '',
+					url: '/shipping-returns/',
+					image: null,
+				},
+			],
+			total: 0,
+		} );
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { pagesPhone: false } );
+	type( 'returns' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'c80' ]
+	);
+	assert.equal( scope.ctx.empty, false );
 } );
 
 test( 'a row carries the classes a plugin gave its product, and drops them for the next', () => {
@@ -1721,4 +1888,95 @@ test( 'a suggested search and a search within a category mark what they add', ()
 		[ 'kazumi ', '<in>', ' ', '<Decks>' ]
 	);
 	document.createElement = create;
+} );
+
+const MIXED = {
+	...ANSWER,
+	queries: [ 'hood black' ],
+	products: [
+		{ ...ANSWER.products[ 0 ], id: 500, described: false },
+		{ ...ANSWER.products[ 0 ], id: 501, described: true },
+		{ ...ANSWER.products[ 0 ], id: 502, described: false },
+		...described( 503, 3 ),
+	],
+	terms: [ { ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Guides' } ],
+	content: [ PAGES[ 1 ], PAGES[ 0 ] ],
+	total: 6,
+};
+
+test( 'to fit, the products found only by their description go before the suggested search, and that before the page asked for (D-143)', async () => {
+	window.innerHeight = 460;
+	dom.fetch = () => respond( MIXED );
+	type( 'kazumi' );
+	const ctx = scope.ctx;
+	const { panel, resized, run } = measuredPanel( ctx );
+	panel.hidden = false;
+	panel.shown = true;
+	await settle();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'qhood black', 'p500', 'p502', 'c71', 'p501', 'all' ],
+		'the category, then the last described products'
+	);
+	window.innerHeight = 340;
+	resized[ 0 ]();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'p500', 'p502', 'c71', 'all' ],
+		'the last described product, then the suggested search'
+	);
+	window.innerHeight = 280;
+	resized[ 0 ]();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'p500', 'p502', 'all' ],
+		'the page before the products named for the search'
+	);
+	window.innerHeight = 800;
+	delete window.requestAnimationFrame;
+	delete window.ResizeObserver;
+} );
+
+test( 'a search within a category still shows when every product only mentions the words (D-143)', async () => {
+	dom.fetch = () =>
+		respond( {
+			...ANSWER,
+			products: described( 600, 2 ),
+			terms: [],
+			scopes: [
+				{ id: 31, name: 'Wheels', url: '/?s=x&product_cat=wheels' },
+			],
+			content: [ PAGES[ 1 ] ],
+		} );
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'c71', 'p600', 'p601', 's31', 'all' ]
+	);
+} );
+
+test( 'at a cap of 4 the page asked for takes the suggested search’s row (D-143)', async () => {
+	dom.fetch = () =>
+		respond( {
+			...MIXED,
+			products: [
+				{ ...ANSWER.products[ 0 ], id: 700, described: false },
+				{ ...ANSWER.products[ 0 ], id: 701, described: false },
+				{ ...ANSWER.products[ 0 ], id: 702, described: false },
+			],
+		} );
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { maxPhone: 4 } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'p700', 'p701', 'p702', 'c71', 'all' ]
+	);
 } );

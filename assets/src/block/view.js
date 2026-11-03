@@ -563,32 +563,53 @@ function contentRow( ctx, c, index, first ) {
  * How many suggested searches, products, categories (scopes, then terms) and posts or pages the panel shows (D-136).
  * Each group has its own limit first: the owner's products, up to 3 suggested searches (2 on a phone, D-112), up to
  * 3 terms (2 on a phone) sharing their room with up to 2 searches within a category (D-113), and up to 2 posts or
- * pages (none on a phone unless the form allows them). Then the whole panel is filled to its cap in this order: one
- * suggested search, three products, one category or scope row, the other products, the other suggested searches
- * and categories, and posts or pages last. "See all" is not counted.
+ * pages (none on a phone unless the form allows them). The panel's posts and pages all have every word in their
+ * title (D-137); the first is the page the shopper asked for (D-143), which gets its row on a phone too, and the
+ * products are then split into those found by more than their description (`products`) and those some word
+ * reached only there (`described`). The whole panel is filled to its cap in this order: one suggested search,
+ * three products, the page asked for, the rest of the three products from the described ones, one category or
+ * scope row, the other products, the other described products, the other suggested searches and categories, and
+ * the other posts or pages last. "See all" is not counted.
  *
  * @param {Object} ctx   The block's context.
- * @param {Object} found How many of each the answer has: `{queries, products, scopes, terms, content}`.
- * @return {{queries: number, products: number, scopes: number, terms: number, content: number}} The budget.
+ * @param {Object} found How many of each the answer has: `{queries, products, described, scopes, terms, content}`;
+ *                       `described` is 0 when there is no page asked for, every product then in `products`.
+ * @return {{queries: number, products: number, described: number, scopes: number, terms: number, page: number, content: number}} The budget.
  */
 export function budget( ctx, found ) {
 	const phone = Boolean( window.matchMedia?.( PHONE ).matches );
 	const room = phone ? PHONE_TERMS : TERMS;
-	const scopes = Math.min( SCOPES, room, found.products ? found.scopes : 0 );
+	const scopes = Math.min(
+		SCOPES,
+		room,
+		found.products + ( found.described || 0 ) ? found.scopes : 0
+	);
+	const products = Math.min( ctx.limit, found.products );
+	const page = found.content > 0 ? 1 : 0;
 	const has = {
 		queries: Math.min( phone ? PHONE_QUERIES : QUERIES, found.queries ),
-		products: Math.min( ctx.limit, found.products ),
+		products,
+		described: Math.min( ctx.limit - products, found.described || 0 ),
 		scopes,
 		terms: ctx.terms ? Math.min( room - scopes, found.terms ) : 0,
+		page,
 		content:
 			phone && false === ctx.pagesPhone
 				? 0
-				: Math.min( CONTENT, found.content ),
+				: Math.min( CONTENT, found.content ) - page,
 	};
 	const cap =
 		Number( phone ? ctx.maxPhone : ctx.max ) ||
 		( phone ? PHONE_MOST : MOST );
-	const out = { queries: 0, products: 0, scopes: 0, terms: 0, content: 0 };
+	const out = {
+		queries: 0,
+		products: 0,
+		described: 0,
+		scopes: 0,
+		terms: 0,
+		page: 0,
+		content: 0,
+	};
 	let left = cap;
 	const take = ( group, upTo ) => {
 		const n = Math.max(
@@ -602,13 +623,20 @@ export function budget( ctx, found ) {
 		take( 'scopes', upTo - out.terms );
 		take( 'terms', upTo - out.scopes );
 	};
-	// The first three products are promised (when there are three): a cap of 3 leaves no room for the search.
-	if ( cap > Math.min( FIRST_PRODUCTS, has.products ) ) {
+	// The first three products are promised (when there are three), and then the page asked for: a cap of 3 leaves
+	// no room for the search, nor for the page; a cap of 4 none for the search when there is a page.
+	if (
+		cap >
+		Math.min( FIRST_PRODUCTS, has.products + has.described ) + has.page
+	) {
 		take( 'queries', 1 );
 	}
 	take( 'products', FIRST_PRODUCTS );
+	take( 'page', 1 );
+	take( 'described', FIRST_PRODUCTS - out.products );
 	category( 1 );
 	take( 'products', Infinity );
+	take( 'described', Infinity );
 	take( 'queries', Infinity );
 	category( Infinity );
 	take( 'content', Infinity );
@@ -669,11 +697,14 @@ function fit( ctx, tries = FIT_TRIES ) {
 				}
 				return;
 			}
-			// The last row goes, but a suggested search before any product (D-112).
+			// The last row goes, but a suggested search before any product (D-112); the products found only by their
+			// description, then the suggested search, before the page asked for (D-143).
 			const last = ( keep ) => suggestions.findLast( keep );
 			const drop =
-				last( ( r ) => ! r.product && ! r.query ) ||
+				last( ( r ) => ! r.product && ! r.query && ! r.asked ) ||
+				last( ( r ) => r.described ) ||
 				last( ( r ) => r.query ) ||
+				last( ( r ) => r.asked ) ||
 				suggestions[ suggestions.length - 1 ];
 			const chosen = ctx.rows[ ctx.active ];
 			ctx.rows = ctx.rows
@@ -701,19 +732,27 @@ function fit( ctx, tries = FIT_TRIES ) {
 function showAnswer( ctx, data, input ) {
 	const list = ( name ) =>
 		Array.isArray( data[ name ] ) ? data[ name ] : [];
+	const content = list( 'content' );
+	// With a page asked for (D-143), the products found only by their description go after it.
+	const all = list( 'products' );
+	const split = content.length > 0;
 	const found = {
 		queries: list( 'queries' ),
-		products: list( 'products' ),
+		products: split ? all.filter( ( p ) => ! p.described ) : all,
+		described: split ? all.filter( ( p ) => p.described ) : [],
 		scopes: list( 'scopes' ),
 		terms: list( 'terms' ),
-		content: list( 'content' ),
+		page: content.slice( 0, 1 ),
+		content: content.slice( 1 ),
 	};
-	const most = budget(
-		ctx,
-		Object.fromEntries(
-			Object.entries( found ).map( ( [ k, v ] ) => [ k, v.length ] )
-		)
-	);
+	const most = budget( ctx, {
+		queries: found.queries.length,
+		products: found.products.length,
+		described: found.described.length,
+		scopes: found.scopes.length,
+		terms: found.terms.length,
+		content: content.length,
+	} );
 	const query = data.query || ctx.query.trim();
 	const rows = [];
 	found.queries
@@ -722,6 +761,18 @@ function showAnswer( ctx, data, input ) {
 	found.products
 		.slice( 0, most.products )
 		.forEach( ( p ) => rows.push( productRow( ctx, p, rows.length ) ) );
+	found.page.slice( 0, most.page ).forEach( ( c ) =>
+		rows.push( {
+			...contentRow( ctx, c, rows.length, true ),
+			asked: true,
+		} )
+	);
+	found.described.slice( 0, most.described ).forEach( ( p ) =>
+		rows.push( {
+			...productRow( ctx, p, rows.length ),
+			described: true,
+		} )
+	);
 	found.scopes
 		.slice( 0, most.scopes )
 		.forEach( ( sc ) =>
@@ -733,7 +784,9 @@ function showAnswer( ctx, data, input ) {
 	found.content
 		.slice( 0, most.content )
 		.forEach( ( c, i ) =>
-			rows.push( contentRow( ctx, c, rows.length, i === 0 ) )
+			rows.push(
+				contentRow( ctx, c, rows.length, i === 0 && ! most.page )
+			)
 		);
 	const count = rows.length;
 	const total = Number( data.total || 0 );

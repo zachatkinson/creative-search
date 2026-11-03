@@ -51,6 +51,7 @@ final class Schemas {
 							),
 							'matched'    => array( 'type' => 'string' ),
 							'cart'       => array( 'type' => 'boolean' ),
+							'described'  => array( 'type' => 'boolean' ),
 						),
 					),
 				),

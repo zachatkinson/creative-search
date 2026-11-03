@@ -1020,6 +1020,8 @@ This replaces D-092's row budget (10 on a desktop with terms giving way first, 4
 
 **Why:** the panel's length should be one number the owner sets, not a sum nobody chose; and when room is short the shopper should see the one suggested search, the first products and the one category before anything else.
 
+*1.6.2: the page asked for (a title holding every word searched) gets a row after the first three products, and products found only by their description go after it (D-143).*
+
 ### D-137 · The panel suggests a page by its title; a phone's panel leaves pages out · 2026-11-03
 
 For "hood" the panel offered Wheel guide and Privacy policy, pages with the word somewhere in their content, not in their titles. A suggestion row shows only the title, so the shopper cannot see why it is there.
@@ -1030,6 +1032,8 @@ In the panel (`SearchService::content()` with `suggest`), the content search now
 
 **Why:** a suggestion has to look like what was typed; a page matched by its body belongs on the results page, where it has a line of context. On a phone the four or five rows above the keyboard are worth more as products.
 
+*1.6.2: the first of those pages, the one asked for, shows on a phone too whatever `suggest_pages_phone` says, and before the products that only mention the words in their description; the other pages keep this rule (D-143).*
+
 ### D-138 · In stock first is the store's choice, not a fixed rule · 2026-11-03
 
 Zach, 3 November: for "hood" the first two products were two sold-out hoodies ahead of two in stock, because "Hoody" matched better than the −6 the scorer takes for sold out (spec: Matching → B_stock). The plugin is reused across shops, so this is a setting, `in_stock_first`, off by default, which keeps today's ranking exactly.
@@ -1039,6 +1043,8 @@ On, products that can be bought come before sold-out ones, and each part keeps i
 The switch sits on the Boosts and exclusions tab, beside the other rules that change the order ("Sold-out products: Show products that can be bought first"). The brief names no tab; this one already holds the ranking rules.
 
 **Why:** Skatehouse wants it on, to match Creative Shop's "Sold-out products last" on the shop's own lists, but another shop may want a better match first even when it is sold out; the score's −6 stays the default.
+
+*1.6.2: in stock first applies among products that match alike: products found by more than their description come first, then those found only there, each group in stock first (D-142).*
 
 ### D-139 · Analytics count shoppers: staff and test runs stay out, and the numbers can be cleared · 2026-11-03
 
@@ -1065,9 +1071,48 @@ The spec says "No external service, no API key, no outbound requests", and gate 
 
 **Why:** without updates, every fix waits on someone uploading a zip to each shop; with a pinned host, a pinned hash and an off switch, the one request costs a shop less than an unpatched plugin.
 
+*1.6.2: a package offered for this plugin that the cached manifest doesn't name is checked against the manifest read again, and refused when it still doesn't match (D-144).*
+
 ### D-141 · The browser suite marks every request to the shop as a test run · 2026-11-03
 
 The demo's top searches were this suite's own ("kazumi", "xyzzy"), from runs pointed at it with `WP_BASE_URL`. Zach approved sending `X-Creative-Test: 1` (D-139) from the suite. Every spec now imports `test` from `tests/e2e/support/test.ts`, which adds the header to each request for the base URL's origin through a context route, on every run, local or not. It isn't Playwright's `extraHTTPHeaders`, because that option sends the header to every origin. Then Twenty Twenty-Five's Google Fonts requests needed a CORS preflight that fonts.gstatic.com refused, the page fell back to another font, the field moved, and the panel's height budget (D-092) dropped the "kazumi in Decks" row (scope.spec.ts failed only with it). panel.spec.ts builds the log it needs through WP-CLI, so nothing depends on the browser's searches being logged.
 
 **Why:** a run against a real shop should leave its analytics as they were. The header costs nothing on a local run.
+
+### D-142 · In stock first, among products that match alike · 2026-11-03
+
+With `in_stock_first` on (D-138), every product that could be bought came before every sold-out one, whatever it matched on. For "hood" on the demo the panel then showed two hoodies and four products that only mention the word in their description, and the four sold-out hoodies named for the search were gone. The 1.6.0 brief had asked for "each part keeps its score order"; the 1.6.2 brief puts how a product matched ahead of its stock.
+
+1. **The two groups.** A product some searched word reaches only in its short or long description (`Fields::DESCRIPTIONS`) is in the second group; every other product, found by each word in its name, SKU, attributes, category, tag, brand or custom fields, is in the first. A word counts as reaching a field when the product carries a term the word reached there, whatever the field's weight. The brief names name, SKU, attributes, brand and category; tags and custom fields go with them, because the brief's line is "only in their description". The panel's "Matches the description" line (`MatchExplainer`, one word at a time) falls on these products in practice; it is a label, worked out after ranking, and the ranking does not read it.
+2. **The order.** With the setting on: the first group, then the second; in each, in stock (or on backorder) before sold out; in each part, the score order. Pins are put first after ranking, as before. Off, nothing changes: the score decides.
+3. **One rule, both rankers.** `Score::$descriptionOnly` is set by the PHP `Scorer` (a word whose postings in the product are all in the description fields) and by the SQL statement (`s.reach`, the product over the words of "some field outside the description holds this word"), and `Hit::stockFirst()` and the statement's `ORDER BY` both lead with it. `RankParityTest` has an in-stock-first round and compares the flag, so the panel, the results page and `/search` cannot disagree. The merge of phrase-synonym forms keeps each product where it ranks best under the same order, so a product named in one form is not held back by its description-only form.
+4. **The help text** says products come first "among products that match as well".
+
+**Why:** a shopper who types "hood" wants hoodies; one that is sold out still answers the search better than a deck whose description mentions a hood, and the shop can still show it as sold out.
+
+### D-143 · The page the shopper asked for gets a row · 2026-11-03
+
+The panel filled with pages last (D-136), so once products reached the cap no page had a row, and a phone showed none (`suggest_pages_phone` off, D-137). On the demo "size guide" suggested six wheels whose descriptions mention a size guide and no Size guides page; "returns" on a phone suggested nothing.
+
+1. **Which page.** The panel's posts and pages already have every searched word in their title, matched as the panel matches (stems and prefixes, so "guide" finds "guides", D-137). The first, the best match, is the page asked for. Only that one moves; the others keep their place at the end and their phone rule.
+2. **Where.** In the fill (`budget()`): one suggested search, the first three products named for the search, the page, then the rest of the three products from those found only by their description, then the category row and the rest as before. In the panel's order: suggested searches, products named for the search, the page, products found only by their description, categories, the other pages. When no product matches by name, the page comes right after the suggested search. At a cap of 3 with three products named for the search, the promised products win (D-136).
+3. **A phone** shows the page asked for whatever `suggest_pages_phone` says.
+4. **The split.** Each product row in `/suggest` carries `described` (D-142's flag; a pinned product is never `described`, so it keeps its place). The panel splits the products only when there is a page asked for; otherwise they stay in the order they came, as before. The searches within a category still count every product, named or not.
+5. **Small caps.** At a cap of 3 the three products named for the search win and the page gets no row (D-136's promise). At a cap of 4 with a page, the page takes the suggested search's row.
+6. **When the panel doesn't fit the screen** (D-092), the rows go in this order: the categories and other pages, the products found only by their description, the suggested search, the page asked for, then the products named for the search.
+7. **Phrase-synonym forms.** With `in_stock_first` off, a product keeps the score of its best form (D-109); if that form found it only by its description while another named it, the row says `described` and goes after the page. Rare, panel only, and left as is: both forms are the same query to the shopper.
+
+**Why:** a shopper who types the name of a page wants that page; it is one row, and a product that only mentions the words is a weaker answer than the page they name.
+
+### D-144 · Only a package that matches the manifest is installed · 2026-11-03
+
+`Updater::verify()` checked a package only when it was the cached manifest's, and returned `false` otherwise, so WordPress installed it unchecked. That happened when a newer release was published after WordPress's last check, or when the manifest had been unreadable and was cached that way for an hour. Low risk (the address had come from a trusted manifest), but it skipped the one check that catches a replaced release asset.
+
+1. **Whose package.** One of this plugin's releases (an address starting `https://github.com/zachatkinson/creative-releases/releases/download/creative-search-`), or the one WordPress's update data (`update_plugins`) offers for this plugin's basename, is checked. Every other package is left to core or to its own plugin. The brief said "any address under https://github.com/zachatkinson/creative-releases/", but that repository holds every agency plugin's releases: with that prefix Search would refuse Shipment Tracking's and Stockroom's updates (its filter runs first) and read its own manifest again for each. The spec review caught it; a test holds a Creative Restock package as not ours. The sibling briefs need the same narrowing to their own slug.
+2. **The check.** When the cached manifest doesn't name it, the manifest is read again past the cache (`ManifestSource::fresh()`, once; the answer replaces the cached one). It is installed only when the manifest names that package and the download's SHA-256 matches. Otherwise `csearch_package_unknown`, a `WP_Error` that asks the user to check for updates again; a mismatched hash is still `csearch_package_mismatch`.
+3. **Tests.** The brief asks for unit tests. The Updater needs WordPress (`WP_Error`, site transients, file deletion), so its cases are in the integration `UpdaterTest` beside the 1.6.1 ones, as in the sibling plugins: a package the manifest no longer names (read again, then installed or refused), an unreadable manifest, the package core offers for this plugin, a match, a mismatched hash. `Manifest` stays in the unit suite.
+
+The sibling plugins use the same `Updater`; the brief carries this fix to each of their next briefs.
+
+**Why:** a check that can be skipped by timing is not a check; refusing costs the owner one "Check again".
 

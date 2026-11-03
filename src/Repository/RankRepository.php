@@ -101,7 +101,7 @@ final class RankRepository extends Repository {
 		$stock  = $this->prepare( '(CASE WHEN d.in_stock = 1 THEN 0 ELSE %d END)', (int) Scorer::SOLD_OUT );
 		$owner  = '(d.boost' . ( array() === $rules ? '' : ' + COALESCE(r.points, 0)' ) . ')';
 		$phrase = $phrased ? 's.bonus' : '0';
-		$sql[]  = "SELECT d.id, d.type, d.object_id, d.lang, d.title, d.name_key, d.in_stock, d.visible, d.boost, d.total_sales, s.bests, {$phrase} AS phrase, {$exact} AS exact, {$stock} AS stock, {$owner} AS owner, (sku.doc IS NOT NULL) AS sku_hit, ROUND(s.base + {$phrase} + {$exact} + {$stock} + {$owner}, 6) AS total";
+		$sql[]  = "SELECT d.id, d.type, d.object_id, d.lang, d.title, d.name_key, d.in_stock, d.visible, d.boost, d.total_sales, s.bests, {$phrase} AS phrase, {$exact} AS exact, {$stock} AS stock, {$owner} AS owner, (sku.doc IS NOT NULL) AS sku_hit, s.reach, ROUND(s.base + {$phrase} + {$exact} + {$stock} + {$owner}, 6) AS total";
 		$sql[]  = $this->prepare( 'FROM s INNER JOIN %i d ON d.id = s.doc', Tables::documents() );
 		$sql[]  = $this->prepare(
 			'LEFT JOIN (SELECT ps.document_id AS doc FROM %i ts INNER JOIN %i ps ON ps.term_id = ts.id AND ps.generation = %d AND ps.lang = %s AND ps.product = %d WHERE ts.term = %s AND ps.field = %d) sku ON sku.doc = s.doc',
@@ -139,8 +139,9 @@ final class RankRepository extends Repository {
 		foreach ( array_keys( $plan->phrases ) as $n ) {
 			$sql[] = 'AND s.q' . (int) $n . ' = 1';
 		}
-		// What can be bought first, when the owner asks for it (D-138); each part in score order.
-		$sql[] = $this->prepare( 'ORDER BY ' . ( $plan->inStockFirst ? 'd.in_stock DESC, ' : '' ) . 'total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
+		// What can be bought first, when the owner asks for it (D-138), among products that match alike (D-142); each
+		// part in score order.
+		$sql[] = $this->prepare( 'ORDER BY ' . ( $plan->inStockFirst ? 's.reach DESC, d.in_stock DESC, ' : '' ) . 'total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
 
 		return $this->rows( implode( ' ', $sql ) );
 	}
@@ -179,6 +180,7 @@ final class RankRepository extends Repository {
 		$bests    = array();
 		$named    = array();
 		$held     = array();
+		$reached  = array();
 		$ordered  = array();
 		$adjacent = array();
 		for ( $i = 0; $i < $count; $i++ ) {
@@ -186,13 +188,15 @@ final class RankRepository extends Repository {
 			$bests[]   = "MAX(b{$i})";
 			$named[]   = "CONCAT('{$i}:', MAX(b{$i}))";
 			$held[]    = "MAX(b{$i}) IS NOT NULL";
+			$reached[] = 'MAX(CASE WHEN b' . $i . ' IS NOT NULL AND field NOT IN (' . implode( ', ', Fields::DESCRIPTIONS ) . ') THEN 1 ELSE 0 END)';
 			if ( $i > 0 ) {
 				$previous   = $i - 1;
 				$ordered[]  = "p{$previous} < p{$i}";
 				$adjacent[] = "p{$i} = p{$previous} + 1";
 			}
 		}
-		$scores = array( '(' . implode( ' + ', $bests ) . ') AS base', "CONCAT_WS(',', " . implode( ', ', $named ) . ') AS bests' );
+		// 1 when every word reached the product outside its description (D-142).
+		$scores = array( '(' . implode( ' + ', $bests ) . ') AS base', "CONCAT_WS(',', " . implode( ', ', $named ) . ') AS bests', '(' . implode( ' * ', $reached ) . ') AS reach' );
 		if ( ! $phrased ) {
 			return self::scored( $columns, $scores, $held );
 		}

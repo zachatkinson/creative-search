@@ -45,6 +45,14 @@ final class HttpManifestSource implements ManifestSource {
 	}
 
 	/**
+	 * The latest release read again now; the answer replaces the cached one (D-144).
+	 */
+	public function fresh(): ?Manifest {
+		self::flush();
+		return $this->latest();
+	}
+
+	/**
 	 * Forget the cached manifest (Dashboard → Updates → Check again).
 	 */
 	public static function flush(): void {

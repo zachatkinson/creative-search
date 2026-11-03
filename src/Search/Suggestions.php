@@ -81,7 +81,8 @@ final class Suggestions {
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
 			// A panel limited to a category leaves out the pins: one may sit outside it (D-110, D-117).
-			$products = $this->pinnedFirst( $result->products, array() === $scope ? $this->search->pinnedDocuments( $query, $lang, $result->lang ) : array() );
+			$pinned   = array() === $scope ? $this->search->pinnedDocuments( $query, $lang, $result->lang ) : array();
+			$products = $this->pinnedFirst( $result->products, $pinned );
 			$shown    = array();
 			foreach ( $result->terms as $hit ) {
 				if ( Document::CATEGORY === $hit->document->type ) {
@@ -90,7 +91,7 @@ final class Suggestions {
 			}
 			$answer = array(
 				'queries'   => $this->queries->for( $query, $lang ),
-				'products'  => $this->products( array_slice( $products, 0, $limit ), $result ),
+				'products'  => $this->products( array_slice( $products, 0, $limit ), $result, $pinned ),
 				// A panel already limited to a category offers no other category to search within (D-113, D-117).
 				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here ) : array(),
 				'terms'     => $this->terms( $result->terms ),
@@ -127,22 +128,30 @@ final class Suggestions {
 	 * Product rows: a variation the query named shows its own image and opens with it chosen (D-104), and a match
 	 * the row does not show says what it was (D-105).
 	 *
-	 * @param Document[]   $documents Products, in order.
-	 * @param SearchResult $result    The search they came from.
+	 * @param Document[]           $documents Products, in order.
+	 * @param SearchResult         $result    The search they came from.
+	 * @param array<int, Document> $pinned    The owner's pinned products, by product id: never `described`, so they keep their place (D-143).
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $documents, SearchResult $result ): array {
+	private function products( array $documents, SearchResult $result, array $pinned = array() ): array {
 		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
 		$rows    = $this->search->index()->rows( $ids );
 		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
 		$cart    = Settings::isOn( 'suggest_cart' );
-		$out     = array();
+		$only    = array();
+		foreach ( $result->products as $hit ) {
+			if ( $hit->score->descriptionOnly && ! isset( $pinned[ $hit->document->objectId ] ) ) {
+				$only[ $hit->document->id ] = true;
+			}
+		}
+		$out = array();
 		foreach ( $documents as $document ) {
 			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {
 				continue;
 			}
 			$detail     = $details[ $document->id ] ?? null;
+			$described  = isset( $only[ $document->id ] );
 			$imageId    = $detail->imageId ?? Cast::int( $row['image_id'] );
 			$suggestion = array(
 				'id'         => $document->objectId,
@@ -155,6 +164,8 @@ final class Suggestions {
 				'in_stock'   => $document->inStock,
 				'type'       => 'product',
 				'matched'    => null === $detail ? '' : MatchDetails::line( $detail ),
+				// Some searched word reached it only in its description: the panel puts the page asked for before it (D-143).
+				'described'  => $described,
 				// Simple, purchasable, in stock and needing no choice: one click puts it in the cart (D-115).
 				'cart'       => $cart && 1 === Cast::int( $row['cart'] ?? 0 ),
 			);

@@ -41,7 +41,7 @@ final class RankPlan {
 	 * @param int[]                                $scope       Products of these term-taxonomy ids only (D-117);
 	 *                                                          none limits nothing.
 	 * @param bool                                 $inStockFirst What can be bought first, each part in score
-	 *                                                          order (D-138).
+	 *                                                          order (D-138), among products that match alike (D-142).
 	 */
 	public function __construct(
 		public readonly string $lang,

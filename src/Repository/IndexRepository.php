@@ -273,7 +273,7 @@ final class IndexRepository implements IndexStore {
 					(int) $row['total_sales'],
 					(int) $row['object_id']
 				),
-				new Score( $tokens, (float) $row['phrase'], (float) $row['exact'], (float) $row['stock'], (float) $row['owner'] )
+				new Score( $tokens, (float) $row['phrase'], (float) $row['exact'], (float) $row['stock'], (float) $row['owner'], descriptionOnly: '1' !== (string) $row['reach'] )
 			);
 		}
 		return $hits;

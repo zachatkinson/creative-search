@@ -223,10 +223,14 @@ test.describe( 'the admin in French', () => {
 			'/wp-admin/edit.php?post_type=product&s=kazumi+skate+deck+dealer'
 		);
 		await page.locator( '.row-title' ).first().click();
-		await page.locator( '.csearch_options a' ).click();
-		await expect(
-			page.getByLabel( 'Exclure de la recherche' )
-		).toBeVisible();
+		await page.waitForURL( /post\.php\?post=\d+&action=edit/ );
+		// WooCommerce binds the product data tabs once its script runs: a click before that opens nothing.
+		await expect( async () => {
+			await page.locator( '.csearch_options a' ).click();
+			await expect(
+				page.getByLabel( 'Exclure de la recherche' )
+			).toBeVisible( { timeout: 1000 } );
+		} ).toPass();
 		// "il y a" is the plugin's; the duration is WordPress's own, French with WordPress's fr_CA pack.
 		await expect( page.locator( '.csearch-last-indexed' ) ).toContainText(
 			/Indexé il y a .+\./

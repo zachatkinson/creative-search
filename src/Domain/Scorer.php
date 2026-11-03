@@ -43,8 +43,10 @@ final class Scorer {
 		$weights = $plan->weights;
 		$tokens  = array();
 		$fields  = array();
+		$only    = false;
 		foreach ( $widenings as $i => $widening ) {
-			$best = null;
+			$best  = null;
+			$named = false;
 			foreach ( $widening->postingsIn( $document->id, true ) as $term => $byField ) {
 				$match = $widening->matches[ $term ];
 				$term  = (string) $term;
@@ -64,10 +66,12 @@ final class Scorer {
 						);
 					}
 					$fields[ $field ][ $i ] = min( $fields[ $field ][ $i ] ?? PHP_INT_MAX, $position );
+					$named                  = $named || ! in_array( $field, Fields::DESCRIPTIONS, true );
 				}
 			}
 			if ( null !== $best ) {
 				$tokens[ $i ] = $best;
+				$only         = $only || ! $named;
 			}
 		}
 		$owner = $document->boost;
@@ -79,7 +83,8 @@ final class Scorer {
 			self::phraseBonus( $fields, count( $widenings ) ),
 			( in_array( $document->nameKey, $plan->nameKeys(), true ) ? self::EXACT_NAME : 0.0 ) + ( in_array( $plan->key, $document->skuKeys, true ) ? self::EXACT_SKU : 0.0 ),
 			$document->inStock ? 0.0 : self::SOLD_OUT,
-			(float) $owner
+			(float) $owner,
+			descriptionOnly: $only
 		);
 	}
 
