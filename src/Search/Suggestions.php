@@ -136,13 +136,20 @@ final class Suggestions {
 		$rows    = $this->search->index()->rows( $ids );
 		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
 		$cart    = Settings::isOn( 'suggest_cart' );
-		$out     = array();
+		$only    = array();
+		foreach ( $result->products as $hit ) {
+			if ( $hit->score->descriptionOnly ) {
+				$only[ $hit->document->id ] = true;
+			}
+		}
+		$out = array();
 		foreach ( $documents as $document ) {
 			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {
 				continue;
 			}
 			$detail     = $details[ $document->id ] ?? null;
+			$described  = isset( $only[ $document->id ] );
 			$imageId    = $detail->imageId ?? Cast::int( $row['image_id'] );
 			$suggestion = array(
 				'id'         => $document->objectId,
@@ -155,6 +162,8 @@ final class Suggestions {
 				'in_stock'   => $document->inStock,
 				'type'       => 'product',
 				'matched'    => null === $detail ? '' : MatchDetails::line( $detail ),
+				// Some searched word reached it only in its description: the panel puts the page asked for before it (D-143).
+				'described'  => $described,
 				// Simple, purchasable, in stock and needing no choice: one click puts it in the cart (D-115).
 				'cart'       => $cart && 1 === Cast::int( $row['cart'] ?? 0 ),
 			);

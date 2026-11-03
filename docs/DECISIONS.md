@@ -1020,6 +1020,8 @@ This replaces D-092's row budget (10 on a desktop with terms giving way first, 4
 
 **Why:** the panel's length should be one number the owner sets, not a sum nobody chose; and when room is short the shopper should see the one suggested search, the first products and the one category before anything else.
 
+*1.6.2: the page asked for (a title holding every word searched) gets a row after the first three products, and products found only by their description go after it (D-143).*
+
 ### D-137 · The panel suggests a page by its title; a phone's panel leaves pages out · 2026-11-03
 
 For "hood" the panel offered Wheel guide and Privacy policy, pages with the word somewhere in their content, not in their titles. A suggestion row shows only the title, so the shopper cannot see why it is there.
@@ -1029,6 +1031,8 @@ In the panel (`SearchService::content()` with `suggest`), the content search now
 `suggest_pages_phone` (default no) leaves posts and pages out of the panel on a phone, where the cap (D-136) leaves few rows and they go to products. A phone is what the panel already treats as one, so this is applied in the browser too; `/suggest` returns the same answer for both.
 
 **Why:** a suggestion has to look like what was typed; a page matched by its body belongs on the results page, where it has a line of context. On a phone the four or five rows above the keyboard are worth more as products.
+
+*1.6.2: the first of those pages, the one asked for, shows on a phone too whatever `suggest_pages_phone` says, and before the products that only mention the words in their description; the other pages keep this rule (D-143).*
 
 ### D-138 · In stock first is the store's choice, not a fixed rule · 2026-11-03
 
@@ -1083,4 +1087,15 @@ With `in_stock_first` on (D-138), every product that could be bought came before
 4. **The help text** says products come first "among products that match as well".
 
 **Why:** a shopper who types "hood" wants hoodies; one that is sold out still answers the search better than a deck whose description mentions a hood, and the shop can still show it as sold out.
+
+### D-143 · The page the shopper asked for gets a row · 2026-11-03
+
+The panel filled with pages last (D-136), so once products reached the cap no page had a row, and a phone showed none (`suggest_pages_phone` off, D-137). On the demo "size guide" suggested six wheels whose descriptions mention a size guide and no Size guides page; "returns" on a phone suggested nothing.
+
+1. **Which page.** The panel's posts and pages already have every searched word in their title, matched as the panel matches (stems and prefixes, so "guide" finds "guides", D-137). The first, the best match, is the page asked for. Only that one moves; the others keep their place at the end and their phone rule.
+2. **Where.** In the fill (`budget()`): one suggested search, the first three products named for the search, the page, then the rest of the three products from those found only by their description, then the category row and the rest as before. In the panel's order: suggested searches, products named for the search, the page, products found only by their description, categories, the other pages. When no product matches by name, the page comes right after the suggested search. At a cap of 3 with three products named for the search, the promised products win (D-136).
+3. **A phone** shows the page asked for whatever `suggest_pages_phone` says.
+4. **The split.** Each product row in `/suggest` carries `described` (D-142's flag; pinned products count as named). The panel splits the products only when there is a page asked for; otherwise they stay in the order they came, as before.
+
+**Why:** a shopper who types the name of a page wants that page; it is one row, and a product that only mentions the words is a weaker answer than the page they name.
 

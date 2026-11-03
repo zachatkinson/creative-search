@@ -127,6 +127,25 @@ final class StockFirstTest extends IndexTestCase {
 		self::assertSame( $want, $orders['api'] );
 	}
 
+	public function test_the_panel_marks_the_products_found_only_by_their_description(): void {
+		$described = array();
+		foreach ( $this->service( Suggestions::class )->answer( 'hood', 'en', 6 )['products'] as $row ) {
+			$described[ $this->names( array( (int) $row['id'] ) )[0] ] = $row['described'];
+		}
+		ksort( $described );
+		self::assertSame(
+			array(
+				'Deck Broke'      => true,
+				'Hood'            => false,
+				'Hoodie Classic'  => false,
+				'Hoodie Preorder' => false,
+				'Hoody Sold'      => false,
+			),
+			$described,
+			'the panel puts the page asked for before the described ones (D-143)'
+		);
+	}
+
 	public function test_a_pinned_sold_out_product_keeps_its_place(): void {
 		Settings::update( array( 'in_stock_first' => 'yes' ) );
 		$this->service( OwnerRules::class )->addPins( 'hood', '', array( $this->ids['Hoody Sold'] ) );
