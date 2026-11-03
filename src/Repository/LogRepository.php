@@ -76,6 +76,15 @@ final class LogRepository extends Repository {
 	}
 
 	/**
+	 * Delete every row (the Analytics tab's Clear analytics, `wp csearch analytics clear`, D-139).
+	 *
+	 * @return int Rows deleted.
+	 */
+	public function clear(): int {
+		return $this->run( $this->prepare( 'DELETE FROM %i', Tables::log() ) );
+	}
+
+	/**
 	 * Counts for one UTC day: searches, searches that found nothing, searches followed by a click.
 	 *
 	 * @param string $day `Y-m-d`.

@@ -33,6 +33,7 @@ final class SettingsTest extends TestCase {
 		self::assertSame( 2, $d['min_chars'] );
 		self::assertSame( 8, $d['panel_max'], 'Baymard: at most 10 on a desktop (D-136)' );
 		self::assertSame( 5, $d['panel_max_phone'], 'Baymard: 4 to 8 on a phone (D-136)' );
+		self::assertSame( 'no', $d['log_staff_searches'], 'the team\'s searches stay out of Analytics (D-139)' );
 		self::assertSame( 'no', $d['in_stock_first'], 'today\'s score until the shop chooses it (D-138)' );
 		self::assertSame( 'no', $d['suggest_pages_phone'], 'a phone\'s rows go to products (D-137)' );
 		self::assertSame( 'yes', $d['fallback_to_default_language'] );
@@ -62,7 +63,7 @@ final class SettingsTest extends TestCase {
 		self::assertSame( 'yes', $d['suggest_scopes'], 'searches within a category on (D-113)' );
 		self::assertSame( 'no', $d['suggest_cart'], 'add to cart off until the shop chooses it (D-115)' );
 		self::assertSame( 'yes', $d['analytics_events'], 'the browser events on; nothing leaves the page (D-116)' );
-		self::assertCount( 41, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertCount( 42, $d, 'every key is documented in docs/SETTINGS.md' );
 	}
 
 	public function test_the_filter_attributes_are_attribute_taxonomies(): void {

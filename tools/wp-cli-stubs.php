@@ -28,6 +28,12 @@ class WP_CLI {
 	public static function warning( string $message ): void {}
 
 	/**
+	 * @param string               $question Question.
+	 * @param array<string, mixed> $assoc    Flags; `yes` skips the question.
+	 */
+	public static function confirm( string $question, array $assoc = array() ): void {}
+
+	/**
 	 * @param string|\WP_Error $message Message.
 	 * @param bool|int         $exit    Exit.
 	 * @return never

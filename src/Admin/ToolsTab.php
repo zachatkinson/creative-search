@@ -241,7 +241,9 @@ final class ToolsTab {
 
 		echo '<h3>' . esc_html__( 'Search log', 'creative-search' ) . '</h3><table class="form-table" role="presentation"><tbody>';
 		echo '<tr><th scope="row"><label for="csearch-retention">' . esc_html__( 'Keep searches for (days)', 'creative-search' ) . '</label></th><td><input type="number" id="csearch-retention" name="retention_days" min="' . esc_attr( (string) Settings::RETENTION_MIN ) . '" max="' . esc_attr( (string) Settings::RETENTION_MAX ) . '" step="1" class="small-text" value="' . esc_attr( Cast::str( $settings['retention_days'] ) ) . '" aria-describedby="csearch-retention-help">';
-		echo '<p class="description" id="csearch-retention-help">' . esc_html__( 'Searches are anonymous; older ones are deleted each night. The daily counts are kept for the charts.', 'creative-search' ) . '</p></td></tr></tbody></table>';
+		echo '<p class="description" id="csearch-retention-help">' . esc_html__( 'Searches are anonymous; older ones are deleted each night. The daily counts are kept for the charts.', 'creative-search' ) . '</p></td></tr>';
+		self::flag( 'log_staff_searches', __( 'Staff searches', 'creative-search' ), __( 'Log searches by signed-in staff who can edit products. Off, your team’s searches stay out of Analytics.', 'creative-search' ), $settings );
+		echo '</tbody></table>';
 
 		echo '<h3>' . esc_html__( 'Search bar defaults', 'creative-search' ) . '</h3><p>' . esc_html__( 'For the shortcode, the widget, the theme’s own search form and new search blocks; a block can change each.', 'creative-search' ) . '</p><table class="form-table" role="presentation"><tbody>';
 		self::number( 'suggest_limit', __( 'Products suggested', 'creative-search' ), Settings::LIMIT_MIN, Settings::LIMIT_MAX, $settings );

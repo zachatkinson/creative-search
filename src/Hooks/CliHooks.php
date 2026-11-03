@@ -78,6 +78,11 @@ final class CliHooks implements Hookable {
 			array( 'shortdesc' => 'Delete search-log rows older than the retention period.' )
 		);
 		WP_CLI::add_command(
+			'csearch analytics clear',
+			array( $maintenance, 'clear' ),
+			array( 'shortdesc' => 'Delete every logged search and daily count.' )
+		);
+		WP_CLI::add_command(
 			'csearch cache flush',
 			array( $maintenance, 'flush' ),
 			array( 'shortdesc' => 'Drop every cached search answer.' )

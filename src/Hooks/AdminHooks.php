@@ -43,6 +43,7 @@ final class AdminHooks implements Hookable {
 		add_action( 'admin_menu', array( $this->page, 'menu' ), 60 );
 		add_action( 'admin_enqueue_scripts', array( $this->page, 'enqueue' ) );
 		add_action( 'admin_notices', array( $this->page, 'warnings' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( CSEARCH_FILE ), array( $this->page, 'actionLinks' ) );
 		foreach ( array_keys( Actions::handlers() ) as $action ) {
 			add_action( 'admin_post_' . $action, fn() => $this->actions->handle( $action ) );
 		}

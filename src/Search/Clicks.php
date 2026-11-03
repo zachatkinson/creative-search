@@ -29,9 +29,10 @@ final class Clicks {
 	/**
 	 * Constructor.
 	 *
-	 * @param LogRepository $log The log table.
+	 * @param LogRepository $log    The log table.
+	 * @param SearchLog     $search Who stays out of the log (D-139).
 	 */
-	public function __construct( private LogRepository $log ) {
+	public function __construct( private LogRepository $log, private SearchLog $search ) {
 	}
 
 	/**
@@ -45,7 +46,8 @@ final class Clicks {
 	 */
 	public function record( string $query, string $lang, string $type, int $id ): bool {
 		$normalised = SearchLog::normalise( SearchService::clean( $query ) );
-		if ( '' === $normalised || ! in_array( $type, self::TYPES, true ) || $id <= 0 ) {
+		// A click from staff or a test run would mark a shopper's search of the same words (D-139).
+		if ( '' === $normalised || ! in_array( $type, self::TYPES, true ) || $id <= 0 || $this->search->ignored() ) {
 			return false;
 		}
 		return $this->log->click( $normalised, $lang, Clock::format( Clock::timestamp() - self::WINDOW ), $type, $id );

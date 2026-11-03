@@ -101,6 +101,7 @@ final class OwnerRulesTest extends IndexTestCase {
 	public function test_a_redirect_sends_its_words_to_its_page_before_any_category(): void {
 		$this->rules()->addRedirect( 'Size guide', '', '/size-guide/' );
 		$this->rules()->addRedirect( 'wheels', '', home_url( '/wheel-care/' ) );
+		wp_set_current_user( 0 ); // A shopper's search: staff are not logged (D-139).
 		self::assertSame( home_url( '/size-guide/' ), $this->target( 'the SIZE guide!' ), 'case, stop words and punctuation do not matter; a path becomes the address' );
 		self::assertTrue( $GLOBALS['wp_query']->get( 'csearch_routed' ), 'the results page is left' );
 		$pending = $this->service( SearchLog::class )->pending();

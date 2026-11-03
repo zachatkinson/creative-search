@@ -38,6 +38,36 @@ final class Analytics {
 	}
 
 	/**
+	 * What Clear analytics would delete (D-139): the search-log rows and the days of roll-ups.
+	 *
+	 * @return array{searches: int, days: int}
+	 */
+	public function held(): array {
+		$stats = Settings::get( 'stats' );
+		return array(
+			'searches' => $this->log->count(),
+			'days'     => is_array( $stats ) ? count( $stats ) : 0,
+		);
+	}
+
+	/**
+	 * Delete every search-log row and every daily roll-up, for a shop's launch day (D-139). The suggested
+	 * searches, which are built from the log, go with them, so the cached answers are dropped too.
+	 *
+	 * @return array{searches: int, days: int} What was deleted.
+	 */
+	public function clear(): array {
+		$held     = $this->held();
+		$searches = $this->log->clear();
+		Settings::set( 'stats', array() );
+		do_action( 'csearch_flush_cache' );
+		return array(
+			'searches' => $searches,
+			'days'     => $held['days'],
+		);
+	}
+
+	/**
 	 * A period the screen offers, from a request value.
 	 *
 	 * @param mixed $value Days asked for.

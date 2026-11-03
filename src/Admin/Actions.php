@@ -39,6 +39,7 @@ final class Actions {
 	public const SYNONYM_IMPORT   = 'csearch_synonym_import';
 	public const SYNONYM_EXPORT   = 'csearch_synonym_export';
 	public const ANALYTICS_EXPORT = 'csearch_analytics_export';
+	public const ANALYTICS_CLEAR  = 'csearch_analytics_clear';
 	public const BOOSTS_SAVE      = 'csearch_boosts_save';
 	public const RULES_SAVE       = 'csearch_rules_save';
 	public const TOOLS_SAVE       = 'csearch_tools_save';
@@ -59,7 +60,7 @@ final class Actions {
 	/**
 	 * Settings the Tools tab saves: yes/no flags, then numbers and text.
 	 */
-	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone' );
+	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone', 'log_staff_searches' );
 	public const TOOLS_VALUES = array( 'retention_days', 'suggest_limit', 'suggest_terms', 'panel_max', 'panel_max_phone', 'min_chars', 'placeholder', 'panel_position', 'filter_attributes' );
 
 	/**
@@ -101,6 +102,7 @@ final class Actions {
 			self::SYNONYM_IMPORT   => 'importSynonyms',
 			self::SYNONYM_EXPORT   => 'exportSynonyms',
 			self::ANALYTICS_EXPORT => 'exportLog',
+			self::ANALYTICS_CLEAR  => 'clearAnalytics',
 			self::BOOSTS_SAVE      => 'saveBoosts',
 			self::RULES_SAVE       => 'saveRules',
 			self::TOOLS_SAVE       => 'saveTools',
@@ -252,6 +254,25 @@ final class Actions {
 				$analytics->exportTo( $out, $days );
 			},
 		);
+	}
+
+	/**
+	 * Delete every logged search and daily count, after the Analytics tab's confirmation (D-139).
+	 *
+	 * @param array<string, mixed> $input The form.
+	 */
+	public function clearAnalytics( array $input ): string {
+		unset( $input );
+		$done = $this->analytics->clear();
+		Notices::flash(
+			'success',
+			sprintf(
+				/* translators: %s: number of searches */
+				_n( 'Analytics cleared: %s search deleted, with the daily counts. New searches are counted from now.', 'Analytics cleared: %s searches deleted, with the daily counts. New searches are counted from now.', $done['searches'], 'creative-search' ),
+				number_format_i18n( $done['searches'] )
+			)
+		);
+		return AdminPage::url( 'analytics' );
 	}
 
 	/**

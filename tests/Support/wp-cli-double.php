@@ -28,6 +28,18 @@ namespace {
 			public static function success( string $m ): void {
 				self::$lines[] = 'success: ' . $m;
 			}
+			/**
+			 * Real WP-CLI asks, and exits on anything but yes; `--yes` skips the question.
+			 *
+			 * @param string               $q     The question.
+			 * @param array<string, mixed> $assoc Flags.
+			 */
+			public static function confirm( string $q, array $assoc = array() ): void {
+				self::$lines[] = 'confirm: ' . $q;
+				if ( empty( $assoc['yes'] ) ) {
+					throw new \RuntimeException( 'not confirmed' );
+				}
+			}
 			public static function warning( string $m ): void {
 				self::$lines[] = 'warning: ' . $m;
 			}

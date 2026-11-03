@@ -81,7 +81,8 @@ A block or shortcode also takes `mode` (`field`, the default, or `button`: an ic
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `retention_days` | 90 | 7 to 365 | Days a search-log row is kept before the nightly purge. |
-| `stats` | `[]` | `{ 'Y-m-d': { name: count } }` | Daily roll-ups the Analytics charts read, so they survive the purge. Written by the plugin, not the owner. |
+| `log_staff_searches` | `no` | yes/no | Log searches by signed-in users who can edit products (`edit_products`: administrators and shop managers). Off, their searches and suggestion clicks are neither logged nor counted, in the panel too, where the REST request is recognised by the logged-in cookie (D-139). Set on the Tools tab under Search log. A request with the header `X-Creative-Test: 1` is never logged, and `csearch_log_search` can leave out any other. |
+| `stats` | `[]` | `{ 'Y-m-d': { name: count } }` | Daily roll-ups the Analytics charts read, so they survive the purge. Written by the plugin, not the owner. Emptied with the log by Clear analytics on the Analytics tab, or `wp csearch analytics clear` (D-139). |
 
 ## The index state (`csearch_index_state`)
 
