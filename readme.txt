@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.1
+Stable tag: 1.6.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.6.2 =
+With "Show products that can be bought first" on, products named for the search stay ahead of products that only mention it; the page a search names gets its row; updates are checked even when the release changed since WordPress last looked. No index rebuild is needed.
+
 = 1.6.1 =
 Updates now arrive through Dashboard → Updates like any other plugin's. Install this version by hand once; no index rebuild is needed.
 
@@ -94,6 +97,11 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.2 =
+* "Show products that can be bought first" now applies among products that match as well: products found by their name, SKU, attributes, brand or category come before products that only mention the search in their description, each group with what can be bought first.
+* A page whose title holds every word searched gets a row in the suggestions, after the products named for the search and before those that only mention it, on a phone too.
+* An update is installed only when it matches the published release: the release notes are read again when they have changed since WordPress last checked, and an update that still doesn't match is refused with a request to check again.
 
 = 1.6.1 =
 * Updates through wp-admin: the plugin checks the agency's releases on GitHub and installs a new version only when its checksum matches. `CSEARCH_DISABLE_UPDATES` turns the check off.
