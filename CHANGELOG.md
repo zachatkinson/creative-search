@@ -14,6 +14,7 @@ Updates through wp-admin, from the agency's releases.
 
 ### Changed
 - Uninstall also deletes the cached update manifest.
+- The browser tests send `X-Creative-Test: 1` to the shop on every request, so a run against a real shop stays out of its analytics (D-141).
 
 ## [1.6.0] - 2026-11-03
 

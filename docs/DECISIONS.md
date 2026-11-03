@@ -1065,3 +1065,9 @@ The spec says "No external service, no API key, no outbound requests", and gate 
 
 **Why:** without updates, every fix waits on someone uploading a zip to each shop; with a pinned host, a pinned hash and an off switch, the one request costs a shop less than an unpatched plugin.
 
+### D-141 · The browser suite marks every request to the shop as a test run · 2026-11-03
+
+The demo's top searches were this suite's own ("kazumi", "xyzzy"), from runs pointed at it with `WP_BASE_URL`. Zach approved sending `X-Creative-Test: 1` (D-139) from the suite. Every spec now imports `test` from `tests/e2e/support/test.ts`, which adds the header to each request for the base URL's origin through a context route, on every run, local or not. It isn't Playwright's `extraHTTPHeaders`, because that option sends the header to every origin. Then Twenty Twenty-Five's Google Fonts requests needed a CORS preflight that fonts.gstatic.com refused, the page fell back to another font, the field moved, and the panel's height budget (D-092) dropped the "kazumi in Decks" row (scope.spec.ts failed only with it). panel.spec.ts builds the log it needs through WP-CLI, so nothing depends on the browser's searches being logged.
+
+**Why:** a run against a real shop should leave its analytics as they were. The header costs nothing on a local run.
+
