@@ -32,9 +32,11 @@ final class Updater {
 	public const SLUG = 'creative-search';
 
 	/**
-	 * Where the agency's release zips are published: a package under it is this plugin's to check (D-144).
+	 * Where this plugin's release zips are published: a package under it is this plugin's to check (D-144). The
+	 * repository holds every agency plugin's releases, so the prefix names this one's (`creative-search-<version>`);
+	 * a sibling's package is left to its own updater.
 	 */
-	public const RELEASES = 'https://github.com/zachatkinson/creative-releases/';
+	public const RELEASES = 'https://github.com/zachatkinson/creative-releases/releases/download/' . self::SLUG . '-';
 
 	/**
 	 * How a package is downloaded to a temporary file.
@@ -182,8 +184,8 @@ final class Updater {
 	}
 
 	/**
-	 * Whether a package is this plugin's: the one WordPress's update data offers for it, or any under the
-	 * agency's releases (D-144).
+	 * Whether a package is this plugin's: the one WordPress's update data offers for it, or one of its own
+	 * releases (D-144).
 	 *
 	 * @param string $package The package's address.
 	 */

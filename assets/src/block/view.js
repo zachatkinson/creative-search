@@ -579,7 +579,11 @@ function contentRow( ctx, c, index, first ) {
 export function budget( ctx, found ) {
 	const phone = Boolean( window.matchMedia?.( PHONE ).matches );
 	const room = phone ? PHONE_TERMS : TERMS;
-	const scopes = Math.min( SCOPES, room, found.products ? found.scopes : 0 );
+	const scopes = Math.min(
+		SCOPES,
+		room,
+		found.products + ( found.described || 0 ) ? found.scopes : 0
+	);
 	const products = Math.min( ctx.limit, found.products );
 	const page = found.content > 0 ? 1 : 0;
 	const has = {
@@ -619,8 +623,12 @@ export function budget( ctx, found ) {
 		take( 'scopes', upTo - out.terms );
 		take( 'terms', upTo - out.scopes );
 	};
-	// The first three products are promised (when there are three): a cap of 3 leaves no room for the search.
-	if ( cap > Math.min( FIRST_PRODUCTS, has.products + has.described ) ) {
+	// The first three products are promised (when there are three), and then the page asked for: a cap of 3 leaves
+	// no room for the search, nor for the page; a cap of 4 none for the search when there is a page.
+	if (
+		cap >
+		Math.min( FIRST_PRODUCTS, has.products + has.described ) + has.page
+	) {
 		take( 'queries', 1 );
 	}
 	take( 'products', FIRST_PRODUCTS );
@@ -689,11 +697,14 @@ function fit( ctx, tries = FIT_TRIES ) {
 				}
 				return;
 			}
-			// The last row goes, but a suggested search before any product (D-112).
+			// The last row goes, but a suggested search before any product (D-112); the products found only by their
+			// description, then the suggested search, before the page asked for (D-143).
 			const last = ( keep ) => suggestions.findLast( keep );
 			const drop =
-				last( ( r ) => ! r.product && ! r.query ) ||
+				last( ( r ) => ! r.product && ! r.query && ! r.asked ) ||
+				last( ( r ) => r.described ) ||
 				last( ( r ) => r.query ) ||
+				last( ( r ) => r.asked ) ||
 				suggestions[ suggestions.length - 1 ];
 			const chosen = ctx.rows[ ctx.active ];
 			ctx.rows = ctx.rows
@@ -750,14 +761,18 @@ function showAnswer( ctx, data, input ) {
 	found.products
 		.slice( 0, most.products )
 		.forEach( ( p ) => rows.push( productRow( ctx, p, rows.length ) ) );
-	found.page
-		.slice( 0, most.page )
-		.forEach( ( c ) =>
-			rows.push( contentRow( ctx, c, rows.length, true ) )
-		);
-	found.described
-		.slice( 0, most.described )
-		.forEach( ( p ) => rows.push( productRow( ctx, p, rows.length ) ) );
+	found.page.slice( 0, most.page ).forEach( ( c ) =>
+		rows.push( {
+			...contentRow( ctx, c, rows.length, true ),
+			asked: true,
+		} )
+	);
+	found.described.slice( 0, most.described ).forEach( ( p ) =>
+		rows.push( {
+			...productRow( ctx, p, rows.length ),
+			described: true,
+		} )
+	);
 	found.scopes
 		.slice( 0, most.scopes )
 		.forEach( ( sc ) =>

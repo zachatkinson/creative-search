@@ -146,6 +146,14 @@ final class StockFirstTest extends IndexTestCase {
 		);
 	}
 
+	public function test_a_pinned_product_found_only_by_its_description_counts_as_named(): void {
+		$this->service( OwnerRules::class )->addPins( 'hood', '', array( $this->ids['Deck Broke'] ) );
+		do_action( 'csearch_flush_cache' );
+		$rows = $this->service( Suggestions::class )->answer( 'hood', 'en', 6 )['products'];
+		self::assertSame( $this->ids['Deck Broke'], (int) $rows[0]['id'], 'pinned first' );
+		self::assertFalse( $rows[0]['described'], 'so the panel keeps it in its place before the page asked for (D-143)' );
+	}
+
 	public function test_a_pinned_sold_out_product_keeps_its_place(): void {
 		Settings::update( array( 'in_stock_first' => 'yes' ) );
 		$this->service( OwnerRules::class )->addPins( 'hood', '', array( $this->ids['Hoody Sold'] ) );

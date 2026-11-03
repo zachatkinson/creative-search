@@ -171,6 +171,15 @@ final class UpdaterTest extends IntegrationTestCase {
 		$this->assertSame( 0, $calls, 'nothing downloaded' );
 	}
 
+	public function test_a_sibling_plugins_release_is_left_to_its_own_updater(): void {
+		$calls  = 0;
+		$source = $this->source( null );
+		$sister = 'https://github.com/zachatkinson/creative-releases/releases/download/creative-restock-1.0.0/creative-restock-1.0.0.zip';
+		$this->assertFalse( ( new Updater( $source, self::BASENAME, self::downloader( 'zip bytes', $calls ) ) )->verify( false, $sister ), 'the same releases repository, another plugin (D-144)' );
+		$this->assertSame( 0, $source->fresh, 'its manifest is not read again for it' );
+		$this->assertSame( 0, $calls );
+	}
+
 	public function test_an_unreadable_manifest_refuses_the_package(): void {
 		$calls  = 0;
 		$source = $this->source( null );

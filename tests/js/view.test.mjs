@@ -1889,3 +1889,94 @@ test( 'a suggested search and a search within a category mark what they add', ()
 	);
 	document.createElement = create;
 } );
+
+const MIXED = {
+	...ANSWER,
+	queries: [ 'hood black' ],
+	products: [
+		{ ...ANSWER.products[ 0 ], id: 500, described: false },
+		{ ...ANSWER.products[ 0 ], id: 501, described: true },
+		{ ...ANSWER.products[ 0 ], id: 502, described: false },
+		...described( 503, 3 ),
+	],
+	terms: [ { ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Guides' } ],
+	content: [ PAGES[ 1 ], PAGES[ 0 ] ],
+	total: 6,
+};
+
+test( 'to fit, the products found only by their description go before the suggested search, and that before the page asked for (D-143)', async () => {
+	window.innerHeight = 460;
+	dom.fetch = () => respond( MIXED );
+	type( 'kazumi' );
+	const ctx = scope.ctx;
+	const { panel, resized, run } = measuredPanel( ctx );
+	panel.hidden = false;
+	panel.shown = true;
+	await settle();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'qhood black', 'p500', 'p502', 'c71', 'p501', 'all' ],
+		'the category, then the last described products'
+	);
+	window.innerHeight = 340;
+	resized[ 0 ]();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'p500', 'p502', 'c71', 'all' ],
+		'the last described product, then the suggested search'
+	);
+	window.innerHeight = 280;
+	resized[ 0 ]();
+	run();
+	assert.deepEqual(
+		ctx.rows.map( ( r ) => r.key ),
+		[ 'p500', 'p502', 'all' ],
+		'the page before the products named for the search'
+	);
+	window.innerHeight = 800;
+	delete window.requestAnimationFrame;
+	delete window.ResizeObserver;
+} );
+
+test( 'a search within a category still shows when every product only mentions the words (D-143)', async () => {
+	dom.fetch = () =>
+		respond( {
+			...ANSWER,
+			products: described( 600, 2 ),
+			terms: [],
+			scopes: [
+				{ id: 31, name: 'Wheels', url: '/?s=x&product_cat=wheels' },
+			],
+			content: [ PAGES[ 1 ] ],
+		} );
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'c71', 'p600', 'p601', 's31', 'all' ]
+	);
+} );
+
+test( 'at a cap of 4 the page asked for takes the suggested search’s row (D-143)', async () => {
+	dom.fetch = () =>
+		respond( {
+			...MIXED,
+			products: [
+				{ ...ANSWER.products[ 0 ], id: 700, described: false },
+				{ ...ANSWER.products[ 0 ], id: 701, described: false },
+				{ ...ANSWER.products[ 0 ], id: 702, described: false },
+			],
+		} );
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { maxPhone: 4 } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'p700', 'p701', 'p702', 'c71', 'all' ]
+	);
+} );
