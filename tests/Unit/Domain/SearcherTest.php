@@ -449,14 +449,27 @@ final class SearcherTest extends TestCase {
 		self::assertSame( 8.0, $r->products[0]->score->phrase );
 	}
 
-	public function test_in_stock_first_puts_what_can_be_bought_ahead_each_part_in_score_order(): void {
+	public function test_in_stock_first_keeps_a_name_match_ahead_of_a_description_match(): void {
 		$off = $this->search( 'decks ' );
 		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger', 'Skatehouse Hoodie, Logo' ), self::titles( $off ), 'off: the sold-out name match beats the in-stock description match' );
+		self::assertFalse( $off->products[1]->score->descriptionOnly );
+		self::assertTrue( $off->products[2]->score->descriptionOnly, 'the hoodie only mentions decks in its description' );
 		$on = $this->search( 'decks ', 'en', new SearchOptions( inStockFirst: true ) );
-		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'Skatehouse Hoodie, Logo', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $on ), 'on: the order flips (D-138)' );
-		self::assertSame( $off->products[1]->score->total(), $on->products[2]->score->total(), 'the score itself is unchanged' );
+		self::assertSame( self::titles( $off ), self::titles( $on ), 'on: a sold-out name match still comes before an in-stock description match (D-142)' );
+		self::assertSame( $off->products[1]->score->total(), $on->products[1]->score->total(), 'the score itself is unchanged' );
 		$this->product( 'KAZUMI Skate Deck, Sold Again', 'KAZ-SOA-00031', array(), false, 500, array() );
-		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'Skatehouse Hoodie, Logo', 'KAZUMI Skate Deck, Sold Again', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'decks ', 'en', new SearchOptions( inStockFirst: true ) ) ), 'the sold-out part in its own order' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Sold Again', 'KAZUMI Skate Deck, Ghost Tiger', 'Skatehouse Hoodie, Logo' ), self::titles( $this->search( 'decks ', 'en', new SearchOptions( inStockFirst: true ) ) ), 'the sold-out name matches in their own order, before the description match' );
+	}
+
+	public function test_in_stock_first_puts_the_in_stock_name_match_first(): void {
+		$this->product( 'Omega Wheels', 'WHL-OMG-00001', array(), false, 0, array() );
+		$this->product( 'Omega Wheels Pro', 'WHL-OMP-00002', array(), true, 0, array() );
+		$this->product( 'Omega Bearings', 'BRG-OMG-00003', array(), true, 0, array(), 'Made to fit omega wheels.' );
+		$off = $this->search( 'omega wheels' );
+		self::assertSame( array( 'Omega Wheels', 'Omega Wheels Pro', 'Omega Bearings' ), self::titles( $off ), 'off: the sold-out exact name first' );
+		$on = $this->search( 'omega wheels', 'en', new SearchOptions( inStockFirst: true ) );
+		self::assertSame( array( 'Omega Wheels Pro', 'Omega Wheels', 'Omega Bearings' ), self::titles( $on ), 'on: of two name matches the in-stock one first, the description match after both (D-142)' );
+		self::assertTrue( $on->products[2]->score->descriptionOnly, 'wheels reached the bearings only in their description' );
 	}
 
 	public function test_exact_name_earns_the_bonus(): void {

@@ -26,7 +26,7 @@ use CreativeBranding\Search\Tests\Support\WooCommerceCatalogue;
  * D-086: the one statement (`RankRepository`) and `Domain\Ranker` over the same postings must give the same
  * products in the same order with the same totals, for the golden set and a few hundred generated queries
  * (words, prefixes, typos, minus words, quoted phrases, SKUs, both languages), with and without the owner's
- * rules, hidden-by-SKU and custom weights. The Domain's ranking is the one Infection proves; this holds the SQL
+ * rules, hidden-by-SKU, custom weights and in stock first. The Domain's ranking is the one Infection proves; this holds the SQL
  * to it on every database in the matrix.
  */
 final class RankParityTest extends IndexTestCase {
@@ -144,6 +144,8 @@ final class RankParityTest extends IndexTestCase {
 					'attribute' => 5,
 				),
 			),
+			// D-138, D-142: name matches, then description-only ones, each in stock first; on the round's weights above.
+			'in stock first'     => array( 'in_stock_first' => 'yes' ),
 		);
 		$compared  = 0;
 		$different = array();
@@ -170,13 +172,13 @@ final class RankParityTest extends IndexTestCase {
 	}
 
 	/**
-	 * Each hit as `id:total`, the total to six decimals.
+	 * Each hit as `id:total` (the total to six decimals), with `:d` when some word reached it only in its description.
 	 *
 	 * @param Hit[] $hits Hits.
 	 * @return string[]
 	 */
 	private static function ranking( array $hits ): array {
-		return array_map( static fn( Hit $h ): string => $h->document->objectId . ':' . number_format( round( $h->score->total(), 6 ), 6, '.', '' ), $hits );
+		return array_map( static fn( Hit $h ): string => $h->document->objectId . ':' . number_format( round( $h->score->total(), 6 ), 6, '.', '' ) . ( $h->score->descriptionOnly ? ':d' : '' ), $hits );
 	}
 
 	/**

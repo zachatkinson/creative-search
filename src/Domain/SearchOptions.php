@@ -34,7 +34,7 @@ final class SearchOptions {
 	 *                                         synonyms, never a word it begins or a typo's neighbour.
 	 * @param int[]              $scope        Products of these term-taxonomy ids only (a category and its subcategories,
 	 *                                         D-117); none limits nothing.
-	 * @param bool               $inStockFirst What can be bought before what is sold out, each in score order (D-138).
+	 * @param bool               $inStockFirst What can be bought before what is sold out, each in score order (D-138), among products that match alike (D-142).
 	 */
 	public function __construct(
 		public readonly array $weights = array(),

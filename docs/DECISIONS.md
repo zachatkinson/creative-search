@@ -1040,6 +1040,8 @@ The switch sits on the Boosts and exclusions tab, beside the other rules that ch
 
 **Why:** Skatehouse wants it on, to match Creative Shop's "Sold-out products last" on the shop's own lists, but another shop may want a better match first even when it is sold out; the score's −6 stays the default.
 
+*1.6.2: in stock first applies among products that match alike: products found by more than their description come first, then those found only there, each group in stock first (D-142).*
+
 ### D-139 · Analytics count shoppers: staff and test runs stay out, and the numbers can be cleared · 2026-11-03
 
 On the demo the top queries were the end-to-end suite's ("kazumi" 446 times, "xyzzy" 319, "zzqxv" 16), so click-through read 0.3% and the no-results list was mostly the agency's own. Before launch the numbers have to be the shoppers'.
@@ -1070,4 +1072,15 @@ The spec says "No external service, no API key, no outbound requests", and gate 
 The demo's top searches were this suite's own ("kazumi", "xyzzy"), from runs pointed at it with `WP_BASE_URL`. Zach approved sending `X-Creative-Test: 1` (D-139) from the suite. Every spec now imports `test` from `tests/e2e/support/test.ts`, which adds the header to each request for the base URL's origin through a context route, on every run, local or not. It isn't Playwright's `extraHTTPHeaders`, because that option sends the header to every origin. Then Twenty Twenty-Five's Google Fonts requests needed a CORS preflight that fonts.gstatic.com refused, the page fell back to another font, the field moved, and the panel's height budget (D-092) dropped the "kazumi in Decks" row (scope.spec.ts failed only with it). panel.spec.ts builds the log it needs through WP-CLI, so nothing depends on the browser's searches being logged.
 
 **Why:** a run against a real shop should leave its analytics as they were. The header costs nothing on a local run.
+
+### D-142 · In stock first, among products that match alike · 2026-11-03
+
+With `in_stock_first` on (D-138), every product that could be bought came before every sold-out one, whatever it matched on. For "hood" on the demo the panel then showed two hoodies and four products that only mention the word in their description, and the four sold-out hoodies named for the search were gone. The 1.6.0 brief had asked for "each part keeps its score order"; the 1.6.2 brief puts how a product matched ahead of its stock.
+
+1. **The two groups.** A product some searched word reaches only in its short or long description (`Fields::DESCRIPTIONS`) is in the second group; every other product, found by each word in its name, SKU, attributes, category, tag, brand or custom fields, is in the first. A word counts as reaching a field when the product carries a term the word reached there, whatever the field's weight. The brief names name, SKU, attributes, brand and category; tags and custom fields go with them, because the brief's line is "only in their description". The panel's "Matches the description" line (`MatchExplainer`, one word at a time) falls on these products in practice; it is a label, worked out after ranking, and the ranking does not read it.
+2. **The order.** With the setting on: the first group, then the second; in each, in stock (or on backorder) before sold out; in each part, the score order. Pins are put first after ranking, as before. Off, nothing changes: the score decides.
+3. **One rule, both rankers.** `Score::$descriptionOnly` is set by the PHP `Scorer` (a word whose postings in the product are all in the description fields) and by the SQL statement (`s.reach`, the product over the words of "some field outside the description holds this word"), and `Hit::stockFirst()` and the statement's `ORDER BY` both lead with it. `RankParityTest` has an in-stock-first round and compares the flag, so the panel, the results page and `/search` cannot disagree. The merge of phrase-synonym forms keeps each product where it ranks best under the same order, so a product named in one form is not held back by its description-only form.
+4. **The help text** says products come first "among products that match as well".
+
+**Why:** a shopper who types "hood" wants hoodies; one that is sold out still answers the search better than a deck whose description mentions a hood, and the shop can still show it as sold out.
 

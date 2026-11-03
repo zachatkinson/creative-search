@@ -39,15 +39,16 @@ final class Hit {
 	}
 
 	/**
-	 * Order for products when the owner puts what can be bought first (`in_stock_first`, D-138): in stock (which
-	 * includes on backorder) before sold out, each part in {@see Hit::compare()}'s order.
+	 * Order for products when the owner puts what can be bought first (`in_stock_first`, D-138, D-142): products
+	 * that match on more than their description first, then those found by some word only there; in each group
+	 * in stock (which includes on backorder) before sold out, each part in {@see Hit::compare()}'s order.
 	 *
 	 * @param Hit $a A hit.
 	 * @param Hit $b Another.
 	 */
 	public static function stockFirst( Hit $a, Hit $b ): int {
-		$stock = $b->document->inStock <=> $a->document->inStock;
-		return 0 !== $stock ? $stock : self::compare( $a, $b );
+		$order = array( $a->score->descriptionOnly, $b->document->inStock ) <=> array( $b->score->descriptionOnly, $a->document->inStock );
+		return 0 !== $order ? $order : self::compare( $a, $b );
 	}
 
 	/**
