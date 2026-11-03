@@ -126,6 +126,8 @@ final class Settings {
 			// The whole panel's rows at most, on a desktop and on a phone (D-136).
 			'panel_max'                    => self::PANEL_MAX_DEFAULT,
 			'panel_max_phone'              => self::PANEL_MAX_PHONE_DEFAULT,
+			// Posts and pages in the panel on a phone too (D-137); off, the room goes to products.
+			'suggest_pages_phone'          => 'no',
 			'show_prices'                  => 'yes',
 			'show_stock'                   => 'yes',
 			'show_terms'                   => 'yes',
@@ -257,7 +259,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}

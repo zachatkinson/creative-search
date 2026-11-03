@@ -734,6 +734,33 @@ test( 'posts and pages follow the terms, two at most, the first under the group 
 	assert.equal( sent.get( 'id' ), '70' );
 } );
 
+test( 'a phone leaves the pages out unless the form allows them (D-137)', async () => {
+	dom.fetch = () => respond( { ...ANSWER, terms: [], content: PAGES } );
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { pagesPhone: false } );
+	type( 'kazumi' );
+	await settle();
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.content ).length, 0 );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { pagesPhone: true } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.content ).length, 2 );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { pagesPhone: false } );
+	type( 'kazumi' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.content ).length,
+		2,
+		'a desktop keeps them'
+	);
+} );
+
 test( 'pages come last: they get only the room the cap leaves', async () => {
 	dom.fetch = () =>
 		respond( {

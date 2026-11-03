@@ -149,6 +149,16 @@ final class ContentTest extends IndexTestCase {
 		self::assertCount( 3, $this->found( 'guide' ), 'three on the results page' );
 	}
 
+	public function test_the_panel_suggests_a_page_by_its_title_and_the_results_page_by_its_content_too(): void {
+		self::assertSame( array( 'Wheel guide' ), $this->found( 'diameter' ), 'the results page matches the content' );
+		self::assertSame( array(), $this->found( 'diameter', 'suggest' ), 'the panel does not (D-137)' );
+		self::assertContains( 'Deck width guide', $this->found( 'shoe' ) );
+		self::assertSame( array(), $this->found( 'shoe', 'suggest' ) );
+		self::assertSame( array( 'Size guides' ), $this->found( 'size guide', 'suggest' ), 'its children carry "size" only through their parent' );
+		self::assertSame( array( 'Wheel guide' ), $this->found( 'wheel gui', 'suggest' ), 'the last word as a prefix, as everywhere' );
+		self::assertSame( array( 'Shipping & returns' ), $this->found( 'returns', 'suggest' ) );
+	}
+
 	public function test_a_page_that_becomes_the_front_page_leaves_and_children_follow_their_parent(): void {
 		$this->service( IndexQueue::class )->clear();
 		update_option( 'page_on_front', $this->pages['Contact'] );

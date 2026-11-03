@@ -1019,3 +1019,13 @@ Each group keeps its own limit first (the owner's products; 3 suggested searches
 This replaces D-092's row budget (10 on a desktop with terms giving way first, 4 products on a phone): a phone's products are now bounded by its cap rather than a fixed 4, so an owner who raises `panel_max_phone` gets more products, not more categories. D-092's `fit()` is unchanged and still drops the last rows when the capped panel does not fit the screen.
 
 **Why:** the panel's length should be one number the owner sets, not a sum nobody chose; and when room is short the shopper should see the one suggested search, the first products and the one category before anything else.
+
+### D-137 · The panel suggests a page by its title; a phone's panel leaves pages out · 2026-11-03
+
+For "hood" the panel offered Wheel guide and Privacy policy, pages with the word somewhere in their content, not in their titles. A suggestion row shows only the title, so the shopper cannot see why it is there.
+
+In the panel (`SearchService::content()` with `suggest`), the content search now ranks its first 10, as before, and keeps those whose title the query matches, in rank order, up to the panel's 2: every token of the query must have reached at least one term the document carries in its name field (`Domain\TitleMatch`, from the postings through `IndexRepository::fieldsOf()`, which now takes the kind, D-105). The same widening applies as everywhere else, so the last word still counts as a prefix ("wheel gui" offers Wheel guide), and a stem or a corrected typo counts. A parent page's title, indexed as a child's category, does not count, and neither does a search that had to drop a word: the shopper's words have to be in the title the row shows. The results page keeps matching titles and content as before, and the cache key now carries the context, so the two never share an answer.
+
+`suggest_pages_phone` (default no) leaves posts and pages out of the panel on a phone, where the cap (D-136) leaves few rows and they go to products. A phone is what the panel already treats as one, so this is applied in the browser too; `/suggest` returns the same answer for both.
+
+**Why:** a suggestion has to look like what was typed; a page matched by its body belongs on the results page, where it has a line of context. On a phone the four or five rows above the keyboard are worth more as products.

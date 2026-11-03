@@ -305,7 +305,7 @@ add_filter(
 
 - **Since:** 1.1.0
 - **Signature:** `apply_filters( 'csearch_content_limit', int $limit, string $context ): int`
-- **What it does:** how many posts and pages show beside the products: 3 on the results page (`page`), which it can raise to 10, and 2 in the panel (`suggest`), which it can only lower, since the panel's row budget holds at most 2 (D-092); 0 shows none.
+- **What it does:** how many posts and pages show beside the products: 3 on the results page (`page`), which it can raise to 10, and 2 in the panel (`suggest`), which it can only lower, since the panel holds at most 2 (D-136); 0 shows none. In the panel a post or page shows only when the query matches its title (D-137).
 - **Where it runs:** `Search\SearchService::content()`, on a `/suggest` request and on the results page.
 - **Example:**
 

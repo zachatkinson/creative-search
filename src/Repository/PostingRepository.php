@@ -57,16 +57,18 @@ final class PostingRepository extends Repository {
 	}
 
 	/**
-	 * Which of some terms some product documents carry, field by field, read by the primary key's lead for each
-	 * term (D-105): only for the few products a panel or a results page shows.
+	 * Which of some terms some documents carry, field by field, read by the primary key's lead for each term
+	 * (D-105): only for the few products a panel or a results page shows, or the few posts and pages a panel
+	 * might suggest by their titles (D-137).
 	 *
-	 * @param int[]    $documentIds Product document ids.
+	 * @param int[]    $documentIds Document ids, all of one kind.
 	 * @param string[] $terms       Terms.
 	 * @param int      $generation  Generation.
 	 * @param string   $lang        Language code.
+	 * @param int      $kind        Products ({@see Kind::PRODUCT}) or posts and pages ({@see Kind::CONTENT}).
 	 * @return array<int, array<int, string[]>> Document id to field id to the terms there.
 	 */
-	public function fieldsOf( array $documentIds, array $terms, int $generation, string $lang ): array {
+	public function fieldsOf( array $documentIds, array $terms, int $generation, string $lang, int $kind = Kind::PRODUCT ): array {
 		if ( array() === $documentIds || array() === $terms ) {
 			return array();
 		}
@@ -77,7 +79,7 @@ final class PostingRepository extends Repository {
 				Tables::postings(),
 				$generation,
 				$lang,
-				Kind::PRODUCT,
+				$kind,
 				...$terms
 			)
 		);

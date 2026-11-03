@@ -18,6 +18,7 @@ use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Domain\Searcher;
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Domain\Synonyms;
+use CreativeBranding\Search\Domain\TitleMatch;
 use CreativeBranding\Search\Index\AnalyzerFactory;
 use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\Languages;
@@ -145,17 +146,17 @@ final class SearchService {
 		 * @since 1.1.0
 		 *
 		 * @param int    $limit   2 in the panel, 3 on the results page; 0 shows none. The panel never shows more
-		 *                        than 2 (its row budget, D-092), so there it can only be lowered.
+		 *                        than 2 (D-136), so there it can only be lowered.
 		 * @param string $context `suggest` or `page`.
 		 */
 		$limit = max( 0, min( 'suggest' === $context ? self::CONTENT_PANEL : self::CONTENT_MAX, Cast::int( apply_filters( 'csearch_content_limit', $default, $context ) ) ) );
 		if ( 0 === $limit ) {
 			return array();
 		}
-		$key    = Cache::key( $this->index->generation(), 'content', array( $query, $lang, $limit, $this->settingsKey() ) );
+		$key    = Cache::key( $this->index->generation(), 'content', array( $query, $lang, $limit, $context, $this->settingsKey() ) );
 		$cached = $this->cache->get( $key );
 		if ( null === $cached ) {
-			$hits   = $this->runContent( $query, $lang, $limit )->products;
+			$hits   = 'suggest' === $context ? $this->byTitle( $this->runContent( $query, $lang, self::CONTENT_MAX ), $limit ) : $this->runContent( $query, $lang, $limit )->products;
 			$cached = array( 'ids' => array_map( static fn( Hit $hit ): int => $hit->document->id, $hits ) );
 			$this->cache->set( $key, $cached );
 		}
@@ -182,6 +183,25 @@ final class SearchService {
 			);
 		}
 		return $out;
+	}
+
+	/**
+	 * The posts and pages whose titles the query matches, in rank order (D-137): the panel suggests a page by its
+	 * title, never for a word somewhere in its content. A search that had to drop a word suggests none.
+	 *
+	 * @param SearchResult $result The content search, ranked over the first ten.
+	 * @param int          $limit  How many to keep.
+	 * @return Hit[]
+	 */
+	private function byTitle( SearchResult $result, int $limit ): array {
+		if ( $result->dropped || array() === $result->products ) {
+			return array();
+		}
+		$ids    = array_map( static fn( Hit $hit ): int => $hit->document->id, $result->products );
+		$terms  = array_values( array_unique( array_merge( ...array_values( $result->tokens ) ) ) );
+		$fields = $this->index->fieldsOf( $ids, $terms, $result->lang, Kind::CONTENT );
+		$kept   = array_filter( $result->products, static fn( Hit $hit ): bool => TitleMatch::covers( $result->tokens, $fields[ $hit->document->id ] ?? array() ) );
+		return array_slice( array_values( $kept ), 0, $limit );
 	}
 
 	/**

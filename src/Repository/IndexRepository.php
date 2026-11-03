@@ -346,16 +346,17 @@ final class IndexRepository implements IndexStore {
 	}
 
 	/**
-	 * Which of some terms some product documents of a language carry, field by field, in the live generation
-	 * (D-105); none until schema 3's rebuild has gone live.
+	 * Which of some terms some documents of a language carry, field by field, in the live generation (D-105);
+	 * none until schema 3's rebuild has gone live.
 	 *
-	 * @param int[]    $documentIds Product document ids.
+	 * @param int[]    $documentIds Document ids, all of one kind.
 	 * @param string[] $terms       Terms.
 	 * @param string   $lang        Language code.
+	 * @param int      $kind        Products, or posts and pages (D-137).
 	 * @return array<int, array<int, string[]>> Document id to field id to terms.
 	 */
-	public function fieldsOf( array $documentIds, array $terms, string $lang ): array {
-		return ! Upgrader::rebuilt() ? array() : $this->postings->fieldsOf( $documentIds, $terms, $this->generation(), $lang );
+	public function fieldsOf( array $documentIds, array $terms, string $lang, int $kind = Kind::PRODUCT ): array {
+		return ! Upgrader::rebuilt() ? array() : $this->postings->fieldsOf( $documentIds, $terms, $this->generation(), $lang, $kind );
 	}
 
 	/**

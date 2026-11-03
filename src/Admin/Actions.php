@@ -59,7 +59,7 @@ final class Actions {
 	/**
 	 * Settings the Tools tab saves: yes/no flags, then numbers and text.
 	 */
-	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events' );
+	public const TOOLS_FLAGS  = array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone' );
 	public const TOOLS_VALUES = array( 'retention_days', 'suggest_limit', 'suggest_terms', 'panel_max', 'panel_max_phone', 'min_chars', 'placeholder', 'panel_position', 'filter_attributes' );
 
 	/**
