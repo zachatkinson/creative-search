@@ -602,7 +602,10 @@ export function budget( ctx, found ) {
 		take( 'scopes', upTo - out.terms );
 		take( 'terms', upTo - out.scopes );
 	};
-	take( 'queries', 1 );
+	// The first three products are promised (when there are three): a cap of 3 leaves no room for the search.
+	if ( cap > Math.min( FIRST_PRODUCTS, has.products ) ) {
+		take( 'queries', 1 );
+	}
 	take( 'products', FIRST_PRODUCTS );
 	category( 1 );
 	take( 'products', Infinity );

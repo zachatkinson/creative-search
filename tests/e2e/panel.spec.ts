@@ -44,6 +44,35 @@ for ( const theme of [ 'twentytwentyfive', 'storefront' ] ) {
 			wp( `theme activate ${ theme }` );
 		} );
 
+		test( 'the whole panel stops at its cap: eight rows on a desktop, five on a phone (D-136)', async ( {
+			page,
+			isMobile,
+		} ) => {
+			await page.goto( '/search-block/' );
+			await typeInto( page, 'deck' );
+			const listbox = page.getByRole( 'listbox' );
+			const all = listbox.locator( '.csearch-option-all' );
+			await expect( all ).toHaveCount( 1 );
+			const rows = listbox.locator(
+				'[role="option"]:not(.csearch-option-all)'
+			);
+			const count = await rows.count();
+			expect( count ).toBeGreaterThan( 0 );
+			expect( count ).toBeLessThanOrEqual( isMobile ? 5 : 8 );
+			if ( isMobile ) {
+				// On a phone the first three suggestions after a suggested search are products, when there are three.
+				const products = listbox.locator( '.csearch-option-product' );
+				expect( await products.count() ).toBeGreaterThanOrEqual(
+					Math.min( 3, count - 2 )
+				);
+			}
+			await axe(
+				page,
+				`${ theme } panel at its cap`,
+				'.wp-block-creative-search-search, .csearch-form'
+			);
+		} );
+
 		test( 'a suggested search leads, and a scope follows the products', async ( {
 			page,
 			isMobile,

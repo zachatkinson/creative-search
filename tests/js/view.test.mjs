@@ -589,6 +589,31 @@ test( 'the panel stops at its cap: eight rows on a desktop, five on a phone, See
 
 	form++;
 	input = dom.element( `csearch-${ form }-input` );
+	dom.fetch = () => respond( { ...many, queries: [ 'kazumi deck' ] } );
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { limit: 10, maxPhone: 3 } );
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'p100', 'p101', 'p102', 'all' ],
+		'at a cap of three the products keep their three, before a suggested search'
+	);
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 10, maxPhone: 4 } );
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'qkazumi deck', 'p100', 'p101', 'p102', 'all' ],
+		'at four the search comes back'
+	);
+	window.matchMedia = matchMedia;
+	dom.fetch = () => respond( many );
+
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
 	scope.ctx = context( { limit: 10, max: 12 } );
 	type( 'kazumi' );
 	await settle();

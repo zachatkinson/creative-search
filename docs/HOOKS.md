@@ -251,7 +251,7 @@ No new filter or action for other plugins. What the admin attaches, listed so no
 
 ### Admin actions (`admin-post.php`)
 
-Internal endpoints, not for plugins to call; each checks `manage_woocommerce` and a nonce named after the action (D-068): `csearch_synonym_save`, `csearch_synonym_delete`, `csearch_synonym_import`, `csearch_synonym_export`, `csearch_analytics_export`, `csearch_boosts_save`, `csearch_tools_save`, `csearch_reindex`, `csearch_reindex_cancel`, `csearch_product_reindex`, `csearch_dismiss_notice`.
+Internal endpoints, not for plugins to call; each checks `manage_woocommerce` and a nonce named after the action (D-068): `csearch_synonym_save`, `csearch_synonym_delete`, `csearch_synonym_import`, `csearch_synonym_export`, `csearch_analytics_export`, `csearch_analytics_clear` (D-139), `csearch_boosts_save`, `csearch_tools_save`, `csearch_reindex`, `csearch_reindex_cancel`, `csearch_product_reindex`, `csearch_dismiss_notice`.
 
 ### WooCommerce hooks the plugin uses
 
