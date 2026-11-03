@@ -57,7 +57,7 @@ final class Ranker {
 				$hits[] = new Hit( $document, $this->scorer->score( $plan, $document, $widenings ) );
 			}
 		}
-		usort( $hits, array( Hit::class, 'compare' ) );
+		usort( $hits, array( Hit::class, $plan->inStockFirst ? 'stockFirst' : 'compare' ) );
 		return array_slice( $hits, 0, $plan->limit );
 	}
 

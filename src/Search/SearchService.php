@@ -398,7 +398,8 @@ final class SearchService {
 			$retry,
 			Kind::PRODUCT,
 			$strict,
-			array_values( array_unique( array_map( 'intval', $scope ) ) )
+			array_values( array_unique( array_map( 'intval', $scope ) ) ),
+			Settings::isOn( 'in_stock_first' )
 		);
 	}
 
@@ -432,7 +433,7 @@ final class SearchService {
 	 * @return array<int, mixed>
 	 */
 	public function settingsKey(): array {
-		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ), Settings::get( OwnerRules::PINS ) );
+		return array( Settings::get( 'fields' ), Settings::get( 'hidden_by_sku' ), Settings::get( 'fallback_to_default_language' ), Settings::get( 'boost_rules' ), Settings::get( 'show_prices' ), Settings::get( 'index_posts' ), Settings::get( 'index_pages' ), Settings::get( OwnerRules::PINS ), Settings::get( 'in_stock_first' ) );
 	}
 
 	/**

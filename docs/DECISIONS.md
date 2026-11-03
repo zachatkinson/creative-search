@@ -1029,3 +1029,13 @@ In the panel (`SearchService::content()` with `suggest`), the content search now
 `suggest_pages_phone` (default no) leaves posts and pages out of the panel on a phone, where the cap (D-136) leaves few rows and they go to products. A phone is what the panel already treats as one, so this is applied in the browser too; `/suggest` returns the same answer for both.
 
 **Why:** a suggestion has to look like what was typed; a page matched by its body belongs on the results page, where it has a line of context. On a phone the four or five rows above the keyboard are worth more as products.
+
+### D-138 · In stock first is the store's choice, not a fixed rule · 2026-11-03
+
+Zach, 3 November: for "hood" the first two products were two sold-out hoodies ahead of two in stock, because "Hoody" matched better than the −6 the scorer takes for sold out (spec: Matching → B_stock). The plugin is reused across shops, so this is a setting, `in_stock_first`, off by default, which keeps today's ranking exactly.
+
+On, products that can be bought come before sold-out ones, and each part keeps its score order: the score is not changed, only the order's first key. "Can be bought" is the document's `in_stock` flag, which the indexer takes from WooCommerce's `is_in_stock()` and so already includes products on backorder. It is applied where the ranking is made, so it holds before the limit and nothing ranked below the first page can be missed: the one SQL statement leads its `ORDER BY` with `d.in_stock DESC` (D-086), and the PHP order (`explain`, the schema-1 window, the merge of a query's phrase-synonym forms, D-109) sorts with `Hit::stockFirst()` instead of `Hit::compare()`. It reaches the Domain as `SearchOptions::$inStockFirst` and `RankPlan::$inStockFirst`, and the cache key carries it. Pinned products (D-110) are put first after the ranking, as before, so a pinned sold-out product keeps its place. The panel, the results page and `/search` all rank through `SearchService`, so they agree.
+
+The switch sits on the Boosts and exclusions tab, beside the other rules that change the order ("Sold-out products: Show products that can be bought first"). The brief names no tab; this one already holds the ranking rules.
+
+**Why:** Skatehouse wants it on, to match Creative Shop's "Sold-out products last" on the shop's own lists, but another shop may want a better match first even when it is sold out; the score's −6 stays the default.

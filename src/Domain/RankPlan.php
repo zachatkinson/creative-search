@@ -40,6 +40,8 @@ final class RankPlan {
 	 *                                                          completed (D-100); empty reads the key alone.
 	 * @param int[]                                $scope       Products of these term-taxonomy ids only (D-117);
 	 *                                                          none limits nothing.
+	 * @param bool                                 $inStockFirst What can be bought first, each part in score
+	 *                                                          order (D-138).
 	 */
 	public function __construct(
 		public readonly string $lang,
@@ -55,7 +57,8 @@ final class RankPlan {
 		public readonly int $limit,
 		public readonly int $kind = Kind::PRODUCT,
 		public readonly array $names = array(),
-		public readonly array $scope = array()
+		public readonly array $scope = array(),
+		public readonly bool $inStockFirst = false
 	) {
 	}
 
@@ -85,7 +88,7 @@ final class RankPlan {
 			$texts[ $i ]  = $query->tokens[ $i ]->text;
 			$tokens[ $i ] = $widening->matches;
 		}
-		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ), $options->scope );
+		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ), $options->scope, $options->inStockFirst );
 	}
 
 	/**

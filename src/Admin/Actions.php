@@ -276,6 +276,7 @@ final class Actions {
 				'boost_rules'       => array_values( array_filter( $rules ) ),
 				'fallback_products' => self::fallback( $input ),
 				'hidden_by_sku'     => Settings::yesNo( $input['hidden_by_sku'] ?? 'no' ),
+				'in_stock_first'    => Settings::yesNo( $input['in_stock_first'] ?? 'no' ),
 				'help_page'         => $input['help_page'] ?? Settings::get( 'help_page' ),
 				'help_text'         => $input['help_text'] ?? Settings::get( 'help_text' ),
 				'guide_page'        => $input['guide_page'] ?? Settings::get( 'guide_page' ),

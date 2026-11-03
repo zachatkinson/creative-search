@@ -106,6 +106,8 @@ final class Settings {
 			// Matching.
 			'hidden_by_sku'                => 'no',
 			'boost_rules'                  => array(),
+			// Products that can be bought (on backorder too) before sold-out ones, each in score order (D-138).
+			'in_stock_first'               => 'no',
 			'fallback_products'            => array(),
 			// The no-results page's two links (D-096): a page the owner picks, and its wording ('' reads the default).
 			'help_page'                    => 0,
@@ -259,7 +261,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone', 'in_stock_first' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}

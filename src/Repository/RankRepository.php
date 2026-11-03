@@ -139,7 +139,8 @@ final class RankRepository extends Repository {
 		foreach ( array_keys( $plan->phrases ) as $n ) {
 			$sql[] = 'AND s.q' . (int) $n . ' = 1';
 		}
-		$sql[] = $this->prepare( 'ORDER BY total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
+		// What can be bought first, when the owner asks for it (D-138); each part in score order.
+		$sql[] = $this->prepare( 'ORDER BY ' . ( $plan->inStockFirst ? 'd.in_stock DESC, ' : '' ) . 'total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
 
 		return $this->rows( implode( ' ', $sql ) );
 	}
