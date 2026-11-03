@@ -1,7 +1,7 @@
 <?php
 /**
  * Uninstall: removes the eight tables, every option and transient, the product, post and page meta, the scheduled actions
- * and the object-cache group, on every site of a network. Deactivation leaves all of it in place.
+ * and the object-cache group, on every site of a network, and the network's cached update manifest. Deactivation leaves all of it in place.
  *
  * The work is in Install\Uninstaller so the integration suite can prove it leaves nothing; this file only
  * reaches it, and repeats the list inline when the autoloader is missing.
@@ -60,6 +60,8 @@ function csearch_uninstall_site(): void {
 	}
 	wp_cache_flush_group( 'csearch' );
 }
+
+delete_site_transient( 'csearch_update_manifest' );
 
 if ( is_multisite() ) {
 	$csearch_site_ids = get_sites(

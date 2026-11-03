@@ -29,6 +29,7 @@
 			<directory suffix=".php">src/Settings</directory>
 			<file>src/Container.php</file>
 			<file>src/Support/Cast.php</file>
+			<file>src/Updates/Manifest.php</file>
 		</include>
 	</source>
 </phpunit>

@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ Creative Search keeps its own index of every product a shopper may see (names, S
 
 The search bar is a real combobox (keyboard, screen reader and touch all work), the results page stays the shop's own template with relevance as the default sort, and an Analytics screen shows the owner what people search for and what finds nothing, with no personal data.
 
-No external service, no API key, no outbound requests. French and English stem and fold accents; the French site's product fields index alongside the English ones.
+No external service and no API key; the only request the plugin makes is its own update check (see the FAQ). French and English stem and fold accents; the French site's product fields index alongside the English ones.
 
 == Installation ==
 
@@ -28,7 +28,7 @@ No external service, no API key, no outbound requests. French and English stem a
 
 = Does it send anything off the site? =
 
-No. The index, the suggestions and the analytics are all on the server, and the plugin sends nothing to any other service. With "Analytics events" on (the default), the search bar also tells the page's own tag manager (its `dataLayer`, when the page has one) what was searched and chosen, with a search that looks like an email address, a phone number, a card number or a postal code sent as "[redacted]" instead; turn it off under WooCommerce → Search → Tools.
+Nothing about the shop or its shoppers. The index, the suggestions and the analytics are all on the server. The one request is the update check: at most twice a day, when WordPress checks for plugin updates, the plugin reads its release notes from the agency's public releases on GitHub, sending no site address. Turn it off with `define( 'CSEARCH_DISABLE_UPDATES', true );` in wp-config.php. With "Analytics events" on (the default), the search bar also tells the page's own tag manager (its `dataLayer`, when the page has one) what was searched and chosen, with a search that looks like an email address, a phone number, a card number or a postal code sent as "[redacted]" instead; turn it off under WooCommerce → Search → Tools.
 
 = What does it keep about shoppers? =
 
@@ -59,6 +59,9 @@ For example: `.site-header { --csearch-field-bg: #111; --csearch-field-fg: #fff;
 WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi deck"`.
 
 == Upgrade Notice ==
+
+= 1.6.1 =
+Updates now arrive through Dashboard → Updates like any other plugin's. Install this version by hand once; no index rebuild is needed.
 
 = 1.6.0 =
 A shorter suggestion panel, pages suggested by title, an optional in-stock-first order, and analytics that leave out staff and test runs. No index rebuild is needed.
@@ -91,6 +94,9 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.1 =
+* Updates through wp-admin: the plugin checks the agency's releases on GitHub and installs a new version only when its checksum matches. `CSEARCH_DISABLE_UPDATES` turns the check off.
 
 = 1.6.0 =
 * The suggestions have one length: at most 8 rows on a computer and 5 on a phone by default (Tools → Suggestions), with a suggested search, the first products and a category before anything else.

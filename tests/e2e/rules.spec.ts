@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/test';
 import { axe } from './support/axe';
 import { login } from './support/login';
 
