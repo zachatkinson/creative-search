@@ -12,7 +12,7 @@ Walked before each tag, by someone other than the author of the milestone. OWASP
 6. No user data is serialised; no PHP object is stored anywhere; `unserialize` is banned (gate 2).
 7. The log never stores identity: no IP, user id, session, user agent or page URL; queries that look like an email, phone, card or postal code are logged as `[redacted]`.
 8. Rate limits on `/suggest` (30 per 10 s) and `/search` (20 per 10 s) per client, counters in the object cache only.
-9. No file is written; no remote request is made, ever (gate 5).
+9. No file is written; no remote request is made, except the update check to the agency's own release manifest, which can be turned off (D-140; gate 5 allows that one call and fails on any other).
 10. `uninstall.php` removes every table, option, transient, meta, scheduled action and cache entry.
 
 ## Walk, per tag
@@ -28,9 +28,11 @@ Walked before each tag, by someone other than the author of the milestone. OWASP
 | A07 | Identification failures | No login surface; nothing per user. | ✅ | ✅ no login surface | ✅ no login surface; dismissals per user | ✅ no login surface | ✅ no login surface |
 | A08 | Integrity failures | No remote code, no remote calls, no `eval` (gates 2 and 5). | ✅ | ✅ no remote code or calls (gates 2, 5); the block's price HTML comes from the plugin's own same-origin route | ✅ no remote code or calls; the progress script calls the plugin's own `/status` with WordPress's REST nonce | ✅ no remote code or calls; the translation files load from the plugin's own folder | ✅ no remote code or calls; analytics events go to the page's own `dataLayer`, nothing is sent by the plugin |
 | A09 | Logging failures | The search log is the plugin's only log, anonymous by design; failures go to `error_log` through `Support\Logger` (milestone 3). | n/a | ✅ the search log keeps no identity (columns tested); job failures recorded in the index state | ✅ unchanged | ✅ unchanged | ✅ the search log keeps no identity; unchanged |
-| A10 | SSRF | No outbound requests (gate 5). | ✅ | ✅ gate 5 clean | ✅ gate 5 clean | ✅ gate 5 clean | ✅ gate 5 clean |
+| A10 | SSRF | No outbound requests but the update check, to a fixed https address (gate 5, D-140). | ✅ | ✅ gate 5 clean | ✅ gate 5 clean | ✅ gate 5 clean | ✅ gate 5 clean |
 | — | Uninstall | `UninstallTest::test_uninstall_leaves_nothing` green. | ✅ |  | ✅ also removes `csearch_dismissed_notices` (tested) | ✅ unchanged (green in the full integration run) | ✅ also drops `csearch_facts` (tested) |
 | — | Plugin Check | `wp plugin check creative-search` zero errors and warnings. | ✅ "Checks complete. No errors found." |  | ✅ "Checks complete. No errors found." | ✅ "Checks complete. No errors found." on the newest and the oldest pair | ✅ "Checks complete. No errors found." |
 
+
+**v1.6.1** (the update check, D-140), walked by the author (docs/reviews/1.6.1.md). A08: the package is installed only from `github.com` over https and only when its SHA-256 matches the manifest (a mismatch tested, and deleted); no code is evaluated from the manifest, whose changelog is escaped. A10: the only request goes to the constant `Updater::MANIFEST_URL` through `wp_safe_remote_get()`, no input reaches the address, and gate 5 fails on any other outbound call. Uninstall also deletes the `csearch_update_manifest` site transient (tested). Plugin Check: no errors or warnings apart from `plugin_updater_detected` for the `Update URI` header, which `tools/plugin-check.sh` allows and nothing else.
 
 The v1.3.0 column covers the 1.3 release (owner rules, the match line, suggested searches and scopes, add to cart, search within a category, custom fields), walked by the author with an independent spec review (docs/reviews/1.3.md); 1.1 and 1.2 have no column here: their security dimension is in docs/reviews/1.1.md and 1.2.md. The v1.0.0 column covers milestone 8, walked by the author with an independent spec review (docs/reviews/M8.md); Zach's review is the second walk. The v0.7.0 column covers milestone 7, walked by the author with an independent spec review (docs/reviews/M7.md). The v0.6.0 column covers milestones 3 to 6 (v0.4.0 was tagged without its walk; this one includes it). Walked by the author with two independent spec reviews (docs/reviews/M3.md, docs/reviews/M5.md), not by a second person: Zach's review is the second walk.

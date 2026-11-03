@@ -3,7 +3,7 @@
  * Plugin Name:       Creative Search
  * Plugin URI:        https://creativebranding.ca
  * Description:       Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, its own index, analytics, an accessible search bar.
- * Version:           1.6.0
+ * Version:           1.6.1
  * Requires at least: 7.0
  * Requires PHP:      8.5
  * Requires Plugins:  woocommerce
@@ -13,6 +13,7 @@
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       creative-search
  * Domain Path:       /languages
+ * Update URI:        https://raw.githubusercontent.com/zachatkinson/creative-releases/main/creative-search/info.json
  * WC requires at least: 10.0
  * WC tested up to:   11.2
  *
@@ -25,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CSEARCH_VERSION', '1.6.0' );
+define( 'CSEARCH_VERSION', '1.6.1' );
 define( 'CSEARCH_FILE', __FILE__ );
 define( 'CSEARCH_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CSEARCH_URL', plugin_dir_url( __FILE__ ) );

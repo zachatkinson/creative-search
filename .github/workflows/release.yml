@@ -1,0 +1,73 @@
+# On a version tag (v1.6.1), once CI passes on it: build the zip, write its manifest, and publish both to the public releases repo that
+# client sites check for updates (Updates\Updater). Needs a RELEASES_TOKEN secret: a fine-grained token with
+# Contents read and write on zachatkinson/creative-releases only.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Every CI job (lint, analysis, gates, unit, mutation, the integration and browser matrix, Plugin Check, the
+  # budgets) on the tagged commit; nothing is published unless they all pass.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    env:
+      RELEASES_REPO: zachatkinson/creative-releases
+    steps:
+      - name: Check RELEASES_TOKEN can write to the releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          test -n "$GH_TOKEN" || { echo "The RELEASES_TOKEN secret is missing."; exit 1; }
+          push="$(gh api "repos/${RELEASES_REPO}" --jq .permissions.push)" || { echo "RELEASES_TOKEN can't read ${RELEASES_REPO} (expired, or not given that repo)."; exit 1; }
+          test "$push" = "true" || { echo "RELEASES_TOKEN can't write to ${RELEASES_REPO}: give it Contents read and write."; exit 1; }
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+      - name: Check the tag matches the plugin version
+        run: |
+          version="$(grep -E '^ \* Version:' creative-search.php | awk '{print $3}')"
+          test "v${version}" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} is not v${version}"; exit 1; }
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # The zip carries the built blocks (build/), so the scripts are installed and built first.
+      - run: npm ci
+      - name: Build
+        run: bash tools/build-zip.sh
+      - name: Write the manifest
+        run: php tools/release-manifest.php "tmp/creative-search-${VERSION}.zip" > tmp/info.json
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          tag="creative-search-${VERSION}"
+          gh release create "$tag" "tmp/creative-search-${VERSION}.zip" --repo "$RELEASES_REPO" --title "Creative Search ${VERSION}" \
+            --notes "$(php -r '$m = json_decode(file_get_contents("tmp/info.json"), true); echo "- " . implode("\n- ", $m["changelog"]);')"
+      - name: Point info.json at it
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          path="creative-search/info.json"
+          sha="$(gh api "repos/${RELEASES_REPO}/contents/${path}" --jq .sha 2>/dev/null || true)"
+          gh api --method PUT "repos/${RELEASES_REPO}/contents/${path}" \
+            -f message="Creative Search ${VERSION}" \
+            -f content="$(base64 -w0 tmp/info.json)" \
+            ${sha:+-f sha="$sha"}

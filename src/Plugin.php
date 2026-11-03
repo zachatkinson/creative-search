@@ -9,6 +9,9 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search;
 
+use CreativeBranding\Search\Updates\HttpManifestSource;
+use CreativeBranding\Search\Updates\Updater;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -40,6 +43,9 @@ final class Plugin {
 			return;
 		}
 		self::$booted = true;
+
+		// Updates come from the agency's releases, also while WooCommerce is missing, so a fix still arrives (D-140).
+		( new Updater( new HttpManifestSource( Updater::MANIFEST_URL ), plugin_basename( CSEARCH_FILE ) ) )->register();
 
 		if ( ! self::woocommerceOk() ) {
 			add_action( 'admin_notices', array( self::class, 'missingWooCommerceNotice' ) );

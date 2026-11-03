@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-03
+
+Updates through wp-admin, from the agency's releases.
+
+### Added
+- The plugin checks `zachatkinson/creative-releases` for a new version when WordPress checks for plugin updates (at most every 12 hours), shows its changelog in the details popup, and installs it only when the zip's SHA-256 matches the manifest. The `CSEARCH_DISABLE_UPDATES` constant and the `csearch_updates_enabled` filter turn it off (D-140).
+- A version tag publishes the release: every CI job on the tagged commit, then the zip and its manifest to creative-releases (D-140).
+
+### Changed
+- Uninstall also deletes the cached update manifest.
+
 ## [1.6.0] - 2026-11-03
 
 A shorter panel, in stock first as the store's choice, and analytics without test traffic, from the 3 November UX review against Baymard's research.

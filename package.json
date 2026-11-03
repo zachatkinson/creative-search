@@ -1,6 +1,6 @@
 {
 	"name": "creative-search",
-	"version": "1.6.0",
+	"version": "1.6.1",
 	"private": true,
 	"description": "Search for WooCommerce: live suggestions, typo tolerance, an index of its own, analytics, an accessible search bar.",
 	"author": "Zach Atkinson",
@@ -21,7 +21,7 @@
 		"format": "wp-scripts format assets/src assets/admin tests/js tests/e2e playwright.config.ts eslint.config.js .prettierrc.js",
 		"test:js": "vitest run",
 		"test:e2e": "playwright test",
-		"plugin-check": "wp-env run cli wp plugin check creative-search --exclude-directories=tests,tools,node_modules,vendor,tmp,docs,test-results,playwright-report,.claude,.github --exclude-files=.wp-env.json,.wp-env.override.json,.gitignore,.distignore,.editorconfig,.nvmrc,CLAUDE.md,composer.json,composer.lock,package.json,package-lock.json,phpcs.xml,phpstan.neon,phpunit.xml.dist,phpunit-integration.xml.dist,infection.json5,infection-domain.json5,playwright.config.ts,vitest.config.mjs,eslint.config.js,.stylelintrc.json,.prettierrc.js",
+		"plugin-check": "bash tools/plugin-check.sh",
 		"check": "npm run lint:js && npm run lint:css && npm run format:check && npm run test:js"
 	},
 	"devDependencies": {

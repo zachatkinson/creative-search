@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Install;
 
 use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Support\Tables;
+use CreativeBranding\Search\Updates\HttpManifestSource;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -18,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Removes everything the plugin made: the eight tables, every option and transient, the product meta, the
- * scheduled actions and the object-cache group. Per site on a network. Never touches products or orders.
+ * scheduled actions, the object-cache group and the network's cached update manifest. Per site on a network. Never touches products or orders.
  */
 final class Uninstaller {
 
@@ -26,6 +27,8 @@ final class Uninstaller {
 	 * Uninstall every site.
 	 */
 	public static function run(): void {
+		// The update manifest is cached once for the whole network (D-140).
+		delete_site_transient( HttpManifestSource::CACHE );
 		if ( is_multisite() ) {
 			/** @var int[] $siteIds */
 			$siteIds = get_sites(

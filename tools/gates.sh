@@ -41,8 +41,10 @@ if [ -n "$missing" ]; then
 	echo "Gate 4: missing declare( strict_types=1 ):"; echo "$missing"; status=1
 fi
 
-# 5. No remote requests, ever.
-hits="$(grep -rnE 'wp_remote_(get|post|request|head)|curl_init|file_get_contents\(\s*["'"'"']https?:' src --include='*.php' || true)"
+# 5. No remote requests but one: the update manifest, read by Updates\HttpManifestSource (D-140). The package itself is
+#    downloaded by WordPress's upgrader (download_url() through Updates\Updater's injected downloader).
+hits="$(grep -rnE 'wp_(safe_)?remote_(get|post|request|head)|curl_init|fsockopen|download_url\(|file_get_contents\(\s*["'"'"']https?:' src --include='*.php' \
+	| grep -vE '^src/Updates/HttpManifestSource\.php:[0-9]+:.*wp_safe_remote_get\(|^src/Updates/Updater\.php:[0-9]+:.*return download_url\(' || true)"
 if [ -n "$hits" ]; then
 	echo "Gate 5: outbound request:"; echo "$hits"; status=1
 fi

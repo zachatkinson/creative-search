@@ -540,3 +540,24 @@ The block's colour hooks (D-128). Set them anywhere a CSS custom property inheri
 ```
 
 Choose pairs with at least 4.5:1 contrast; the focus ring needs 3:1 against what surrounds the field.
+
+## 1.6.1: updates (1.6.1)
+
+### `csearch_updates_enabled` (filter)
+
+Whether the plugin checks the agency's releases for updates (D-140). Default true, or false when the constant `CSEARCH_DISABLE_UPDATES` is true. Read once, when the plugin boots; false attaches no update hook and makes no request.
+
+| Argument | Type | What |
+| --- | --- | --- |
+| `$enabled` | `bool` | true to check |
+
+```php
+add_filter( 'csearch_updates_enabled', '__return_false' );
+```
+
+Or in wp-config.php: `define( 'CSEARCH_DISABLE_UPDATES', true );`
+
+### WordPress hooks the plugin uses
+
+`update_plugins_raw.githubusercontent.com` (the `Update URI` header's host), `plugins_api`, `upgrader_pre_download` and `load-update-core.php`. The update error code is `csearch_package_mismatch`.
+

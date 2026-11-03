@@ -13,6 +13,7 @@ use CreativeBranding\Search\Install\Uninstaller;
 use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Support\IntegrationTestCase;
+use CreativeBranding\Search\Updates\HttpManifestSource;
 
 /**
  * Uninstall leaves nothing: no table, option, transient, meta, scheduled action or cache entry.
@@ -28,6 +29,7 @@ final class UninstallTest extends IntegrationTestCase {
 		update_option( Options::STOPWORDS_PREFIX . 'fr', array( 'les' ) );
 		set_transient( Options::TRANSIENT_PREFIX . 'notice_1', 'x', HOUR_IN_SECONDS );
 		set_transient( Options::TRANSIENT_PREFIX . 'reindex', 'running' );
+		set_site_transient( HttpManifestSource::CACHE, array( 'data' => null ), HOUR_IN_SECONDS );
 		$product = new \WC_Product_Simple();
 		$product->set_name( 'Deck' );
 		$product->set_regular_price( '10' );
@@ -49,6 +51,7 @@ final class UninstallTest extends IntegrationTestCase {
 		}
 		$options = $wpdb->get_col( $wpdb->prepare( 'SELECT option_name FROM %i WHERE option_name LIKE %s OR option_name LIKE %s OR option_name LIKE %s', $wpdb->options, '%' . $wpdb->esc_like( 'csearch' ) . '%', $wpdb->esc_like( '_transient_csearch_' ) . '%', $wpdb->esc_like( '_transient_timeout_csearch_' ) . '%' ) );
 		self::assertSame( array(), $options, 'options or transients left behind' );
+		self::assertFalse( get_site_transient( HttpManifestSource::CACHE ), 'the update manifest cache left behind' );
 		$meta = $wpdb->get_col( $wpdb->prepare( 'SELECT meta_key FROM %i WHERE meta_key LIKE %s', $wpdb->postmeta, $wpdb->esc_like( '_csearch_' ) . '%' ) );
 		self::assertSame( array(), $meta, 'product meta left behind' );
 		self::assertSame( array(), $wpdb->get_col( $wpdb->prepare( 'SELECT umeta_id FROM %i WHERE meta_key = %s', $wpdb->usermeta, Options::USER_DISMISSED ) ), 'user meta left behind' );
@@ -79,6 +82,7 @@ final class UninstallTest extends IntegrationTestCase {
 		self::assertStringContainsString( "'" . Options::USER_DISMISSED . "'", $source );
 		self::assertStringContainsString( "'" . Options::QUEUE_GROUP . "'", $source );
 		self::assertStringContainsString( "wp_cache_flush_group( '" . Options::CACHE_GROUP . "' )", $source );
+		self::assertStringContainsString( "delete_site_transient( '" . HttpManifestSource::CACHE . "' )", $source );
 	}
 
 	public function test_uninstall_is_idempotent(): void {
