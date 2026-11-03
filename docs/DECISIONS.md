@@ -997,3 +997,13 @@ The weight is deliberate, and lower than D-125's 0,4,0. A site styles the block 
 
 **Why:** the block has to look like itself in a theme that styles buttons, without the site writing overrides, and without undoing the overrides a site does write.
 
+
+### D-135 · The header's Description stays under 140 characters, and readme.txt repeats it · 2026-10-28
+
+The Plugin Handbook's header requirements ask for a Description of fewer than 140 characters, because the Plugins screen shows it. 1.5.2's was 174, and readme.txt's short description, a different sentence, was 143. Both are now the same 137-character sentence, and the agency's other plugins took the same fix on 27 October.
+
+`tests/Unit/PluginHeaderTest.php` reads the Description line of `creative-search.php` as WordPress does and fails at 140 characters or more (counted in UTF-8 characters, not bytes). It also fails when readme.txt's short description is not the same sentence, so the two cannot drift apart again and the readme's 150-character limit is covered by the header's.
+
+The Canadian French entry was edited in the .po by hand, not through `composer i18n:po`, so that no other entry, comment or header line in it could change; the compiled .mo differs from 1.5.2's in that one entry only.
+
+**Why:** a long Description is cut or wraps badly on the Plugins screen, and a unit test catches it on every run, before Plugin Check or a review would.

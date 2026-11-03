@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-10-28
+
+The plugin's description only.
+
+### Changed
+- A short description on the Plugins screen, under the 140 characters the Plugin Handbook asks for: the header's Description and readme.txt's short description are now the same 137-character sentence, with its Canadian French translation, and a unit test fails when the header's Description reaches 140 characters (D-135).
+
 ## [1.5.2] - 2026-10-27
 
 The search block's buttons keep their own look inside a theme's styles.

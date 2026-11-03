@@ -4,11 +4,11 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.5.2
+Stable tag: 1.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, an index of its own, analytics, an accessible search bar.
+Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, its own index, analytics, an accessible search bar.
 
 == Description ==
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.5.3 =
+The plugin's description only.
+
 = 1.5.2 =
 The search field's clear button no longer turns into a dark block on hover in themes that style every button's hover, such as Kadence.
 
@@ -85,6 +88,9 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.5.3 =
+* A short description on the Plugins screen, under the 140 characters the Plugin Handbook asks for.
 
 = 1.5.2 =
 * The search block's buttons (clear, submit, and Button mode's open and close) keep their own look on hover and focus in themes that style every button, such as Kadence; the clear button no longer turns into a dark block.

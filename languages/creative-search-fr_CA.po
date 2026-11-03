@@ -26,8 +26,8 @@ msgstr "https://creativebranding.ca"
 
 #. Description of the plugin
 #: creative-search.php
-msgid "Search for WooCommerce: live suggestions as the shopper types, typo tolerance, SKU and attribute matching, an index of its own, search analytics and an accessible search bar."
-msgstr "La recherche pour WooCommerce : suggestions en direct pendant la saisie, tolérance aux fautes de frappe, recherche par UGS et par attribut, un index qui lui est propre, des statistiques de recherche et une barre de recherche accessible."
+msgid "Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, its own index, analytics, an accessible search bar."
+msgstr "La recherche pour WooCommerce : suggestions en direct, tolérance aux fautes de frappe, recherche par UGS et par attribut, un index qui lui est propre, des statistiques et une barre de recherche accessible."
 
 #. Author of the plugin
 #: creative-search.php
