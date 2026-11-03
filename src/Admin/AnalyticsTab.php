@@ -94,6 +94,34 @@ final class AnalyticsTab {
 		echo AdminPage::formStart( Actions::ANALYTICS_EXPORT ) . '<input type="hidden" name="days" value="' . esc_attr( (string) $days ) . '"><p class="description">' . esc_html__( 'Every search of the period, one row each, the same columns as the log. Nothing in it identifies a shopper.', 'creative-search' ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts.
 		submit_button( __( 'Export CSV', 'creative-search' ), 'secondary', 'submit', false );
 		echo '</form>';
+
+		$this->clear();
+	}
+
+	/**
+	 * Clear analytics (D-139): a link to a confirmation that says what goes, then a button that deletes it. No
+	 * script is needed, and nothing is deleted by one click.
+	 */
+	private function clear(): void {
+		echo '<h2 id="csearch-clear">' . esc_html__( 'Clear analytics', 'creative-search' ) . '</h2>';
+		$asked = isset( $_GET['clear'] ) && '1' === $_GET['clear']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- showing the question changes nothing; the deletion checks its nonce.
+		if ( ! $asked ) {
+			echo '<p class="description">' . esc_html__( 'Start the numbers again from nothing, such as on launch day, after testing.', 'creative-search' ) . '</p>';
+			echo '<p><a class="button" href="' . esc_url( AdminPage::url( 'analytics', array( 'clear' => '1' ) ) . '#csearch-clear' ) . '">' . esc_html__( 'Clear analytics…', 'creative-search' ) . '</a></p>';
+			return;
+		}
+		$held = $this->analytics->held();
+		echo '<div class="notice notice-warning inline csearch-confirm" role="group" aria-labelledby="csearch-clear"><p><strong>' . esc_html__( 'This deletes, for good:', 'creative-search' ) . '</strong></p><ul class="ul-disc">';
+		/* translators: %s: number of searches */
+		echo '<li>' . esc_html( sprintf( _n( '%s logged search, with what was clicked after it', 'all %s logged searches, with what was clicked after each', $held['searches'], 'creative-search' ), number_format_i18n( $held['searches'] ) ) ) . '</li>';
+		/* translators: %s: number of days */
+		echo '<li>' . esc_html( sprintf( _n( '%s day of daily counts behind the charts', '%s days of daily counts behind the charts', $held['days'], 'creative-search' ), number_format_i18n( $held['days'] ) ) ) . '</li>';
+		echo '<li>' . esc_html__( 'the suggested searches, which are built from the log, until shoppers search again', 'creative-search' ) . '</li></ul>';
+		echo '<p>' . esc_html__( 'Synonyms, redirects, pins and the index are not touched. Export a CSV first to keep a copy.', 'creative-search' ) . '</p>';
+		echo AdminPage::formStart( Actions::ANALYTICS_CLEAR ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts.
+		echo '<p>';
+		submit_button( __( 'Clear analytics', 'creative-search' ), 'delete', 'submit', false, array( 'id' => 'csearch-clear-confirm' ) );
+		echo ' <a class="button button-secondary" href="' . esc_url( AdminPage::url( 'analytics' ) ) . '">' . esc_html__( 'Cancel', 'creative-search' ) . '</a></p></form></div>';
 	}
 
 	/**

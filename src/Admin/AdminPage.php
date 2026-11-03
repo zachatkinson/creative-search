@@ -105,6 +105,20 @@ final class AdminPage {
 	}
 
 	/**
+	 * The Plugins screen's links for this plugin, with Settings first, as the other Creative plugins have it.
+	 *
+	 * @param mixed $links The links WordPress gives (Deactivate, …).
+	 * @return array<int|string, mixed>
+	 */
+	public function actionLinks( mixed $links ): array {
+		$links = is_array( $links ) ? $links : array();
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return $links;
+		}
+		return array( 'settings' => '<a href="' . esc_url( self::url( 'tools' ) ) . '">' . esc_html__( 'Settings', 'creative-search' ) . '</a>' ) + $links;
+	}
+
+	/**
 	 * Add the submenu under WooCommerce.
 	 */
 	public function menu(): void {

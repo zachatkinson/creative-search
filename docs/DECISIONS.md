@@ -1007,3 +1007,46 @@ The Plugin Handbook's header requirements ask for a Description of fewer than 14
 The Canadian French entry was edited in the .po by hand, not through `composer i18n:po`, so that no other entry, comment or header line in it could change; the compiled .mo differs from 1.5.2's in that one entry only.
 
 **Why:** a long Description is cut or wraps badly on the Plugins screen, and a unit test catches it on every run, before Plugin Check or a review would.
+
+### D-136 · One cap on the whole panel, filled in a fixed order · 2026-11-03
+
+From the 3 November UX review (the brief for 1.6.0): for "hood" the panel showed 11 rows on a desktop and 10 on a phone, of which about four fit above the keyboard, because each group (suggested searches, products, categories and scopes, pages) had its own limit and D-092's budget of 10 was their sum. Baymard's autocomplete research: at most 10 suggestions on a desktop, 4 to 8 on a phone.
+
+`panel_max` (default 8, 4 to 12) and `panel_max_phone` (default 5, 3 to 8) cap the whole panel; "See all" is never counted and always shows. A block (`panelMax`, `panelMaxPhone`) or shortcode (`panel_max`, `panel_max_phone`) overrides both, as it does the other panel options; the widget keeps the owner's. A phone is what the panel already treated as one (`(max-width: 600px), (pointer: coarse)`), so the cap is applied in the browser, in `budget()`, and the answer from `/suggest` is unchanged and still cached once for both widths.
+
+Each group keeps its own limit first (the owner's products; 3 suggested searches, 2 on a phone; 3 terms, 2 on a phone, sharing their room with up to 2 scopes; 2 posts or pages). Then the rows are taken in this order until the cap: one suggested search; 3 products (on a phone this is the brief's "at least 3 when there are 3"); one category or scope row (a scope first, D-113); the other products; then, choices the brief left open, the other suggested searches and the other categories and scopes, in that order; and posts or pages last. One exception: when the cap cannot hold the suggested search and three products (`panel_max_phone` at 3), the three products win, as the brief promises "at least 3 when there are 3"; the search returns at a cap of 4. The rows still show in their groups' order (searches, products, scopes, terms, pages), so taking a category before the fourth product changes which rows show, not where.
+
+This replaces D-092's row budget (10 on a desktop with terms giving way first, 4 products on a phone): a phone's products are now bounded by its cap rather than a fixed 4, so an owner who raises `panel_max_phone` gets more products, not more categories. D-092's `fit()` is unchanged and still drops the last rows when the capped panel does not fit the screen.
+
+**Why:** the panel's length should be one number the owner sets, not a sum nobody chose; and when room is short the shopper should see the one suggested search, the first products and the one category before anything else.
+
+### D-137 · The panel suggests a page by its title; a phone's panel leaves pages out · 2026-11-03
+
+For "hood" the panel offered Wheel guide and Privacy policy, pages with the word somewhere in their content, not in their titles. A suggestion row shows only the title, so the shopper cannot see why it is there.
+
+In the panel (`SearchService::content()` with `suggest`), the content search now ranks its first 10, as before, and keeps those whose title the query matches, in rank order, up to the panel's 2: every token of the query must have reached at least one term the document carries in its name field (`Domain\TitleMatch`, from the postings through `IndexRepository::fieldsOf()`, which now takes the kind, D-105). The same widening applies as everywhere else, so the last word still counts as a prefix ("wheel gui" offers Wheel guide), and a stem or a corrected typo counts. A parent page's title, indexed as a child's category, does not count, and neither does a search that had to drop a word: the shopper's words have to be in the title the row shows. The results page keeps matching titles and content as before, and the cache key now carries the context, so the two never share an answer.
+
+`suggest_pages_phone` (default no) leaves posts and pages out of the panel on a phone, where the cap (D-136) leaves few rows and they go to products. A phone is what the panel already treats as one, so this is applied in the browser too; `/suggest` returns the same answer for both.
+
+**Why:** a suggestion has to look like what was typed; a page matched by its body belongs on the results page, where it has a line of context. On a phone the four or five rows above the keyboard are worth more as products.
+
+### D-138 · In stock first is the store's choice, not a fixed rule · 2026-11-03
+
+Zach, 3 November: for "hood" the first two products were two sold-out hoodies ahead of two in stock, because "Hoody" matched better than the −6 the scorer takes for sold out (spec: Matching → B_stock). The plugin is reused across shops, so this is a setting, `in_stock_first`, off by default, which keeps today's ranking exactly.
+
+On, products that can be bought come before sold-out ones, and each part keeps its score order: the score is not changed, only the order's first key. "Can be bought" is the document's `in_stock` flag, which the indexer takes from WooCommerce's `is_in_stock()` and so already includes products on backorder. It is applied where the ranking is made, so it holds before the limit and nothing ranked below the first page can be missed: the one SQL statement leads its `ORDER BY` with `d.in_stock DESC` (D-086), and the PHP order (`explain`, the schema-1 window, the merge of a query's phrase-synonym forms, D-109) sorts with `Hit::stockFirst()` instead of `Hit::compare()`. It reaches the Domain as `SearchOptions::$inStockFirst` and `RankPlan::$inStockFirst`, and the cache key carries it. Pinned products (D-110) are put first after the ranking, as before, so a pinned sold-out product keeps its place. The panel, the results page and `/search` all rank through `SearchService`, so they agree.
+
+The switch sits on the Boosts and exclusions tab, beside the other rules that change the order ("Sold-out products: Show products that can be bought first"). The brief names no tab; this one already holds the ranking rules.
+
+**Why:** Skatehouse wants it on, to match Creative Shop's "Sold-out products last" on the shop's own lists, but another shop may want a better match first even when it is sold out; the score's −6 stays the default.
+
+### D-139 · Analytics count shoppers: staff and test runs stay out, and the numbers can be cleared · 2026-11-03
+
+On the demo the top queries were the end-to-end suite's ("kazumi" 446 times, "xyzzy" 319, "zzqxv" 16), so click-through read 0.3% and the no-results list was mostly the agency's own. Before launch the numbers have to be the shoppers'.
+
+1. **Staff.** `log_staff_searches` (default no): a search or a suggestion click from a signed-in user who can `edit_products` (administrators and shop managers) is not logged, so it is in no count, chart or suggested search. The panel's REST requests carry no nonce (the form stays free of nonces so a cached page still searches, Skatehouse handoff item 4, D-051), so WordPress resets them to a signed-out user; `SearchLog::ignored()` then reads the logged-in cookie itself with `wp_validate_auth_cookie( '', 'logged_in' )`. This is safe without a nonce because it can only leave a row out, never grant anything; a forged or expired cookie does not validate and is logged as a shopper. A customer's account is a shopper's.
+2. **Test runs.** The filter `csearch_log_search( true, $query, $lang, $results, $source )` can leave any search out, and a request carrying `X-Creative-Test: 1` (exactly "1") is not logged. The header needs no secret: it hides only the sender's own searches. Clicks are left out on the same terms (staff and header), so a test run or a manager clicking can never mark a shopper's search of the same words (D-052); the filter is about searches and is not asked for clicks. The browser's click beacon cannot carry a header, but a suite's click follows its own search, which was not logged, so it marks nothing unless a shopper searched the same words in the last ten minutes.
+3. **Clear analytics.** On the Analytics tab, "Clear analytics…" is a link to a confirmation on the same screen, not a script dialog. It says what goes: the number of logged searches (with their clicks), the days of daily counts, and the suggested searches built from them, and that synonyms, redirects, pins and the index stay. Only the confirmation's button, a POST with its own nonce (`csearch_analytics_clear`, `manage_woocommerce`), deletes: `LogRepository::clear()` (`DELETE FROM`, which needs no `DROP` privilege as `TRUNCATE` would) and `stats` emptied, then the cached answers are dropped so no suggested search outlives its rows. `wp csearch analytics clear` does the same after WP-CLI's confirmation, or at once with `--yes`.
+4. **The Plugins screen.** A Settings link, first, to WooCommerce → Search's Tools tab, where the settings are; only for users who can open it.
+
+**Why:** a shop's analytics are for deciding what to stock and which synonyms to add, and a launch should start from the shoppers' first search, not from the agency's tests.

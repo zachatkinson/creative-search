@@ -449,6 +449,16 @@ final class SearcherTest extends TestCase {
 		self::assertSame( 8.0, $r->products[0]->score->phrase );
 	}
 
+	public function test_in_stock_first_puts_what_can_be_bought_ahead_each_part_in_score_order(): void {
+		$off = $this->search( 'decks ' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'KAZUMI Skate Deck, Ghost Tiger', 'Skatehouse Hoodie, Logo' ), self::titles( $off ), 'off: the sold-out name match beats the in-stock description match' );
+		$on = $this->search( 'decks ', 'en', new SearchOptions( inStockFirst: true ) );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'Skatehouse Hoodie, Logo', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $on ), 'on: the order flips (D-138)' );
+		self::assertSame( $off->products[1]->score->total(), $on->products[2]->score->total(), 'the score itself is unchanged' );
+		$this->product( 'KAZUMI Skate Deck, Sold Again', 'KAZ-SOA-00031', array(), false, 500, array() );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer', 'Skatehouse Hoodie, Logo', 'KAZUMI Skate Deck, Sold Again', 'KAZUMI Skate Deck, Ghost Tiger' ), self::titles( $this->search( 'decks ', 'en', new SearchOptions( inStockFirst: true ) ) ), 'the sold-out part in its own order' );
+	}
+
 	public function test_exact_name_earns_the_bonus(): void {
 		$r = $this->search( 'kazumi skate deck dealer' );
 		self::assertSame( 12.0, $r->products[0]->score->exact );
@@ -650,6 +660,16 @@ final class SearcherTest extends TestCase {
 		self::assertGreaterThan( $plain->products[1]->score->total(), $r->products[2]->score->total(), 'the better of its two scores: the other form names more of it' );
 		$capped = $this->search( 'zeta ss bearings', 'en', new SearchOptions( limit: 2 ), self::phraseSynonyms() );
 		self::assertSame( array( 'Zeta Stainless Steel Bearings', 'Zeta SS Bearings' ), self::titles( $capped ), 'the limit holds over the merged list' );
+	}
+
+	public function test_the_merged_forms_keep_what_can_be_bought_first(): void {
+		$this->product( 'Zeta SS Bearings', 'BRG-ZSS-00001', array(), true, 0, array() );
+		$this->product( 'Zeta Stainless Steel Bearings', 'BRG-ZSB-00003', array(), false, 0, array() );
+		$this->product( 'Zeta Stainless Steel SS Bearings', 'BRG-ZST-00002', array(), true, 0, array() );
+		$off = $this->search( 'zeta ss bearings', 'en', null, self::phraseSynonyms() );
+		self::assertSame( array( 'Zeta Stainless Steel Bearings', 'Zeta SS Bearings', 'Zeta Stainless Steel SS Bearings' ), self::titles( $off ), 'off: the sold-out exact name first' );
+		$on = $this->search( 'zeta ss bearings', 'en', new SearchOptions( inStockFirst: true ), self::phraseSynonyms() );
+		self::assertSame( array( 'Zeta SS Bearings', 'Zeta Stainless Steel SS Bearings', 'Zeta Stainless Steel Bearings' ), self::titles( $on ), 'on: last, across both forms (D-138)' );
 	}
 
 	public function test_without_other_forms_the_ranking_is_the_store_order(): void {

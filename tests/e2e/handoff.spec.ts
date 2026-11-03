@@ -87,16 +87,28 @@ for ( const size of [
 	} );
 }
 
-test( 'pages show in their own group after the products', async ( {
+test( 'pages show in their own group after the products, and stay off a phone (D-137)', async ( {
 	page,
+	isMobile,
 } ) => {
 	await page.goto( '/search-block/' );
 	const input = await field( page );
 	await input.click();
+	const answered = page.waitForResponse(
+		( r ) =>
+			r.url().includes( 'csearch/v1/suggest' ) &&
+			/[?&]q=size(\+|%20)guide(&|$)/.test( r.url() )
+	);
 	await input.pressSequentially( 'size guide', { delay: 30 } );
-	const option = page
-		.getByRole( 'listbox' )
-		.getByRole( 'option', { name: /Size guide/ } );
+	const listbox = page.getByRole( 'listbox' );
+	const option = listbox.getByRole( 'option', { name: /Size guide/ } );
+	if ( isMobile ) {
+		// `suggest_pages_phone` is off by default: a phone's rows go to products, and no product matches.
+		const body = await ( await answered ).json();
+		expect( body.content.length ).toBeGreaterThan( 0 );
+		await expect( option ).toHaveCount( 0 );
+		return;
+	}
 	await expect( option ).toBeVisible();
 	await expect( option.locator( '.csearch-group' ) ).toHaveText(
 		'Pages and posts'

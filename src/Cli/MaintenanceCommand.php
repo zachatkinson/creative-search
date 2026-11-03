@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Cli;
 
+use CreativeBranding\Search\Admin\Analytics;
 use CreativeBranding\Search\Repository\LogRepository;
 use CreativeBranding\Search\Search\Cache;
 use CreativeBranding\Search\Search\LogMaintenance;
@@ -33,8 +34,52 @@ final class MaintenanceCommand {
 	 *
 	 * @param LogRepository  $log         The log table.
 	 * @param LogMaintenance $maintenance The nightly roll-up, run first so the charts keep the purged days.
+	 * @param Analytics      $analytics   Clear analytics (D-139).
 	 */
-	public function __construct( private LogRepository $log, private LogMaintenance $maintenance ) {
+	public function __construct( private LogRepository $log, private LogMaintenance $maintenance, private Analytics $analytics ) {
+	}
+
+	/**
+	 * Delete every search-log row and every daily roll-up: the Analytics tab starts from nothing (D-139).
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--yes]
+	 * : Clear without asking.
+	 *
+	 * [--format=<format>]
+	 * : `json` for `{"searches": n, "days": n}`.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp csearch analytics clear --yes
+	 *
+	 * @param string[]             $args  Positional arguments (none).
+	 * @param array<string, mixed> $assoc Flags.
+	 */
+	public function clear( array $args, array $assoc ): void {
+		unset( $args );
+		$held = $this->analytics->held();
+		WP_CLI::confirm(
+			sprintf(
+				/* translators: %s: number of searches */
+				_n( 'Delete %s logged search and every daily count? Analytics and the suggested searches start again from nothing.', 'Delete %s logged searches and every daily count? Analytics and the suggested searches start again from nothing.', $held['searches'], 'creative-search' ),
+				number_format_i18n( $held['searches'] )
+			),
+			$assoc
+		);
+		$done = $this->analytics->clear();
+		if ( 'json' === ( $assoc['format'] ?? '' ) ) {
+			WP_CLI::line( (string) wp_json_encode( $done ) );
+			return;
+		}
+		WP_CLI::success(
+			sprintf(
+				/* translators: %s: number of searches */
+				_n( 'Analytics cleared: %s search deleted, with the daily counts.', 'Analytics cleared: %s searches deleted, with the daily counts.', $done['searches'], 'creative-search' ),
+				number_format_i18n( $done['searches'] )
+			)
+		);
 	}
 
 	/**

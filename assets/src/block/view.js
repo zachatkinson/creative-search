@@ -30,15 +30,18 @@ const RECENT = 5;
 const RECENT_KEY = 'csearch_recent';
 const SPACE_FOR_PANEL = 240;
 // Baymard: at most 10 suggestions on a desktop, 4 to 8 on a phone, and no scrollbar where the page can scroll
-// (D-092); in a fixed or sticky header, or on a touch screen, the panel scrolls inside itself (D-126).
-const MOST = 10;
+// (D-092); in a fixed or sticky header, or on a touch screen, the panel scrolls inside itself (D-126). The whole
+// panel is capped by `panel_max` and `panel_max_phone` (D-136); these are the caps a form without them uses.
+const MOST = 8;
+const PHONE_MOST = 5;
 const PHONE = '(max-width: 600px), (pointer: coarse)';
-const PHONE_PRODUCTS = 4;
+// Products a phone's cap keeps before the category row, when there are that many (D-136).
+const FIRST_PRODUCTS = 3;
 const PHONE_TERMS = 2;
 const TERMS = 3;
 // Posts and pages, after the products, at most (Skatehouse handoff item 7).
 const CONTENT = 2;
-// Suggested searches above the products, at most; on a phone they leave the products their four (D-112).
+// Suggested searches above the products, at most (D-112).
 const QUERIES = 3;
 const PHONE_QUERIES = 2;
 // Searches within a category, at most, in the room the terms have (D-113).
@@ -557,33 +560,59 @@ function contentRow( ctx, c, index, first ) {
 }
 
 /**
- * How many suggested searches, products, terms and posts or pages the panel shows: the owner's limit, at most
- * 10 rows in all on a desktop with terms giving way first, 4 products and 2 terms on a phone (D-092), up to 3
- * suggested searches above the products (2 on a phone, D-112), and up to 2 posts or pages after them (Skatehouse
- * handoff item 7). The room for terms is shared with the searches within a category, which take it first (D-113).
+ * How many suggested searches, products, categories (scopes, then terms) and posts or pages the panel shows (D-136).
+ * Each group has its own limit first: the owner's products, up to 3 suggested searches (2 on a phone, D-112), up to
+ * 3 terms (2 on a phone) sharing their room with up to 2 searches within a category (D-113), and up to 2 posts or
+ * pages (none on a phone unless the form allows them). Then the whole panel is filled to its cap in this order: one
+ * suggested search, three products, one category or scope row, the other products, the other suggested searches
+ * and categories, and posts or pages last. "See all" is not counted.
  *
- * @param {Object} ctx     The block's context.
- * @param {number} content Posts and pages in the answer.
- * @param {number} queries Suggested searches in the answer.
- * @return {{queries: number, products: number, room: number, content: number}} The budget.
+ * @param {Object} ctx   The block's context.
+ * @param {Object} found How many of each the answer has: `{queries, products, scopes, terms, content}`.
+ * @return {{queries: number, products: number, scopes: number, terms: number, content: number}} The budget.
  */
-function budget( ctx, content = 0, queries = 0 ) {
+export function budget( ctx, found ) {
 	const phone = Boolean( window.matchMedia?.( PHONE ).matches );
-	const pages = Math.min( CONTENT, content );
-	const asked = Math.min( phone ? PHONE_QUERIES : QUERIES, queries );
-	const products = Math.min(
-		ctx.limit,
-		phone ? PHONE_PRODUCTS : MOST - pages - asked
-	);
-	const room = phone
-		? PHONE_TERMS
-		: Math.min( TERMS, MOST - products - pages - asked );
-	return {
-		queries: asked,
-		products,
-		room: Math.max( 0, room ),
-		content: pages,
+	const room = phone ? PHONE_TERMS : TERMS;
+	const scopes = Math.min( SCOPES, room, found.products ? found.scopes : 0 );
+	const has = {
+		queries: Math.min( phone ? PHONE_QUERIES : QUERIES, found.queries ),
+		products: Math.min( ctx.limit, found.products ),
+		scopes,
+		terms: ctx.terms ? Math.min( room - scopes, found.terms ) : 0,
+		content:
+			phone && false === ctx.pagesPhone
+				? 0
+				: Math.min( CONTENT, found.content ),
 	};
+	const cap =
+		Number( phone ? ctx.maxPhone : ctx.max ) ||
+		( phone ? PHONE_MOST : MOST );
+	const out = { queries: 0, products: 0, scopes: 0, terms: 0, content: 0 };
+	let left = cap;
+	const take = ( group, upTo ) => {
+		const n = Math.max(
+			0,
+			Math.min( left, has[ group ] - out[ group ], upTo - out[ group ] )
+		);
+		out[ group ] += n;
+		left -= n;
+	};
+	const category = ( upTo ) => {
+		take( 'scopes', upTo - out.terms );
+		take( 'terms', upTo - out.scopes );
+	};
+	// The first three products are promised (when there are three): a cap of 3 leaves no room for the search.
+	if ( cap > Math.min( FIRST_PRODUCTS, has.products ) ) {
+		take( 'queries', 1 );
+	}
+	take( 'products', FIRST_PRODUCTS );
+	category( 1 );
+	take( 'products', Infinity );
+	take( 'queries', Infinity );
+	category( Infinity );
+	take( 'content', Infinity );
+	return out;
 }
 
 function liveWords( ctx, count ) {
@@ -670,32 +699,38 @@ function fit( ctx, tries = FIT_TRIES ) {
 }
 
 function showAnswer( ctx, data, input ) {
-	const found = Array.isArray( data.content ) ? data.content : [];
-	const asked = Array.isArray( data.queries ) ? data.queries : [];
-	const most = budget( ctx, found.length, asked.length );
-	const products = (
-		Array.isArray( data.products ) ? data.products : []
-	).slice( 0, most.products );
-	const scopes = (
-		products.length && Array.isArray( data.scopes ) ? data.scopes : []
-	).slice( 0, Math.min( SCOPES, most.room ) );
-	const terms = ctx.terms
-		? ( Array.isArray( data.terms ) ? data.terms : [] ).slice(
-				0,
-				most.room - scopes.length
-			)
-		: [];
+	const list = ( name ) =>
+		Array.isArray( data[ name ] ) ? data[ name ] : [];
+	const found = {
+		queries: list( 'queries' ),
+		products: list( 'products' ),
+		scopes: list( 'scopes' ),
+		terms: list( 'terms' ),
+		content: list( 'content' ),
+	};
+	const most = budget(
+		ctx,
+		Object.fromEntries(
+			Object.entries( found ).map( ( [ k, v ] ) => [ k, v.length ] )
+		)
+	);
 	const query = data.query || ctx.query.trim();
 	const rows = [];
-	asked
+	found.queries
 		.slice( 0, most.queries )
 		.forEach( ( q ) => rows.push( queryRow( ctx, q, rows.length ) ) );
-	products.forEach( ( p ) => rows.push( productRow( ctx, p, rows.length ) ) );
-	scopes.forEach( ( sc ) =>
-		rows.push( scopeRow( ctx, sc, query, rows.length ) )
-	);
-	terms.forEach( ( t ) => rows.push( termRow( ctx, t, rows.length ) ) );
-	found
+	found.products
+		.slice( 0, most.products )
+		.forEach( ( p ) => rows.push( productRow( ctx, p, rows.length ) ) );
+	found.scopes
+		.slice( 0, most.scopes )
+		.forEach( ( sc ) =>
+			rows.push( scopeRow( ctx, sc, query, rows.length ) )
+		);
+	found.terms
+		.slice( 0, most.terms )
+		.forEach( ( t ) => rows.push( termRow( ctx, t, rows.length ) ) );
+	found.content
 		.slice( 0, most.content )
 		.forEach( ( c, i ) =>
 			rows.push( contentRow( ctx, c, rows.length, i === 0 ) )

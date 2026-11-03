@@ -241,7 +241,9 @@ final class ToolsTab {
 
 		echo '<h3>' . esc_html__( 'Search log', 'creative-search' ) . '</h3><table class="form-table" role="presentation"><tbody>';
 		echo '<tr><th scope="row"><label for="csearch-retention">' . esc_html__( 'Keep searches for (days)', 'creative-search' ) . '</label></th><td><input type="number" id="csearch-retention" name="retention_days" min="' . esc_attr( (string) Settings::RETENTION_MIN ) . '" max="' . esc_attr( (string) Settings::RETENTION_MAX ) . '" step="1" class="small-text" value="' . esc_attr( Cast::str( $settings['retention_days'] ) ) . '" aria-describedby="csearch-retention-help">';
-		echo '<p class="description" id="csearch-retention-help">' . esc_html__( 'Searches are anonymous; older ones are deleted each night. The daily counts are kept for the charts.', 'creative-search' ) . '</p></td></tr></tbody></table>';
+		echo '<p class="description" id="csearch-retention-help">' . esc_html__( 'Searches are anonymous; older ones are deleted each night. The daily counts are kept for the charts.', 'creative-search' ) . '</p></td></tr>';
+		self::flag( 'log_staff_searches', __( 'Staff searches', 'creative-search' ), __( 'Log searches by signed-in staff who can edit products. Off, your team’s searches stay out of Analytics.', 'creative-search' ), $settings );
+		echo '</tbody></table>';
 
 		echo '<h3>' . esc_html__( 'Search bar defaults', 'creative-search' ) . '</h3><p>' . esc_html__( 'For the shortcode, the widget, the theme’s own search form and new search blocks; a block can change each.', 'creative-search' ) . '</p><table class="form-table" role="presentation"><tbody>';
 		self::number( 'suggest_limit', __( 'Products suggested', 'creative-search' ), Settings::LIMIT_MIN, Settings::LIMIT_MAX, $settings );
@@ -268,6 +270,9 @@ final class ToolsTab {
 		echo '</tbody></table>';
 
 		echo '<h3>' . esc_html__( 'Suggestions', 'creative-search' ) . '</h3><p>' . esc_html__( 'For every search bar.', 'creative-search' ) . '</p><table class="form-table" role="presentation"><tbody>';
+		self::number( 'panel_max', __( 'Suggestions at most', 'creative-search' ), Settings::PANEL_MAX_MIN, Settings::PANEL_MAX_MAX, $settings, __( 'Rows in the whole panel on a computer, besides “See all”: one suggested search, then products, one category, more products, and pages last. A block or shortcode can change it.', 'creative-search' ) );
+		self::number( 'panel_max_phone', __( 'Suggestions at most on a phone', 'creative-search' ), Settings::PANEL_MAX_PHONE_MIN, Settings::PANEL_MAX_PHONE_MAX, $settings, __( 'The same on a phone, where few rows fit above the keyboard: at least three products when there are three.', 'creative-search' ) );
+		self::flag( 'suggest_pages_phone', __( 'Pages on a phone', 'creative-search' ), __( 'Suggest posts and pages on a phone too. Off, a phone’s few rows go to products; the results page still lists them.', 'creative-search' ), $settings );
 		self::flag( 'suggest_queries', __( 'Suggested searches', 'creative-search' ), __( 'Suggest searches other shoppers made, above the products: only searches made three times or more that found products, with every word in your catalogue.', 'creative-search' ), $settings );
 		self::flag( 'suggest_scopes', __( 'Search within a category', 'creative-search' ), __( 'Offer to search within the categories most of the products are in, such as “kazumi in Decks”.', 'creative-search' ), $settings );
 		self::flag( 'suggest_cart', __( 'Add to cart', 'creative-search' ), __( 'Let shoppers add a simple product that needs no choices straight to the cart from the suggestions.', 'creative-search' ), $settings );
@@ -315,16 +320,22 @@ final class ToolsTab {
 	}
 
 	/**
-	 * A number setting row.
+	 * A number setting row, with a description under it when one is given.
 	 *
-	 * @param string               $key      Setting key.
-	 * @param string               $label    Label.
-	 * @param int                  $min      Lowest.
-	 * @param int                  $max      Highest.
-	 * @param array<string, mixed> $settings The settings.
+	 * @param string               $key         Setting key.
+	 * @param string               $label       Label.
+	 * @param int                  $min         Lowest.
+	 * @param int                  $max         Highest.
+	 * @param array<string, mixed> $settings    The settings.
+	 * @param string               $description What the setting does; empty for none.
 	 */
-	private static function number( string $key, string $label, int $min, int $max, array $settings ): void {
-		$id = 'csearch-' . str_replace( '_', '-', $key );
-		echo '<tr><th scope="row"><label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label></th><td><input type="number" id="' . esc_attr( $id ) . '" name="' . esc_attr( $key ) . '" min="' . esc_attr( (string) $min ) . '" max="' . esc_attr( (string) $max ) . '" step="1" class="small-text" value="' . esc_attr( Cast::str( $settings[ $key ] ?? '' ) ) . '"></td></tr>';
+	private static function number( string $key, string $label, int $min, int $max, array $settings, string $description = '' ): void {
+		$id   = 'csearch-' . str_replace( '_', '-', $key );
+		$help = '' === $description ? '' : ' aria-describedby="' . esc_attr( $id . '-help' ) . '"';
+		echo '<tr><th scope="row"><label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label></th><td><input type="number" id="' . esc_attr( $id ) . '" name="' . esc_attr( $key ) . '" min="' . esc_attr( (string) $min ) . '" max="' . esc_attr( (string) $max ) . '" step="1" class="small-text" value="' . esc_attr( Cast::str( $settings[ $key ] ?? '' ) ) . '"' . $help . '>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $help is built from esc_attr().
+		if ( '' !== $description ) {
+			echo '<p class="description" id="' . esc_attr( $id . '-help' ) . '">' . esc_html( $description ) . '</p>';
+		}
+		echo '</td></tr>';
 	}
 }

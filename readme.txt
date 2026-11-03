@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.5.3
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.6.0 =
+A shorter suggestion panel, pages suggested by title, an optional in-stock-first order, and analytics that leave out staff and test runs. No index rebuild is needed.
+
 = 1.5.3 =
 The plugin's description only.
 
@@ -88,6 +91,13 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.0 =
+* The suggestions have one length: at most 8 rows on a computer and 5 on a phone by default (Tools → Suggestions), with a suggested search, the first products and a category before anything else.
+* Pages are suggested by their title only, and not at all on a phone unless you allow it.
+* New "Show products that can be bought first" setting (Boosts and exclusions): sold-out products after the ones in stock or on backorder.
+* Analytics leave out your staff's searches and test runs (the `X-Creative-Test: 1` header or the `csearch_log_search` filter), and can be cleared on launch day.
+* A Settings link on the Plugins screen.
 
 = 1.5.3 =
 * A short description on the Plugins screen, under the 140 characters the Plugin Handbook asks for.

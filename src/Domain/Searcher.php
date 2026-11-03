@@ -72,7 +72,7 @@ final class Searcher {
 		foreach ( $query->alternatives as $alternative ) {
 			$widened  = $this->widenAll( $alternative, $lang, $kind, $options->strict );
 			$forms[]  = array( $alternative, $widened );
-			$products = self::merge( $products, $this->index->rank( RankPlan::of( $alternative, $widened, $lang, $n, $excluded, $options ) ), $options->limit );
+			$products = self::merge( $products, $this->index->rank( RankPlan::of( $alternative, $widened, $lang, $n, $excluded, $options ) ), $options->limit, $options->inStockFirst );
 		}
 		$typos    = self::typos( $widenings );
 		$drop     = null;
@@ -132,17 +132,18 @@ final class Searcher {
 	 * @param Hit[] $ranked One ranking.
 	 * @param Hit[] $more   Another.
 	 * @param int   $limit  At most this many.
+	 * @param bool  $stock  What can be bought first (D-138).
 	 * @return Hit[]
 	 */
-	private static function merge( array $ranked, array $more, int $limit ): array {
-		return array_slice( self::best( array_merge( $ranked, $more ), 'compare' ), 0, $limit );
+	private static function merge( array $ranked, array $more, int $limit, bool $stock ): array {
+		return array_slice( self::best( array_merge( $ranked, $more ), $stock ? 'stockFirst' : 'compare' ), 0, $limit );
 	}
 
 	/**
 	 * Hits in order, each document once, where it ranks best; keyed by document id (the callers' array_slice() renumbers them).
 	 *
-	 * @param Hit[]                    $hits  Hits, a document perhaps more than once.
-	 * @param 'compare'|'compareTerms' $order {@see Hit::compare()} or {@see Hit::compareTerms()}.
+	 * @param Hit[]                                 $hits  Hits, a document perhaps more than once.
+	 * @param 'compare'|'stockFirst'|'compareTerms' $order {@see Hit::compare()}, {@see Hit::stockFirst()} or {@see Hit::compareTerms()}.
 	 * @return Hit[]
 	 */
 	private static function best( array $hits, string $order ): array {

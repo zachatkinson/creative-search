@@ -52,6 +52,9 @@ final class RankPlanTest extends TestCase {
 		self::assertSame( array(), $plan->scope, 'every category' );
 		$scoped = RankPlan::of( $query, array( new TokenWidening( array( 'kazumi' => $deck ), array(), array() ) ), 'en', 9, array(), new SearchOptions( scope: array( 31, 33 ) ) );
 		self::assertSame( array( 31, 33 ), $scoped->scope, 'a category and its subcategories (D-117)' );
+		self::assertFalse( $plan->inStockFirst, 'the score decides unless the owner says otherwise (D-138)' );
+		self::assertTrue( RankPlan::of( $query, array(), 'en', 9, array(), new SearchOptions( inStockFirst: true ) )->inStockFirst );
+		self::assertFalse( ( new RankPlan( 'en', array(), array(), array(), 1, array(), array(), '', false, array(), 1 ) )->inStockFirst, 'nor when a plan is built by hand' );
 	}
 
 	public function test_while_the_last_word_is_typed_its_completions_name_the_product_too(): void {

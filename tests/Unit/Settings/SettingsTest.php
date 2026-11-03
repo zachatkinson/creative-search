@@ -31,6 +31,11 @@ final class SettingsTest extends TestCase {
 		self::assertSame( 6, $d['suggest_limit'] );
 		self::assertSame( 3, $d['suggest_terms'] );
 		self::assertSame( 2, $d['min_chars'] );
+		self::assertSame( 8, $d['panel_max'], 'Baymard: at most 10 on a desktop (D-136)' );
+		self::assertSame( 5, $d['panel_max_phone'], 'Baymard: 4 to 8 on a phone (D-136)' );
+		self::assertSame( 'no', $d['log_staff_searches'], 'the team\'s searches stay out of Analytics (D-139)' );
+		self::assertSame( 'no', $d['in_stock_first'], 'today\'s score until the shop chooses it (D-138)' );
+		self::assertSame( 'no', $d['suggest_pages_phone'], 'a phone\'s rows go to products (D-137)' );
 		self::assertSame( 'yes', $d['fallback_to_default_language'] );
 		self::assertSame( 'no', $d['hidden_by_sku'], 'D-018' );
 		self::assertSame( 'auto', $d['panel_position'] );
@@ -58,7 +63,7 @@ final class SettingsTest extends TestCase {
 		self::assertSame( 'yes', $d['suggest_scopes'], 'searches within a category on (D-113)' );
 		self::assertSame( 'no', $d['suggest_cart'], 'add to cart off until the shop chooses it (D-115)' );
 		self::assertSame( 'yes', $d['analytics_events'], 'the browser events on; nothing leaves the page (D-116)' );
-		self::assertCount( 37, $d, 'every key is documented in docs/SETTINGS.md' );
+		self::assertCount( 42, $d, 'every key is documented in docs/SETTINGS.md' );
 	}
 
 	public function test_the_filter_attributes_are_attribute_taxonomies(): void {
@@ -190,6 +195,14 @@ final class SettingsTest extends TestCase {
 			'min chars high'    => array( 'min_chars', 12, 5 ),
 			'min chars exact'   => array( 'min_chars', 3, 3 ),
 			'min chars junk'    => array( 'min_chars', 'two', 2 ),
+			'panel low'         => array( 'panel_max', 3, 4 ),
+			'panel high'        => array( 'panel_max', 13, 12 ),
+			'panel exact'       => array( 'panel_max', 10, 10 ),
+			'panel junk'        => array( 'panel_max', 'lots', 8 ),
+			'phone low'         => array( 'panel_max_phone', 2, 3 ),
+			'phone high'        => array( 'panel_max_phone', 9, 8 ),
+			'phone exact'       => array( 'panel_max_phone', 4, 4 ),
+			'phone junk'        => array( 'panel_max_phone', array(), 5 ),
 		);
 	}
 

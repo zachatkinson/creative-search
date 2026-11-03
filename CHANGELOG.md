@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-03
+
+A shorter panel, in stock first as the store's choice, and analytics without test traffic, from the 3 November UX review against Baymard's research.
+
+### Added
+- One cap on the whole suggestion panel: `panel_max` (8 rows, 4 to 12) on a desktop and `panel_max_phone` (5, 3 to 8) on a phone, on the Tools tab under Suggestions; a block or shortcode can change both. The panel fills in this order until the cap: one suggested search, three products, one category or "in a category" row, the other products, and pages last. "See all" is not counted and always shows (D-136).
+- `suggest_pages_phone` (off): posts and pages stay out of the panel on a phone, where its rows go to products (D-137).
+- `in_stock_first` (off), on the Boosts and exclusions tab: products that can be bought, backorders included, come before sold-out ones in the panel, on the results page and in `/search`, each part in order of relevance; pinned products keep their place (D-138).
+- `log_staff_searches` (off): searches and suggestion clicks by signed-in users who can edit products are not logged or counted (D-139).
+- The `csearch_log_search` filter, and the `X-Creative-Test: 1` request header, which keep a search out of the log (D-139).
+- Clear analytics on the Analytics tab, after a confirmation that says what goes, and `wp csearch analytics clear` (D-139).
+- A Settings link for the plugin on the Plugins screen.
+
+### Changed
+- The panel suggests a post or page only when the query matches its title; the results page still matches their content too (D-137).
+- The panel's row budget (D-092) is replaced by the cap: a phone's products are bounded by its cap, not a fixed four (D-136).
+
 ## [1.5.3] - 2026-10-28
 
 The plugin's description only.

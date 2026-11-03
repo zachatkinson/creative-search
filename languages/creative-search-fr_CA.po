@@ -43,31 +43,31 @@ msgstr "https://zachatkinson.com"
 msgid "Creative Search: run \"composer install\" before activating the plugin."
 msgstr "Creative Search : exécutez \"composer install\" avant d’activer l’extension."
 
-#: src/Admin/Actions.php:141
-#: src/Admin/AdminPage.php:183
+#: src/Admin/Actions.php:143
+#: src/Admin/AdminPage.php:197
 msgid "Sorry, you are not allowed to manage the shop’s search."
 msgstr "Désolé, vous n’avez pas la permission de gérer la recherche de la boutique."
 
 #. translators: 1: a word, 2: what it means
-#: src/Admin/Actions.php:172
+#: src/Admin/Actions.php:174
 #, php-format
 msgid "Synonym saved: “%1$s” means “%2$s”. Searches use it now."
 msgstr "Synonyme enregistré : « %1$s » veut dire « %2$s ». Les recherches l’utilisent dès maintenant."
 
 #. translators: 1: a word, 2: what it means
-#: src/Admin/Actions.php:175
+#: src/Admin/Actions.php:177
 #, php-format
 msgid "“%1$s” already means “%2$s”; nothing was added."
 msgstr "« %1$s » veut déjà dire « %2$s »; rien n’a été ajouté."
 
 #. translators: 1: a word, 2: what it means
-#: src/Admin/Actions.php:178
+#: src/Admin/Actions.php:180
 #, php-format
 msgid "Synonym added: “%1$s” means “%2$s”. Searches use it now."
 msgstr "Synonyme ajouté : « %1$s » veut dire « %2$s ». Les recherches l’utilisent dès maintenant."
 
 #. translators: %s: number of synonyms
-#: src/Admin/Actions.php:192
+#: src/Admin/Actions.php:194
 #: src/Admin/SynonymsTab.php:61
 #, php-format
 msgid "%s synonym deleted."
@@ -75,56 +75,56 @@ msgid_plural "%s synonyms deleted."
 msgstr[0] "%s synonyme supprimé."
 msgstr[1] "%s synonymes supprimés."
 
-#: src/Admin/Actions.php:206
+#: src/Admin/Actions.php:208
 msgid "Choose a CSV file of 1 MB or less to import."
 msgstr "Choisissez un fichier CSV de 1 Mo ou moins à importer."
 
-#: src/Admin/Actions.php:295
+#: src/Admin/Actions.php:317
 msgid "Boosts and exclusions saved. Searches use them now."
 msgstr "Promotions et exclusions enregistrées. Les recherches les utilisent dès maintenant."
 
 #. translators: %s: number of products
-#: src/Admin/Actions.php:298
+#: src/Admin/Actions.php:320
 #, php-format
 msgid "%s product is back in search once it is reindexed, in a moment."
 msgid_plural "%s products are back in search once they are reindexed, in a moment."
 msgstr[0] "%s produit revient dans la recherche dès qu’il est réindexé, dans un instant."
 msgstr[1] "%s produits reviennent dans la recherche dès qu’ils sont réindexés, dans un instant."
 
-#: src/Admin/Actions.php:396
+#: src/Admin/Actions.php:418
 msgid "Settings saved. What is indexed changed: rebuild the index to apply it to every product."
 msgstr "Réglages enregistrés. Ce qui est indexé a changé : reconstruisez l’index pour l’appliquer à tous les produits."
 
-#: src/Admin/Actions.php:397
+#: src/Admin/Actions.php:419
 msgid "Settings saved."
 msgstr "Réglages enregistrés."
 
-#: src/Admin/Actions.php:429
+#: src/Admin/Actions.php:451
 msgid "The index is being rebuilt. The shop keeps searching the current index until the new one is complete."
 msgstr "L’index est en reconstruction. La boutique continue de chercher dans l’index actuel jusqu’à ce que le nouveau soit complet."
 
-#: src/Admin/Actions.php:430
+#: src/Admin/Actions.php:452
 msgid "A rebuild is already running or waiting to run."
 msgstr "Une reconstruction est déjà en cours ou en attente."
 
-#: src/Admin/Actions.php:445
+#: src/Admin/Actions.php:467
 msgid "The rebuild is stopping. The shop keeps searching the current index."
 msgstr "La reconstruction s’arrête. La boutique continue de chercher dans l’index actuel."
 
-#: src/Admin/Actions.php:446
+#: src/Admin/Actions.php:468
 msgid "No rebuild was running."
 msgstr "Aucune reconstruction n’était en cours."
 
-#: src/Admin/Actions.php:460
+#: src/Admin/Actions.php:482
 msgid "That product does not exist."
 msgstr "Ce produit n’existe pas."
 
-#: src/Admin/Actions.php:465
+#: src/Admin/Actions.php:487
 msgid "The product is queued for the search index; it is searchable as it is now in a moment."
 msgstr "Le produit est en file d’attente pour l’index de recherche; il sera trouvable tel qu’il est maintenant dans un instant."
 
 #. translators: %s: the SKUs or ids not found
-#: src/Admin/Actions.php:503
+#: src/Admin/Actions.php:525
 #: src/Cli/RulesCommand.php:139
 #, php-format
 msgid "No product has the SKU or ID %s."
@@ -147,9 +147,9 @@ msgstr "Promotions et exclusions"
 msgid "Tools"
 msgstr "Outils"
 
-#: src/Admin/AdminPage.php:113
-#: src/Admin/AdminPage.php:114
-#: src/Admin/AdminPage.php:187
+#: src/Admin/AdminPage.php:127
+#: src/Admin/AdminPage.php:128
+#: src/Admin/AdminPage.php:201
 #: src/Admin/ContentPanel.php:34
 #: src/Admin/ProductPanel.php:61
 #: src/Admin/RulesTab.php:43
@@ -160,20 +160,20 @@ msgid "Search"
 msgstr "Recherche"
 
 #. translators: %s: a warning about the search index
-#: src/Admin/AdminPage.php:161
+#: src/Admin/AdminPage.php:175
 #, php-format
 msgid "Creative Search: %s"
 msgstr "Creative Search : %s"
 
-#: src/Admin/AdminPage.php:171
+#: src/Admin/AdminPage.php:185
 msgid "Rebuild the index"
 msgstr "Reconstruire l’index"
 
-#: src/Admin/AdminPage.php:173
+#: src/Admin/AdminPage.php:187
 msgid "Dismiss"
 msgstr "Masquer"
 
-#: src/Admin/AdminPage.php:188
+#: src/Admin/AdminPage.php:202
 msgid "Search settings"
 msgstr "Réglages de la recherche"
 
@@ -199,8 +199,8 @@ msgstr "Résumé"
 
 #: src/Admin/AnalyticsTab.php:54
 #: src/Admin/AnalyticsTab.php:68
-#: src/Admin/AnalyticsTab.php:110
-#: src/Admin/AnalyticsTab.php:166
+#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:194
 msgid "Searches"
 msgstr "Recherches"
 
@@ -213,7 +213,7 @@ msgid "Suggestions clicked"
 msgstr "Suggestions cliquées"
 
 #: src/Admin/AnalyticsTab.php:57
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:138
 msgid "Click-through"
 msgstr "Taux de clics"
 
@@ -295,12 +295,12 @@ msgstr "Toutes les recherches de la période, une ligne chacune, avec les mêmes
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:138
 #: src/Admin/ToolsTab.php:139
 msgid "Query"
 msgstr "Requête"
 
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:138
 #: src/Admin/RulesTab.php:43
 #: src/Admin/RulesTab.php:68
 #: src/Admin/RulesTab.php:126
@@ -311,27 +311,27 @@ msgstr "Requête"
 msgid "Language"
 msgstr "Langue"
 
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:138
 msgid "Results"
 msgstr "Résultats"
 
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:138
 msgid "Actions"
 msgstr "Actions"
 
 #. translators: %s: a search query
-#: src/Admin/AnalyticsTab.php:121
+#: src/Admin/AnalyticsTab.php:149
 #, php-format
 msgid "Explain “%s”"
 msgstr "Expliquer « %s »"
 
 #. translators: %s: a search query
-#: src/Admin/AnalyticsTab.php:121
+#: src/Admin/AnalyticsTab.php:149
 msgid "Explain"
 msgstr "Expliquer"
 
 #. translators: 1: number of searches, 2: number of days, 3: the busiest day's searches
-#: src/Admin/AnalyticsTab.php:140
+#: src/Admin/AnalyticsTab.php:168
 #, php-format
 msgid "%1$s search over %2$s days; the busiest day had %3$s."
 msgid_plural "%1$s searches over %2$s days; the busiest day had %3$s."
@@ -339,39 +339,39 @@ msgstr[0] "%1$s recherche en %2$s jours; le jour le plus achalandé en a compté
 msgstr[1] "%1$s recherches en %2$s jours; le jour le plus achalandé en a compté %3$s."
 
 #. translators: 1: a day, 2: searches, 3: searches with no results
-#: src/Admin/AnalyticsTab.php:155
+#: src/Admin/AnalyticsTab.php:183
 #, php-format
 msgid "%1$s: %2$s search, %3$s with no results"
 msgid_plural "%1$s: %2$s searches, %3$s with no results"
 msgstr[0] "%1$s : %2$s recherche, %3$s sans résultat"
 msgstr[1] "%1$s : %2$s recherches, %3$s sans résultat"
 
-#: src/Admin/AnalyticsTab.php:166
+#: src/Admin/AnalyticsTab.php:194
 msgid "With no results"
 msgstr "Sans résultat"
 
 #. translators: %s: a percentage number
-#: src/Admin/AnalyticsTab.php:177
+#: src/Admin/AnalyticsTab.php:205
 #, php-format
 msgid "%s%%"
 msgstr "%s %%"
 
-#: src/Admin/AnalyticsTab.php:187
+#: src/Admin/AnalyticsTab.php:215
 msgid "Product"
 msgstr "Produit"
 
-#: src/Admin/AnalyticsTab.php:188
-#: src/Admin/BoostsTab.php:158
+#: src/Admin/AnalyticsTab.php:216
+#: src/Admin/BoostsTab.php:160
 msgid "Category"
 msgstr "Catégorie"
 
-#: src/Admin/AnalyticsTab.php:189
-#: src/Admin/BoostsTab.php:159
+#: src/Admin/AnalyticsTab.php:217
+#: src/Admin/BoostsTab.php:161
 msgid "Tag"
 msgstr "Étiquette"
 
-#: src/Admin/AnalyticsTab.php:190
-#: src/Admin/BoostsTab.php:160
+#: src/Admin/AnalyticsTab.php:218
+#: src/Admin/BoostsTab.php:162
 msgid "Brand"
 msgstr "Marque"
 
@@ -454,49 +454,49 @@ msgstr "Ajouter des produits par UGS ou par ID"
 msgid "Separate several with commas. Up to four are shown on the results page when a search finds nothing."
 msgstr "Séparez-en plusieurs par des virgules. Jusqu’à quatre s’affichent sur la page de résultats quand une recherche ne trouve rien."
 
-#: src/Admin/BoostsTab.php:120
+#: src/Admin/BoostsTab.php:122
 msgid "Hidden products"
 msgstr "Produits masqués"
 
-#: src/Admin/BoostsTab.php:120
+#: src/Admin/BoostsTab.php:122
 msgid "Show a hidden product when a search is exactly its SKU"
 msgstr "Afficher un produit masqué quand la recherche est exactement son UGS"
 
-#: src/Admin/BoostsTab.php:122
+#: src/Admin/BoostsTab.php:124
 msgid "Excluded products"
 msgstr "Produits exclus"
 
-#: src/Admin/BoostsTab.php:123
+#: src/Admin/BoostsTab.php:125
 msgid "Products kept out of search from their edit screen (Search panel → Exclude from search). Tick one to let it back in."
 msgstr "Produits tenus à l’écart de la recherche depuis leur page de modification (onglet Recherche → Exclure de la recherche). Cochez-en un pour le remettre dans la recherche."
 
-#: src/Admin/BoostsTab.php:127
+#: src/Admin/BoostsTab.php:129
 msgid "No product is excluded."
 msgstr "Aucun produit n’est exclu."
 
-#: src/Admin/BoostsTab.php:129
+#: src/Admin/BoostsTab.php:131
 msgid "Let back into search"
 msgstr "Remettre dans la recherche"
 
 #. translators: %s: a product
-#: src/Admin/BoostsTab.php:135
+#: src/Admin/BoostsTab.php:137
 #, php-format
 msgid "Let %s back in"
 msgstr "Remettre %s dans la recherche"
 
 #. translators: %s: a word
-#: src/Admin/BoostsTab.php:138
+#: src/Admin/BoostsTab.php:140
 #: src/Admin/SynonymsTable.php:163
 msgid "Edit"
 msgstr "Modifier"
 
 #. translators: %s: a product
-#: src/Admin/BoostsTab.php:140
+#: src/Admin/BoostsTab.php:142
 #, php-format
 msgid "Edit %s"
 msgstr "Modifier %s"
 
-#: src/Admin/BoostsTab.php:147
+#: src/Admin/BoostsTab.php:149
 msgid "Save boosts and exclusions"
 msgstr "Enregistrer les promotions et exclusions"
 
@@ -620,6 +620,7 @@ msgstr "Ajouter le synonyme"
 msgid "Save synonym"
 msgstr "Enregistrer le synonyme"
 
+#: src/Admin/AnalyticsTab.php:124
 #: src/Admin/SynonymsTab.php:105
 msgid "Cancel"
 msgstr "Annuler"
@@ -835,6 +836,7 @@ msgstr "expression %1$s, exact %2$s, stock %3$s, propriétaire %4$s"
 msgid "(%1$s #%2$s)"
 msgstr "(%1$s n° %2$s)"
 
+#: src/Admin/AdminPage.php:118
 #: src/Admin/ToolsTab.php:204
 msgid "Settings"
 msgstr "Réglages"
@@ -901,103 +903,103 @@ msgstr "Conserver les recherches (jours)"
 msgid "Searches are anonymous; older ones are deleted each night. The daily counts are kept for the charts."
 msgstr "Les recherches sont anonymes; les plus anciennes sont supprimées chaque nuit. Les totaux quotidiens sont gardés pour les graphiques."
 
-#: src/Admin/ToolsTab.php:246
+#: src/Admin/ToolsTab.php:248
 msgid "Search bar defaults"
 msgstr "Réglages par défaut de la barre de recherche"
 
-#: src/Admin/ToolsTab.php:246
+#: src/Admin/ToolsTab.php:248
 msgid "For the shortcode, the widget, the theme’s own search form and new search blocks; a block can change each."
 msgstr "Pour le code court, le widget, le formulaire de recherche du thème et les nouveaux blocs de recherche; un bloc peut changer chacun."
 
-#: src/Admin/ToolsTab.php:247
+#: src/Admin/ToolsTab.php:249
 msgid "Products suggested"
 msgstr "Produits suggérés"
 
-#: src/Admin/ToolsTab.php:248
+#: src/Admin/ToolsTab.php:250
 msgid "Categories, tags and brands suggested"
 msgstr "Catégories, étiquettes et marques suggérées"
 
-#: src/Admin/ToolsTab.php:249
+#: src/Admin/ToolsTab.php:251
 msgid "Characters before suggesting"
 msgstr "Caractères avant de suggérer"
 
-#: src/Admin/ToolsTab.php:250
+#: src/Admin/ToolsTab.php:252
 msgid "Prices"
 msgstr "Prix"
 
-#: src/Admin/ToolsTab.php:250
+#: src/Admin/ToolsTab.php:252
 msgid "Show each suggestion’s price."
 msgstr "Afficher le prix de chaque suggestion."
 
-#: src/Admin/ToolsTab.php:251
+#: src/Admin/ToolsTab.php:253
 msgid "Stock"
 msgstr "Stock"
 
-#: src/Admin/ToolsTab.php:251
+#: src/Admin/ToolsTab.php:253
 msgid "Show whether each suggestion is in stock."
 msgstr "Indiquer si chaque suggestion est en stock."
 
-#: src/Admin/ToolsTab.php:252
+#: src/Admin/ToolsTab.php:254
 msgid "Categories, tags and brands"
 msgstr "Catégories, étiquettes et marques"
 
-#: src/Admin/ToolsTab.php:252
+#: src/Admin/ToolsTab.php:254
 msgid "Suggest categories, tags and brands after the products."
 msgstr "Suggérer des catégories, étiquettes et marques après les produits."
 
-#: src/Admin/ToolsTab.php:253
+#: src/Admin/ToolsTab.php:255
 msgid "Label"
 msgstr "Libellé"
 
-#: src/Admin/ToolsTab.php:253
+#: src/Admin/ToolsTab.php:255
 msgid "Show the search field’s label (it is always there for screen readers)."
 msgstr "Afficher le libellé du champ de recherche (il est toujours là pour les lecteurs d’écran)."
 
-#: src/Admin/ToolsTab.php:254
+#: src/Admin/ToolsTab.php:256
 #: src/Block/Widget.php:115
 #: build/block/editor.js:1
 msgid "Placeholder"
 msgstr "Texte indicatif"
 
-#: src/Admin/ToolsTab.php:254
+#: src/Admin/ToolsTab.php:256
 msgid "Empty uses “Search products…” in the shopper’s language."
 msgstr "Vide, on utilise « Rechercher des produits… » dans la langue du client."
 
-#: src/Admin/ToolsTab.php:255
+#: src/Admin/ToolsTab.php:257
 msgid "Suggestions open"
 msgstr "Ouverture des suggestions"
 
-#: src/Admin/ToolsTab.php:258
+#: src/Admin/ToolsTab.php:260
 msgid "Below, or above when a phone’s keyboard would cover them"
 msgstr "En dessous, ou au-dessus quand le clavier d’un téléphone les cacherait"
 
-#: src/Admin/ToolsTab.php:259
+#: src/Admin/ToolsTab.php:261
 #: build/block/editor.js:1
 msgid "Below the field"
 msgstr "Sous le champ"
 
-#: src/Admin/ToolsTab.php:260
+#: src/Admin/ToolsTab.php:262
 #: build/block/editor.js:1
 msgid "Above the field"
 msgstr "Au-dessus du champ"
 
-#: src/Admin/ToolsTab.php:266
+#: src/Admin/ToolsTab.php:268
 msgid "Recent searches"
 msgstr "Recherches récentes"
 
-#: src/Admin/ToolsTab.php:266
+#: src/Admin/ToolsTab.php:268
 msgid "Offer the shopper’s own last searches, kept in their browser only."
 msgstr "Proposer les dernières recherches du client, gardées dans son navigateur seulement."
 
-#: src/Admin/ToolsTab.php:267
+#: src/Admin/ToolsTab.php:269
 msgid "Theme search form"
 msgstr "Formulaire de recherche du thème"
 
-#: src/Admin/ToolsTab.php:267
+#: src/Admin/ToolsTab.php:269
 msgid "Replace the theme’s own search form with this search bar."
 msgstr "Remplacer le formulaire de recherche du thème par cette barre de recherche."
 
-#: src/Admin/ToolsTab.php:276
+#: src/Admin/ToolsTab.php:281
 msgid "Save settings"
 msgstr "Enregistrer les réglages"
 
@@ -1028,7 +1030,7 @@ msgstr "Recherche en cours…"
 msgid "No suggestions"
 msgstr "Aucune suggestion"
 
-#: src/Admin/ToolsTab.php:270
+#: src/Admin/ToolsTab.php:272
 #: src/Block/SearchForm.php:111
 #: build/block/editor.js:1
 msgid "Suggestions"
@@ -1036,7 +1038,7 @@ msgstr "Suggestions"
 
 #. translators: used between the parts of a suggestion's accessible name (name, price, stock); there is a space after the comma
 #: src/Block/SearchForm.php:201
-#: src/Block/SearchForm.php:265
+#: src/Block/SearchForm.php:270
 msgctxt "between the parts of a suggestion name"
 msgid ", "
 msgstr ", "
@@ -1061,31 +1063,31 @@ msgid_plural "%s recent searches"
 msgstr[0] "%s recherche récente"
 msgstr[1] "%s recherches récentes"
 
-#: src/Block/SearchForm.php:260
+#: src/Block/SearchForm.php:265
 msgid "In stock"
 msgstr "En stock"
 
-#: src/Block/SearchForm.php:261
+#: src/Block/SearchForm.php:266
 msgid "Out of stock"
 msgstr "En rupture de stock"
 
 #. translators: 1: a category, tag or brand name, 2: "Category", "Tag" or "Brand", 3: the number of products in it
-#: src/Block/SearchForm.php:267
+#: src/Block/SearchForm.php:272
 #, php-format
 msgid "%1$s, %2$s (%3$s)"
 msgstr "%1$s, %2$s (%3$s)"
 
-#: src/Block/SearchForm.php:269
+#: src/Block/SearchForm.php:274
 msgctxt "a suggestion row"
 msgid "Category"
 msgstr "Catégorie"
 
-#: src/Block/SearchForm.php:270
+#: src/Block/SearchForm.php:275
 msgctxt "a suggestion row"
 msgid "Tag"
 msgstr "Étiquette"
 
-#: src/Block/SearchForm.php:271
+#: src/Block/SearchForm.php:276
 msgctxt "a suggestion row"
 msgid "Brand"
 msgstr "Marque"
@@ -1188,19 +1190,19 @@ msgstr "Réindexation en file d’attente. Suivez-la avec : wp csearch status"
 msgid "(cancelling)"
 msgstr "(annulation en cours)"
 
-#: src/Cli/MaintenanceCommand.php:65
+#: src/Cli/MaintenanceCommand.php:110
 msgid "--days takes a number of days, 0 or more."
 msgstr "--days prend un nombre de jours, 0 ou plus."
 
 #. translators: %d: rows deleted
-#: src/Cli/MaintenanceCommand.php:80
+#: src/Cli/MaintenanceCommand.php:125
 #, php-format
 msgid "%d search deleted from the log."
 msgid_plural "%d searches deleted from the log."
 msgstr[0] "%d recherche supprimée du journal."
 msgstr[1] "%d recherches supprimées du journal."
 
-#: src/Cli/MaintenanceCommand.php:101
+#: src/Cli/MaintenanceCommand.php:146
 msgid "Search answers dropped; the next searches are answered fresh."
 msgstr "Réponses de recherche effacées; les prochaines recherches reçoivent des réponses fraîches."
 
@@ -1385,8 +1387,8 @@ msgid "suggestions"
 msgstr "suggestions"
 
 #. translators: 1: number of results, 2: the query typed
-#: src/Block/SearchForm.php:256
-#: src/Block/SearchForm.php:258
+#: src/Block/SearchForm.php:261
+#: src/Block/SearchForm.php:263
 #, php-format
 msgid "See %1$s result for %2$s"
 msgid_plural "See all %1$s results for %2$s"
@@ -1394,7 +1396,7 @@ msgstr[0] "Voir le %1$s résultat pour %2$s"
 msgstr[1] "Voir les %1$s résultats pour %2$s"
 
 #. translators: 1: synonyms added, 2: rows already present, 3: rows that were not synonyms
-#: src/Admin/Actions.php:214
+#: src/Admin/Actions.php:216
 #, php-format
 msgid "Import finished. Added: %1$s. Already there: %2$s. Skipped: %3$s."
 msgstr "Importation terminée. Ajoutés : %1$s. Déjà présents : %2$s. Ignorés : %3$s."
@@ -1445,7 +1447,7 @@ msgstr "%1$d; en usage : %2$d"
 msgid "Import finished. Added: %1$d. Already there: %2$d. Skipped: %3$d."
 msgstr "Importation terminée. Ajoutés : %1$d. Déjà présents : %2$d. Ignorés : %3$d."
 
-#: src/Index/Indexer.php:378
+#: src/Index/Indexer.php:379
 #: src/Index/Reindex.php:350
 msgid "The search index is being upgraded by another request. Try again in a few minutes."
 msgstr "Une autre requête met à niveau l’index de recherche. Réessayez dans quelques minutes."
@@ -1466,19 +1468,19 @@ msgstr "Deuxième lien"
 msgid "Another page worth offering when a search finds nothing, such as your size guides; none chosen shows none."
 msgstr "Une autre page utile quand une recherche ne trouve rien, comme vos guides des tailles; aucune page choisie n’affiche rien."
 
-#: src/Admin/BoostsTab.php:175
+#: src/Admin/BoostsTab.php:177
 msgid "Page"
 msgstr "Page"
 
-#: src/Admin/BoostsTab.php:181
+#: src/Admin/BoostsTab.php:183
 msgid "— None —"
 msgstr "— Aucune —"
 
-#: src/Admin/BoostsTab.php:185
+#: src/Admin/BoostsTab.php:187
 msgid "Wording"
 msgstr "Libellé"
 
-#: src/Admin/BoostsTab.php:185
+#: src/Admin/BoostsTab.php:187
 msgid "Leave the wording empty to use the default shown."
 msgstr "Laissez le libellé vide pour utiliser celui affiché par défaut."
 
@@ -1519,17 +1521,17 @@ msgid "Close search"
 msgstr "Fermer la recherche"
 
 #. translators: %1$s: the query the suggestions are for, after a word that matched nothing was left out or a typo was corrected
-#: src/Block/SearchForm.php:263
+#: src/Block/SearchForm.php:268
 #, php-format
 msgid "Showing results for %1$s"
 msgstr "Résultats pour %1$s"
 
-#: src/Block/SearchForm.php:282
+#: src/Block/SearchForm.php:287
 msgctxt "a suggestion row"
 msgid "Post"
 msgstr "Article"
 
-#: src/Block/SearchForm.php:283
+#: src/Block/SearchForm.php:288
 msgctxt "a suggestion row"
 msgid "Page"
 msgstr "Page"
@@ -1677,16 +1679,16 @@ msgstr[1] "%1$s résultats pour « %2$s » dans %3$s"
 msgid "A product category’s slug: suggest only its products and its subcategories’ (1.3)."
 msgstr "Le slug d’une catégorie de produits : ne suggérer que ses produits et ceux de ses sous-catégories (1.3)."
 
-#: src/Admin/ToolsTab.php:289
+#: src/Admin/ToolsTab.php:294
 msgid "Custom fields"
 msgstr "Champs personnalisés"
 
-#: src/Admin/ToolsTab.php:294
+#: src/Admin/ToolsTab.php:299
 msgid "Other fields"
 msgstr "Autres champs"
 
 #. translators: %s: the most custom fields that can be searched
-#: src/Admin/ToolsTab.php:298
+#: src/Admin/ToolsTab.php:303
 #, php-format
 msgid "Search these product fields too, such as an Advanced Custom Fields field by its name. Separate other names with commas; up to %s fields. Rebuild the index after a change."
 msgstr "Chercher aussi dans ces champs de produit, comme un champ Advanced Custom Fields par son nom. Séparez les autres noms par des virgules ; jusqu’à %s champs. Reconstruisez l’index après un changement."
@@ -1832,7 +1834,7 @@ msgid_plural "%s rules removed."
 msgstr[0] "%s règle retirée."
 msgstr[1] "%s règles retirées."
 
-#: src/Admin/Actions.php:330
+#: src/Admin/Actions.php:352
 msgid "Redirects and pins saved. Searches use them now."
 msgstr "Redirections et épinglages enregistrés. Les recherches les utilisent maintenant."
 
@@ -1849,25 +1851,25 @@ msgid "Words"
 msgstr "Mots"
 
 #. translators: %1$s: a product's name
-#: src/Block/SearchForm.php:278
+#: src/Block/SearchForm.php:283
 #, php-format
 msgid "%1$s added to your cart."
 msgstr "%1$s ajouté à votre panier."
 
 #. translators: %1$s: a product's name
-#: src/Block/SearchForm.php:280
+#: src/Block/SearchForm.php:285
 #, php-format
 msgid "Could not add %1$s to your cart."
 msgstr "Impossible d’ajouter %1$s à votre panier."
 
 #. translators: 1: the query typed, 2: a category, as in "kazumi in Decks"
-#: src/Block/SearchForm.php:275
+#: src/Block/SearchForm.php:280
 #, php-format
 msgctxt "a search within a category"
 msgid "%1$s in %2$s"
 msgstr "%1$s dans %2$s"
 
-#: src/Block/SearchForm.php:276
+#: src/Block/SearchForm.php:281
 msgctxt "a suggestion row"
 msgid "Suggested search"
 msgstr "Recherche suggérée"
@@ -1881,39 +1883,39 @@ msgctxt "adds a suggested product to the cart"
 msgid "Add"
 msgstr "Ajouter"
 
-#: src/Admin/ToolsTab.php:270
+#: src/Admin/ToolsTab.php:272
 msgid "For every search bar."
 msgstr "Pour toutes les barres de recherche."
 
-#: src/Admin/ToolsTab.php:271
+#: src/Admin/ToolsTab.php:276
 msgid "Suggested searches"
 msgstr "Recherches suggérées"
 
-#: src/Admin/ToolsTab.php:271
+#: src/Admin/ToolsTab.php:276
 msgid "Suggest searches other shoppers made, above the products: only searches made three times or more that found products, with every word in your catalogue."
 msgstr "Suggérer, au-dessus des produits, des recherches faites par d’autres clients : seulement celles faites trois fois ou plus, qui ont trouvé des produits et dont chaque mot est dans votre catalogue."
 
-#: src/Admin/ToolsTab.php:272
+#: src/Admin/ToolsTab.php:277
 msgid "Search within a category"
 msgstr "Chercher dans une catégorie"
 
-#: src/Admin/ToolsTab.php:272
+#: src/Admin/ToolsTab.php:277
 msgid "Offer to search within the categories most of the products are in, such as “kazumi in Decks”."
 msgstr "Proposer de chercher dans les catégories qui contiennent la plupart des produits, comme « kazumi dans Planches »."
 
-#: src/Admin/ToolsTab.php:273
+#: src/Admin/ToolsTab.php:278
 msgid "Add to cart"
 msgstr "Ajout au panier"
 
-#: src/Admin/ToolsTab.php:273
+#: src/Admin/ToolsTab.php:278
 msgid "Let shoppers add a simple product that needs no choices straight to the cart from the suggestions."
 msgstr "Permettre aux clients d’ajouter au panier, directement depuis les suggestions, un produit simple qui ne demande aucun choix."
 
-#: src/Admin/ToolsTab.php:274
+#: src/Admin/ToolsTab.php:279
 msgid "Analytics events"
 msgstr "Événements d’analyse"
 
-#: src/Admin/ToolsTab.php:274
+#: src/Admin/ToolsTab.php:279
 msgid "Tell the page about searches, chosen suggestions, products added to the cart and searches with no suggestions: events on the search form, and on Google Tag Manager’s data layer when the page has one. Nothing is sent anywhere by this plugin."
 msgstr "Informer la page des recherches, des suggestions choisies, des produits ajoutés au panier et des recherches sans suggestion : des événements sur le formulaire de recherche, et dans la couche de données de Google Tag Manager quand la page en a une. Cette extension n’envoie rien nulle part."
 
@@ -1957,3 +1959,118 @@ msgstr "Assombrir la page derrière les suggestions"
 #: src/Rest/SuggestRoute.php:68
 msgid "The product category the shopper is in: offered first as “kazumi in Decks” when it holds results (1.5)."
 msgstr "La catégorie de produits où se trouve le client : proposée en premier, « kazumi dans Planches », lorsqu’elle contient des résultats (1.5)."
+
+#. translators: %s: number of searches
+#: src/Admin/Actions.php:271
+#, php-format
+msgid "Analytics cleared: %s search deleted, with the daily counts. New searches are counted from now."
+msgid_plural "Analytics cleared: %s searches deleted, with the daily counts. New searches are counted from now."
+msgstr[0] "Statistiques effacées : %s recherche supprimée, avec les comptes quotidiens. Les nouvelles recherches sont comptées à partir de maintenant."
+msgstr[1] "Statistiques effacées : %s recherches supprimées, avec les comptes quotidiens. Les nouvelles recherches sont comptées à partir de maintenant."
+
+#: src/Admin/AnalyticsTab.php:106
+#: src/Admin/AnalyticsTab.php:123
+msgid "Clear analytics"
+msgstr "Effacer les statistiques"
+
+#: src/Admin/AnalyticsTab.php:109
+msgid "Start the numbers again from nothing, such as on launch day, after testing."
+msgstr "Repartir de zéro, par exemple le jour du lancement, après les essais."
+
+#: src/Admin/AnalyticsTab.php:110
+msgid "Clear analytics…"
+msgstr "Effacer les statistiques…"
+
+#: src/Admin/AnalyticsTab.php:114
+msgid "This deletes, for good:"
+msgstr "Ceci supprime définitivement :"
+
+#. translators: %s: number of searches
+#: src/Admin/AnalyticsTab.php:116
+#, php-format
+msgid "%s logged search, with what was clicked after it"
+msgid_plural "all %s logged searches, with what was clicked after each"
+msgstr[0] "%s recherche journalisée, avec ce qui a été cliqué ensuite"
+msgstr[1] "les %s recherches journalisées, avec ce qui a été cliqué après chacune"
+
+#. translators: %s: number of days
+#: src/Admin/AnalyticsTab.php:118
+#, php-format
+msgid "%s day of daily counts behind the charts"
+msgid_plural "%s days of daily counts behind the charts"
+msgstr[0] "%s jour de comptes quotidiens derrière les graphiques"
+msgstr[1] "%s jours de comptes quotidiens derrière les graphiques"
+
+#: src/Admin/AnalyticsTab.php:119
+msgid "the suggested searches, which are built from the log, until shoppers search again"
+msgstr "les recherches suggérées, tirées du journal, jusqu’à ce que la clientèle cherche de nouveau"
+
+#: src/Admin/AnalyticsTab.php:120
+msgid "Synonyms, redirects, pins and the index are not touched. Export a CSV first to keep a copy."
+msgstr "Les synonymes, les redirections, les épinglages et l’index ne sont pas touchés. Exportez d’abord en CSV pour en garder une copie."
+
+#: src/Admin/BoostsTab.php:120
+msgid "Sold-out products"
+msgstr "Produits en rupture de stock"
+
+#: src/Admin/BoostsTab.php:120
+msgid "Show products that can be bought first"
+msgstr "Afficher d’abord les produits qu’on peut acheter"
+
+#: src/Admin/BoostsTab.php:121
+msgid "In the suggestions, on the results page and through the API, products in stock or on backorder come before sold-out ones, each in order of relevance. Pinned products keep their place. Off, a sold-out product only ranks a little lower."
+msgstr "Dans les suggestions, sur la page de résultats et par l’API, les produits en stock ou en réapprovisionnement passent avant ceux en rupture de stock, chacun par ordre de pertinence. Les produits épinglés gardent leur place. Désactivé, un produit en rupture de stock est seulement classé un peu plus bas."
+
+#: src/Admin/ToolsTab.php:245
+msgid "Staff searches"
+msgstr "Recherches du personnel"
+
+#: src/Admin/ToolsTab.php:245
+msgid "Log searches by signed-in staff who can edit products. Off, your team’s searches stay out of Analytics."
+msgstr "Journaliser les recherches du personnel connecté qui peut modifier les produits. Désactivé, les recherches de votre équipe restent hors des statistiques."
+
+#: src/Admin/ToolsTab.php:273
+#: build/block/editor.js:1
+msgid "Suggestions at most"
+msgstr "Suggestions au plus"
+
+#: src/Admin/ToolsTab.php:273
+msgid "Rows in the whole panel on a computer, besides “See all”: one suggested search, then products, one category, more products, and pages last. A block or shortcode can change it."
+msgstr "Lignes dans tout le panneau sur un ordinateur, en plus de « Voir tous » : une recherche suggérée, puis des produits, une catégorie, d’autres produits, et les pages en dernier. Un bloc ou un code court peut le changer."
+
+#: src/Admin/ToolsTab.php:274
+#: build/block/editor.js:1
+msgid "Suggestions at most on a phone"
+msgstr "Suggestions au plus sur un téléphone"
+
+#: src/Admin/ToolsTab.php:274
+msgid "The same on a phone, where few rows fit above the keyboard: at least three products when there are three."
+msgstr "La même chose sur un téléphone, où peu de lignes tiennent au-dessus du clavier : au moins trois produits quand il y en a trois."
+
+#: src/Admin/ToolsTab.php:275
+msgid "Pages on a phone"
+msgstr "Pages sur un téléphone"
+
+#: src/Admin/ToolsTab.php:275
+msgid "Suggest posts and pages on a phone too. Off, a phone’s few rows go to products; the results page still lists them."
+msgstr "Suggérer aussi les articles et les pages sur un téléphone. Désactivé, les quelques lignes d’un téléphone vont aux produits; la page de résultats les affiche toujours."
+
+#. translators: %s: number of searches
+#: src/Cli/MaintenanceCommand.php:66
+#, php-format
+msgid "Delete %s logged search and every daily count? Analytics and the suggested searches start again from nothing."
+msgid_plural "Delete %s logged searches and every daily count? Analytics and the suggested searches start again from nothing."
+msgstr[0] "Supprimer %s recherche journalisée et tous les comptes quotidiens? Les statistiques et les recherches suggérées repartent de zéro."
+msgstr[1] "Supprimer %s recherches journalisées et tous les comptes quotidiens? Les statistiques et les recherches suggérées repartent de zéro."
+
+#. translators: %s: number of searches
+#: src/Cli/MaintenanceCommand.php:79
+#, php-format
+msgid "Analytics cleared: %s search deleted, with the daily counts."
+msgid_plural "Analytics cleared: %s searches deleted, with the daily counts."
+msgstr[0] "Statistiques effacées : %s recherche supprimée, avec les comptes quotidiens."
+msgstr[1] "Statistiques effacées : %s recherches supprimées, avec les comptes quotidiens."
+
+#: build/block/editor.js:1
+msgid "Rows in the whole panel on a computer, besides “See all”."
+msgstr "Lignes dans tout le panneau sur un ordinateur, en plus de « Voir tous »."

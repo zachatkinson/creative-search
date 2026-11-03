@@ -532,7 +532,7 @@ test( 'a corrected answer says so in the panel and the live region', async () =>
 	assert.equal( ctx.corrected, '' );
 } );
 
-test( 'a phone gets four products and two terms at most; a desktop ten rows', async () => {
+test( 'the panel stops at its cap: eight rows on a desktop, five on a phone, See all aside (D-136)', async () => {
 	const many = {
 		...ANSWER,
 		products: Array.from( { length: 10 }, ( _, i ) => ( {
@@ -550,11 +550,12 @@ test( 'a phone gets four products and two terms at most; a desktop ten rows', as
 	type( 'kazumi' );
 	await settle();
 	let ctx = scope.ctx;
-	assert.equal( ctx.rows.filter( ( r ) => r.product ).length, 10 );
+	assert.equal( ctx.rows.filter( ( r ) => ! r.all ).length, 8 );
+	assert.equal( ctx.rows.filter( ( r ) => r.product ).length, 7 );
 	assert.equal(
 		ctx.rows.filter( ( r ) => r.term ).length,
-		0,
-		'terms give way first'
+		1,
+		'one category, then more products'
 	);
 
 	const matchMedia = window.matchMedia;
@@ -564,15 +565,125 @@ test( 'a phone gets four products and two terms at most; a desktop ten rows', as
 	scope.ctx = context( { limit: 10 } );
 	type( 'kazumi' );
 	await settle();
-	window.matchMedia = matchMedia;
 	ctx = scope.ctx;
+	assert.equal( ctx.rows.filter( ( r ) => ! r.all ).length, 5 );
 	assert.equal( ctx.rows.filter( ( r ) => r.product ).length, 4 );
-	assert.equal( ctx.rows.filter( ( r ) => r.term ).length, 2 );
+	assert.equal( ctx.rows.filter( ( r ) => r.term ).length, 1 );
 	assert.equal(
 		ctx.rows[ ctx.rows.length - 1 ].all,
 		true,
 		'"See all" stays'
 	);
+
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 10, maxPhone: 3 } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'p100', 'p101', 'p102', 'all' ],
+		'three products before the category'
+	);
+
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	dom.fetch = () => respond( { ...many, queries: [ 'kazumi deck' ] } );
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { limit: 10, maxPhone: 3 } );
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'p100', 'p101', 'p102', 'all' ],
+		'at a cap of three the products keep their three, before a suggested search'
+	);
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 10, maxPhone: 4 } );
+	type( 'kazumi' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'qkazumi deck', 'p100', 'p101', 'p102', 'all' ],
+		'at four the search comes back'
+	);
+	window.matchMedia = matchMedia;
+	dom.fetch = () => respond( many );
+
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 10, max: 12 } );
+	type( 'kazumi' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => ! r.all ).length,
+		12,
+		'a form can raise its cap'
+	);
+} );
+
+test( 'for “hood”: one suggested search, three products, a category, the other products, then pages (D-136)', async () => {
+	const hood = {
+		...ANSWER,
+		queries: [ 'hoodie', 'hoody', 'hood black' ],
+		products: Array.from( { length: 6 }, ( _, i ) => ( {
+			...ANSWER.products[ 0 ],
+			id: 300 + i,
+		} ) ),
+		scopes: [],
+		terms: [
+			{ ...ANSWER.terms[ 0 ], taxonomy: 'category', name: 'Hoodies' },
+		],
+		content: PAGES,
+		total: 6,
+	};
+	dom.fetch = () => respond( hood );
+	scope.ctx = context();
+	type( 'hood' );
+	await settle();
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[
+			'qhoodie',
+			'p300',
+			'p301',
+			'p302',
+			'p303',
+			'p304',
+			'p305',
+			'tcategoryHoodies',
+			'all',
+		]
+	);
+
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context();
+	type( 'hood' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.deepEqual(
+		scope.ctx.rows.map( ( r ) => r.key ),
+		[ 'qhoodie', 'p300', 'p301', 'p302', 'tcategoryHoodies', 'all' ]
+	);
+
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { max: 12 } );
+	type( 'hood' );
+	await settle();
+	const rows = scope.ctx.rows.filter( ( r ) => ! r.all );
+	assert.equal( rows.length, 12 );
+	assert.equal(
+		rows.filter( ( r ) => r.content ).length,
+		2,
+		'pages take what is left'
+	);
+	assert.equal( rows[ rows.length - 1 ].content, true, 'pages last' );
 } );
 
 test( 'the backdrop closes the panel', async () => {
@@ -648,7 +759,34 @@ test( 'posts and pages follow the terms, two at most, the first under the group 
 	assert.equal( sent.get( 'id' ), '70' );
 } );
 
-test( 'pages take their rows from the products on a desktop, never from the ten', async () => {
+test( 'a phone leaves the pages out unless the form allows them (D-137)', async () => {
+	dom.fetch = () => respond( { ...ANSWER, terms: [], content: PAGES } );
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	scope.ctx = context( { pagesPhone: false } );
+	type( 'kazumi' );
+	await settle();
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.content ).length, 0 );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { pagesPhone: true } );
+	type( 'kazumi' );
+	await settle();
+	window.matchMedia = matchMedia;
+	assert.equal( scope.ctx.rows.filter( ( r ) => r.content ).length, 2 );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { pagesPhone: false } );
+	type( 'kazumi' );
+	await settle();
+	assert.equal(
+		scope.ctx.rows.filter( ( r ) => r.content ).length,
+		2,
+		'a desktop keeps them'
+	);
+} );
+
+test( 'pages come last: they get only the room the cap leaves', async () => {
 	dom.fetch = () =>
 		respond( {
 			...ANSWER,
@@ -662,10 +800,16 @@ test( 'pages take their rows from the products on a desktop, never from the ten'
 	scope.ctx = context( { limit: 10 } );
 	type( 'kazumi' );
 	await settle();
-	const rows = scope.ctx.rows.filter( ( r ) => ! r.all );
-	assert.equal( rows.length, 10 );
-	assert.equal( rows.filter( ( r ) => r.product ).length, 8 );
-	assert.equal( rows.filter( ( r ) => r.content ).length, 2 );
+	let rows = scope.ctx.rows.filter( ( r ) => ! r.all );
+	assert.equal( rows.length, 8 );
+	assert.equal( rows.filter( ( r ) => r.content ).length, 0 );
+
+	scope.ctx = context( { limit: 6 } );
+	type( 'kazumi d' );
+	await settle();
+	rows = scope.ctx.rows.filter( ( r ) => ! r.all );
+	assert.equal( rows.filter( ( r ) => r.product ).length, 6 );
+	assert.equal( rows.filter( ( r ) => r.content ).length, 1 );
 } );
 
 test( 'a row carries the classes a plugin gave its product, and drops them for the next', () => {
@@ -1058,8 +1202,8 @@ test( 'a phone shows two suggested searches; a desktop three, before the product
 	);
 	assert.equal(
 		scope.ctx.rows.filter( ( r ) => r.term ).length,
-		1,
-		'then a term, two in all'
+		0,
+		'the second suggested search fills the cap of five'
 	);
 } );
 

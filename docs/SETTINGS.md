@@ -4,7 +4,7 @@ Everything the owner can set, with its default and its range. All of it lives in
 
 Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` compares on every request, written only once the tables match it, D-090), `csearch_rebuild_owed` (set to 0 when a schema upgrade needs a full rebuild, then to the generation of the reindex begun to settle it; cleared when that generation goes live, so a cancelled or abandoned rebuild is queued again, D-090), `csearch_upgrade_lock` (a timestamp held while an upgrade runs, D-046), `csearch_index_state` (the running reindex and the live generation, below), `csearch_reindex_cancel` (the generation the owner asked to stop, D-053), `csearch_stopwords_{lang}` (the owner's stop-word additions, a list of lower-case words, set on the Tools tab), `csearch_analysis_version` (the tokenizer's rules the index was built under; an update that changes them owes one full rebuild, D-098), `csearch_attribute_terms` (the values of the `filter_attributes` attributes, a folded word to its attribute and slug; autoloaded; deleted when a term of those attributes or the choice changes, rebuilt by the next search, D-101), `csearch_category_stems` (each category name's stems by language; autoloaded; deleted when a category changes or a rebuild goes live, D-102). Product meta: `_csearch_boost` (−10 to 10, absent for 0) and `_csearch_exclude` (`yes` or absent), set in the product editor's Search tab and carried by the product CSV (D-070). Post and page meta: `_csearch_exclude` (`yes` or absent), set in the editor's Search box (D-093). User meta: `csearch_dismissed_notices` (the warnings a user dismissed, until each clears; D-071). Transients: `csearch_notice_{user id}` (an action's answer, for one minute).
 
-**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` the suggestion panel's defaults, `category_redirect` and `filter_attributes`, and (under "Suggestions", for every search bar) `suggest_queries`, `suggest_scopes`, `suggest_cart` and `analytics_events`, and `custom_fields`; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`) and `hidden_by_sku`; the Redirects and pins tab sets `query_redirects` and `pinned_products` (also `wp csearch redirect` and `wp csearch pin`). `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
+**Where each is set.** WooCommerce → Search: the Tools tab sets what to index, the stop words, `retention_days` the suggestion panel's defaults, `category_redirect` and `filter_attributes`, and (under "Suggestions") `panel_max` and `panel_max_phone` (a block or shortcode can change both), `suggest_pages_phone` and, for every search bar, `suggest_queries`, `suggest_scopes`, `suggest_cart` and `analytics_events`, and `custom_fields`; the Boosts and exclusions tab sets `boost_rules`, `fallback_products`, the no-results links (`help_page`, `help_text`, `guide_page`, `guide_text`), `in_stock_first` and `hidden_by_sku`; the Redirects and pins tab sets `query_redirects` and `pinned_products` (also `wp csearch redirect` and `wp csearch pin`). `fields` and `languages` have no screen: the spec gives them none, and the `csearch_fields` and `csearch_languages` filters are how a developer changes them. Every screen writes through `Settings::update()`, which merges, sanitises the whole and saves.
 
 ## What to index
 
@@ -14,7 +14,7 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | `index_tags` | `yes` | yes/no | Index product tags, and make tag documents. |
 | `index_variation_skus` | `yes` | yes/no | Index every variation's SKU on the parent document. |
 | `index_posts` | `no` | yes/no | Index published posts, searched apart from the products and shown after them (D-093). Changing it queues the posts' indexing or the removal of their documents. |
-| `index_pages` | `no` | yes/no | Index published pages the same way, except the front page and WooCommerce's shop, cart, checkout and account pages. |
+| `index_pages` | `no` | yes/no | Index published pages the same way, except the front page and WooCommerce's shop, cart, checkout and account pages. In the panel a post or page is suggested only when the query matches its title; the results page also lists those whose content matches (D-137). |
 | `custom_fields` | `[]` | meta keys, 1 to 64 characters of letters, digits, `_ . : -`, not `_wp_…` or `_edit_…`; 20 at most | Product meta keys (ACF field names among them) searched as the `custom` field, 2,000 characters a product in all (D-119). A change asks for a rebuild; a change to one of these fields on a product reindexes it. |
 | `fields` | name 10, sku 10, brand 6, category 5, attribute 5, tag 3, short 2, long 1, custom 4 | each 0 to 100 | Field weights in the score; the `csearch_fields` filter runs over the setting (D-050). A weight of 0 removes a field from the score but not from the index. |
 
@@ -30,6 +30,7 @@ Options beside it: `csearch_db_version` (the schema version `Install\Upgrader` c
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `hidden_by_sku` | `no` | yes/no | A hidden product (catalogue visibility hidden) appears for an exact SKU match. Off until the owner answers the hidden-products question (docs/DECISIONS.md D-018). |
+| `in_stock_first` | `no` | yes/no | Products that can be bought (in stock or on backorder, WooCommerce's `is_in_stock()`) come before sold-out ones in the panel, on the results page and in `/search`, each part in score order; pinned products keep their place first. Off, the score alone decides, a sold-out product losing 6 points (D-138). Set on the Boosts and exclusions tab. |
 | `boost_rules` | `[]` | `{taxonomy, term_id, boost -10..10}` | A number added to every product in a category, brand or tag. |
 | `fallback_products` | `[]` | product ids | Shown on the results page when nothing matches. |
 | `help_page` | `0` | a page id, 0 for none | The no-results page's first link (D-096): a published page, such as the contact page. Filter: `csearch_no_results_links`. |
@@ -57,6 +58,8 @@ A block instance can override each of these but the last four (1.3), which apply
 | `suggest_limit` | 6 | 1 to 10 | Products in the panel. |
 | `suggest_terms` | 3 | 0 to 3 | Categories, tags and brands after the products. |
 | `min_chars` | 2 | 1 to 5 | Characters before the first request. |
+| `panel_max` | 8 | 4 to 12 | Rows in the whole panel at most on a desktop, "See all" aside (D-136). Each group keeps its own limit; the panel is then filled in this order until the cap: one suggested search, 3 products, one category or "in a category" row, the other products, the other suggested searches and categories, and posts or pages last. Set on the Tools tab under Suggestions; `panelMax` on the block, `panel_max` on the shortcode. |
+| `panel_max_phone` | 5 | 3 to 8 | The same on a phone (600 px or narrower, or a touch screen: what the panel already treats as one), where 3 products come before the category row when there are 3. `panelMaxPhone` on the block, `panel_max_phone` on the shortcode. |
 | `show_prices` | `yes` | yes/no | Price in each row. |
 | `show_stock` | `yes` | yes/no | Stock in each row. |
 | `show_terms` | `yes` | yes/no | Show the category, tag and brand rows at all. |
@@ -65,6 +68,7 @@ A block instance can override each of these but the last four (1.3), which apply
 | `panel_position` | `auto` | auto, below, above | `auto` opens below, and above on a phone when the keyboard would cover it. |
 | `recent_searches` | `no` | yes/no | The shopper's last 5 searches, in their browser only. Off by default for privacy (D-004). |
 | `theme_form_takeover` | `no` | yes/no | Replace a classic theme's `get_search_form()` with the block's form. |
+| `suggest_pages_phone` | `no` | yes/no | Posts and pages in the panel on a phone too. Off, they stay out of a phone's panel, where its few rows go to products; a desktop's panel and the results page are not affected (D-137). Set on the Tools tab under Suggestions. |
 | `suggest_queries` | `yes` | yes/no | Up to 3 searches other shoppers made above the products (2 on a phone), from the search log: each made 3 times or more in the retention window, from the results page or with a suggestion chosen, that found products, starts with what is typed (3 characters or more), and has every word in the index (D-112). Filter: `csearch_suggested_searches`. |
 | `suggest_scopes` | `yes` | yes/no | Up to 2 "kazumi in Decks" rows after the products: the categories holding at least 2 of the first 10 ranked products, each a link to the search with WooCommerce's `product_cat` parameter (D-113). |
 | `suggest_cart` | `no` | yes/no | Add to cart from the panel for a simple product that is purchasable, in stock and needs no choice: a small "Add" at the row's end, and Shift+Enter on the chosen row (D-115). Uses WooCommerce's own add-to-cart endpoint; honours "Redirect to the cart page after successful addition". |
@@ -77,7 +81,8 @@ A block or shortcode also takes `mode` (`field`, the default, or `button`: an ic
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `retention_days` | 90 | 7 to 365 | Days a search-log row is kept before the nightly purge. |
-| `stats` | `[]` | `{ 'Y-m-d': { name: count } }` | Daily roll-ups the Analytics charts read, so they survive the purge. Written by the plugin, not the owner. |
+| `log_staff_searches` | `no` | yes/no | Log searches by signed-in users who can edit products (`edit_products`: administrators and shop managers). Off, their searches and suggestion clicks are neither logged nor counted, in the panel too, where the REST request is recognised by the logged-in cookie (D-139). Set on the Tools tab under Search log. A request with the header `X-Creative-Test: 1` is never logged, and `csearch_log_search` can leave out any other. |
+| `stats` | `[]` | `{ 'Y-m-d': { name: count } }` | Daily roll-ups the Analytics charts read, so they survive the purge. Written by the plugin, not the owner. Emptied with the log by Clear analytics on the Analytics tab, or `wp csearch analytics clear` (D-139). |
 
 ## The index state (`csearch_index_state`)
 

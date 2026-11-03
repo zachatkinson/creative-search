@@ -251,7 +251,7 @@ No new filter or action for other plugins. What the admin attaches, listed so no
 
 ### Admin actions (`admin-post.php`)
 
-Internal endpoints, not for plugins to call; each checks `manage_woocommerce` and a nonce named after the action (D-068): `csearch_synonym_save`, `csearch_synonym_delete`, `csearch_synonym_import`, `csearch_synonym_export`, `csearch_analytics_export`, `csearch_boosts_save`, `csearch_tools_save`, `csearch_reindex`, `csearch_reindex_cancel`, `csearch_product_reindex`, `csearch_dismiss_notice`.
+Internal endpoints, not for plugins to call; each checks `manage_woocommerce` and a nonce named after the action (D-068): `csearch_synonym_save`, `csearch_synonym_delete`, `csearch_synonym_import`, `csearch_synonym_export`, `csearch_analytics_export`, `csearch_analytics_clear` (D-139), `csearch_boosts_save`, `csearch_tools_save`, `csearch_reindex`, `csearch_reindex_cancel`, `csearch_product_reindex`, `csearch_dismiss_notice`.
 
 ### WooCommerce hooks the plugin uses
 
@@ -259,7 +259,7 @@ Internal endpoints, not for plugins to call; each checks `manage_woocommerce` an
 
 ### WP-CLI
 
-`wp csearch search "<query>" [--lang=] [--limit=] [--format=]` (not logged), `wp csearch synonyms list [--lang=] [--search=] [--format=]`, `wp csearch synonyms add <word> <means> [--lang=] [--one-way] [--format=json]`, `wp csearch synonyms delete <id>...`, `wp csearch synonyms import <file|->`, `wp csearch synonyms export`, `wp csearch log purge [--days=] [--format=json]` (D-074), `wp csearch cache flush`. Each has `--help` and exits non-zero on failure.
+`wp csearch search "<query>" [--lang=] [--limit=] [--format=]` (not logged), `wp csearch synonyms list [--lang=] [--search=] [--format=]`, `wp csearch synonyms add <word> <means> [--lang=] [--one-way] [--format=json]`, `wp csearch synonyms delete <id>...`, `wp csearch synonyms import <file|->`, `wp csearch synonyms export`, `wp csearch log purge [--days=] [--format=json]` (D-074), `wp csearch analytics clear [--yes] [--format=json]` (every logged search and every daily count, after asking; D-139), `wp csearch cache flush`. Each has `--help` and exits non-zero on failure.
 
 ## Milestone 8: languages and 1.0 (1.0.0)
 
@@ -305,7 +305,7 @@ add_filter(
 
 - **Since:** 1.1.0
 - **Signature:** `apply_filters( 'csearch_content_limit', int $limit, string $context ): int`
-- **What it does:** how many posts and pages show beside the products: 3 on the results page (`page`), which it can raise to 10, and 2 in the panel (`suggest`), which it can only lower, since the panel's row budget holds at most 2 (D-092); 0 shows none.
+- **What it does:** how many posts and pages show beside the products: 3 on the results page (`page`), which it can raise to 10, and 2 in the panel (`suggest`), which it can only lower, since the panel holds at most 2 (D-136); 0 shows none. In the panel a post or page shows only when the query matches its title (D-137).
 - **Where it runs:** `Search\SearchService::content()`, on a `/suggest` request and on the results page.
 - **Example:**
 
@@ -466,6 +466,18 @@ The `custom_fields` setting (Tools → What to index) names product meta keys se
 
 ```php
 add_filter( 'csearch_suggested_searches', static fn( array $picked ): array => array_values( array_filter( $picked, static fn( string $q ): bool => ! str_contains( $q, 'clearance' ) ) ) );
+```
+
+### `csearch_log_search` (filter)
+
+- **Since:** 1.6.0
+- **Signature:** `apply_filters( 'csearch_log_search', bool $log, string $query, string $lang, int $results, string $source ): bool`
+- **What it does:** whether a search goes into the search log (D-139). Return `false` to leave it out of the log, the Analytics tab, the daily counts and the suggested searches, as a test suite or an uptime check might. `$query` is the query as typed, already redacted (`Domain\Scrub`); `$source` is `suggest` or `page`. It runs after the plugin's own checks, so it never sees a search already left out: one from a signed-in user who can edit products while `log_staff_searches` is off, or a request with the header `X-Creative-Test: 1`. That header needs no secret, since it only hides the sender's own searches; it also keeps that request's suggestion clicks from being recorded.
+- **Where it runs:** `Search\SearchLog::record()`, for the panel (`csearch/v1/suggest`), `csearch/v1/search` and the results page.
+- **Example:**
+
+```php
+add_filter( 'csearch_log_search', static fn( bool $log, string $query ): bool => $log && ! str_starts_with( $query, 'zz' ), 10, 2 );
 ```
 
 ### Events in the page (JavaScript)

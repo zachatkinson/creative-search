@@ -39,6 +39,18 @@ final class Hit {
 	}
 
 	/**
+	 * Order for products when the owner puts what can be bought first (`in_stock_first`, D-138): in stock (which
+	 * includes on backorder) before sold out, each part in {@see Hit::compare()}'s order.
+	 *
+	 * @param Hit $a A hit.
+	 * @param Hit $b Another.
+	 */
+	public static function stockFirst( Hit $a, Hit $b ): int {
+		$stock = $b->document->inStock <=> $a->document->inStock;
+		return 0 !== $stock ? $stock : self::compare( $a, $b );
+	}
+
+	/**
 	 * Order for categories, tags and brands: score, then how much of the name the query covers, then the count
 	 * the document carries in `totalSales`, then title, then id (D-037).
 	 *

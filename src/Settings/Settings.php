@@ -37,6 +37,16 @@ final class Settings {
 	public const BOOST_MAX     = 10;
 
 	/**
+	 * Rows the whole suggestion panel shows at most, "See all" aside (D-136): on a desktop, and on a phone.
+	 */
+	public const PANEL_MAX_MIN           = 4;
+	public const PANEL_MAX_MAX           = 12;
+	public const PANEL_MAX_DEFAULT       = 8;
+	public const PANEL_MAX_PHONE_MIN     = 3;
+	public const PANEL_MAX_PHONE_MAX     = 8;
+	public const PANEL_MAX_PHONE_DEFAULT = 5;
+
+	/**
 	 * The owner's rules for single queries (D-108, D-110): rules of each kind at most, products pinned to one
 	 * query at most, and the longest query a rule names (a query's own cap).
 	 */
@@ -96,6 +106,8 @@ final class Settings {
 			// Matching.
 			'hidden_by_sku'                => 'no',
 			'boost_rules'                  => array(),
+			// Products that can be bought (on backorder too) before sold-out ones, each in score order (D-138).
+			'in_stock_first'               => 'no',
 			'fallback_products'            => array(),
 			// The no-results page's two links (D-096): a page the owner picks, and its wording ('' reads the default).
 			'help_page'                    => 0,
@@ -113,6 +125,11 @@ final class Settings {
 			'suggest_limit'                => self::LIMIT_DEFAULT,
 			'suggest_terms'                => self::TERMS_DEFAULT,
 			'min_chars'                    => self::MIN_CHARS_DEFAULT,
+			// The whole panel's rows at most, on a desktop and on a phone (D-136).
+			'panel_max'                    => self::PANEL_MAX_DEFAULT,
+			'panel_max_phone'              => self::PANEL_MAX_PHONE_DEFAULT,
+			// Posts and pages in the panel on a phone too (D-137); off, the room goes to products.
+			'suggest_pages_phone'          => 'no',
 			'show_prices'                  => 'yes',
 			'show_stock'                   => 'yes',
 			'show_terms'                   => 'yes',
@@ -129,6 +146,8 @@ final class Settings {
 			'analytics_events'             => 'yes',
 			// Analytics.
 			'retention_days'               => self::RETENTION_DEFAULT,
+			// Searches by signed-in staff who can edit products (D-139): off, they are neither logged nor counted.
+			'log_staff_searches'           => 'no',
 			'stats'                        => array(),
 		);
 	}
@@ -244,7 +263,7 @@ final class Settings {
 	public static function sanitize( array $input ): array {
 		$out = self::defaults();
 
-		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events' ) as $flag ) {
+		foreach ( array( 'index_long_description', 'index_tags', 'index_variation_skus', 'index_posts', 'index_pages', 'fallback_to_default_language', 'hidden_by_sku', 'show_prices', 'show_stock', 'show_terms', 'label_visible', 'recent_searches', 'theme_form_takeover', 'category_redirect', 'suggest_queries', 'suggest_scopes', 'suggest_cart', 'analytics_events', 'suggest_pages_phone', 'in_stock_first', 'log_staff_searches' ) as $flag ) {
 			if ( array_key_exists( $flag, $input ) ) {
 				$out[ $flag ] = self::yesNo( $input[ $flag ] );
 			}
@@ -287,6 +306,12 @@ final class Settings {
 		}
 		if ( isset( $input['suggest_terms'] ) ) {
 			$out['suggest_terms'] = self::clamp( self::toInt( $input['suggest_terms'], self::TERMS_DEFAULT ), 0, self::TERMS_MAX );
+		}
+		if ( isset( $input['panel_max'] ) ) {
+			$out['panel_max'] = self::clamp( self::toInt( $input['panel_max'], self::PANEL_MAX_DEFAULT ), self::PANEL_MAX_MIN, self::PANEL_MAX_MAX );
+		}
+		if ( isset( $input['panel_max_phone'] ) ) {
+			$out['panel_max_phone'] = self::clamp( self::toInt( $input['panel_max_phone'], self::PANEL_MAX_PHONE_DEFAULT ), self::PANEL_MAX_PHONE_MIN, self::PANEL_MAX_PHONE_MAX );
 		}
 		if ( isset( $input['min_chars'] ) ) {
 			$out['min_chars'] = self::clamp( self::toInt( $input['min_chars'], self::MIN_CHARS_DEFAULT ), self::MIN_CHARS_MIN, self::MIN_CHARS_MAX );

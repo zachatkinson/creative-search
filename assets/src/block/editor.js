@@ -98,6 +98,35 @@ function Edit( { attributes, setAttributes } ) {
 							setAttributes( { limit: value } )
 						}
 					/>
+					<RangeControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __( 'Suggestions at most', 'creative-search' ) }
+						help={ __(
+							'Rows in the whole panel on a computer, besides “See all”.',
+							'creative-search'
+						) }
+						min={ 4 }
+						max={ 12 }
+						value={ attributes.panelMax }
+						onChange={ ( value ) =>
+							setAttributes( { panelMax: value } )
+						}
+					/>
+					<RangeControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __(
+							'Suggestions at most on a phone',
+							'creative-search'
+						) }
+						min={ 3 }
+						max={ 8 }
+						value={ attributes.panelMaxPhone }
+						onChange={ ( value ) =>
+							setAttributes( { panelMaxPhone: value } )
+						}
+					/>
 					{ toggle(
 						'showPrices',
 						__( 'Show prices', 'creative-search' )
