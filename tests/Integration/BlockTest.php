@@ -72,6 +72,8 @@ final class BlockTest extends IntegrationTestCase {
 		self::assertSame( 4, $context['limit'] );
 		self::assertFalse( $context['prices'] );
 		self::assertSame( 2, $context['min'] );
+		self::assertSame( Settings::PANEL_MAX_DEFAULT, $context['max'], 'the whole panel\'s cap (D-136)' );
+		self::assertSame( Settings::PANEL_MAX_PHONE_DEFAULT, $context['maxPhone'] );
 		self::assertSame( '6 suggestions', $context['i18n']['counts'][6] );
 		self::assertSame( '1 suggestion', $context['i18n']['counts'][1] );
 		self::assertSame( 'No suggestions', $context['i18n']['counts'][0] );
@@ -79,6 +81,24 @@ final class BlockTest extends IntegrationTestCase {
 		self::assertSame( array( 'category', 'tag', 'brand' ), array_keys( $context['i18n']['taxonomies'] ), 'the term types /suggest returns' );
 		self::assertSame( '', $context['answered'] );
 		self::assertStringContainsString( 'class="csearch-label csearch-sr"', do_blocks( '<!-- wp:creative-search/search {"labelVisible":false} /-->' ), 'a visually hidden label' );
+	}
+
+	public function test_a_block_or_shortcode_sets_its_own_caps_within_their_ranges(): void {
+		Settings::update(
+			array(
+				'panel_max'       => 10,
+				'panel_max_phone' => 6,
+			)
+		);
+		$owner = self::context( do_shortcode( '[creative_search]' ) );
+		self::assertSame( array( 10, 6 ), array( $owner['max'], $owner['maxPhone'] ), 'the owner\'s caps by default' );
+		$block = self::context( do_blocks( '<!-- wp:creative-search/search {"panelMax":5,"panelMaxPhone":4} /-->' ) );
+		self::assertSame( array( 5, 4 ), array( $block['max'], $block['maxPhone'] ) );
+		$short = self::context( do_shortcode( '[creative_search panel_max="40" panel_max_phone="1"]' ) );
+		self::assertSame( array( Settings::PANEL_MAX_MAX, Settings::PANEL_MAX_PHONE_MIN ), array( $short['max'], $short['maxPhone'] ), 'clamped to the ranges' );
+		$type = WP_Block_Type_Registry::get_instance()->get_registered( 'creative-search/search' );
+		self::assertSame( Settings::PANEL_MAX_DEFAULT, $type->attributes['panelMax']['default'] ?? null, 'the editor starts from the owner\'s cap, read when the block registers' );
+		self::assertSame( Settings::PANEL_MAX_PHONE_DEFAULT, $type->attributes['panelMaxPhone']['default'] ?? null );
 	}
 
 	public function test_the_shortcode_widget_and_takeover_render_the_same_form(): void {

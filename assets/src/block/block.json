@@ -13,6 +13,8 @@
 		"labelVisible": { "type": "boolean" },
 		"placeholder": { "type": "string" },
 		"limit": { "type": "integer", "minimum": 1, "maximum": 10 },
+		"panelMax": { "type": "integer", "minimum": 4, "maximum": 12 },
+		"panelMaxPhone": { "type": "integer", "minimum": 3, "maximum": 8 },
 		"showPrices": { "type": "boolean" },
 		"showStock": { "type": "boolean" },
 		"showTerms": { "type": "boolean" },

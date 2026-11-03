@@ -37,6 +37,8 @@ final class FormOptions {
 		'showTerms'      => 'show_terms',
 		'recentSearches' => 'recent_searches',
 		'panelPosition'  => 'panel_position',
+		'panelMax'       => 'panel_max',
+		'panelMaxPhone'  => 'panel_max_phone',
 	);
 
 	public const FIELD  = 'field';
@@ -58,6 +60,8 @@ final class FormOptions {
 	 *                               dialog, D-099); per form, not a setting.
 	 * @param bool   $dimPage        In Field mode, dim the page behind the open suggestions (D-127); per form,
 	 *                               not a setting.
+	 * @param int    $panelMax       Rows in the whole panel at most on a desktop, "See all" aside (D-136).
+	 * @param int    $panelMaxPhone  The same on a phone.
 	 */
 	public function __construct(
 		public readonly bool $labelVisible,
@@ -70,7 +74,9 @@ final class FormOptions {
 		public readonly string $panelPosition,
 		public readonly int $minChars,
 		public readonly string $mode = self::FIELD,
-		public readonly bool $dimPage = true
+		public readonly bool $dimPage = true,
+		public readonly int $panelMax = Settings::PANEL_MAX_DEFAULT,
+		public readonly int $panelMaxPhone = Settings::PANEL_MAX_PHONE_DEFAULT
 	) {
 	}
 
@@ -116,6 +122,10 @@ final class FormOptions {
 			return Settings::isOn( $key );
 		};
 
+		$number = static function ( string $key ) use ( $values ): int {
+			return array_key_exists( $key, $values ) ? Settings::toInt( $values[ $key ], Settings::int( $key ) ) : Settings::int( $key );
+		};
+
 		$limit = array_key_exists( 'suggest_limit', $values )
 			? Settings::toInt( $values['suggest_limit'], Settings::LIMIT_DEFAULT )
 			: Settings::int( 'suggest_limit' );
@@ -151,7 +161,9 @@ final class FormOptions {
 			$position,
 			Settings::clamp( Settings::toInt( $minChars, Settings::MIN_CHARS_DEFAULT ), Settings::MIN_CHARS_MIN, Settings::MIN_CHARS_MAX ),
 			self::BUTTON === Settings::toString( $values['mode'] ?? '' ) ? self::BUTTON : self::FIELD,
-			! array_key_exists( 'dim_page', $values ) || 'yes' === Settings::yesNo( $values['dim_page'] )
+			! array_key_exists( 'dim_page', $values ) || 'yes' === Settings::yesNo( $values['dim_page'] ),
+			Settings::clamp( $number( 'panel_max' ), Settings::PANEL_MAX_MIN, Settings::PANEL_MAX_MAX ),
+			Settings::clamp( $number( 'panel_max_phone' ), Settings::PANEL_MAX_PHONE_MIN, Settings::PANEL_MAX_PHONE_MAX )
 		);
 	}
 
@@ -173,6 +185,8 @@ final class FormOptions {
 			'showTerms'      => $defaults->showTerms,
 			'recentSearches' => $defaults->recentSearches,
 			'panelPosition'  => $defaults->panelPosition,
+			'panelMax'       => $defaults->panelMax,
+			'panelMaxPhone'  => $defaults->panelMaxPhone,
 		);
 		foreach ( $values as $attribute => $value ) {
 			if ( isset( $schema[ $attribute ] ) ) {

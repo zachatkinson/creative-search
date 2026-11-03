@@ -37,6 +37,16 @@ final class Settings {
 	public const BOOST_MAX     = 10;
 
 	/**
+	 * Rows the whole suggestion panel shows at most, "See all" aside (D-136): on a desktop, and on a phone.
+	 */
+	public const PANEL_MAX_MIN           = 4;
+	public const PANEL_MAX_MAX           = 12;
+	public const PANEL_MAX_DEFAULT       = 8;
+	public const PANEL_MAX_PHONE_MIN     = 3;
+	public const PANEL_MAX_PHONE_MAX     = 8;
+	public const PANEL_MAX_PHONE_DEFAULT = 5;
+
+	/**
 	 * The owner's rules for single queries (D-108, D-110): rules of each kind at most, products pinned to one
 	 * query at most, and the longest query a rule names (a query's own cap).
 	 */
@@ -113,6 +123,9 @@ final class Settings {
 			'suggest_limit'                => self::LIMIT_DEFAULT,
 			'suggest_terms'                => self::TERMS_DEFAULT,
 			'min_chars'                    => self::MIN_CHARS_DEFAULT,
+			// The whole panel's rows at most, on a desktop and on a phone (D-136).
+			'panel_max'                    => self::PANEL_MAX_DEFAULT,
+			'panel_max_phone'              => self::PANEL_MAX_PHONE_DEFAULT,
 			'show_prices'                  => 'yes',
 			'show_stock'                   => 'yes',
 			'show_terms'                   => 'yes',
@@ -287,6 +300,12 @@ final class Settings {
 		}
 		if ( isset( $input['suggest_terms'] ) ) {
 			$out['suggest_terms'] = self::clamp( self::toInt( $input['suggest_terms'], self::TERMS_DEFAULT ), 0, self::TERMS_MAX );
+		}
+		if ( isset( $input['panel_max'] ) ) {
+			$out['panel_max'] = self::clamp( self::toInt( $input['panel_max'], self::PANEL_MAX_DEFAULT ), self::PANEL_MAX_MIN, self::PANEL_MAX_MAX );
+		}
+		if ( isset( $input['panel_max_phone'] ) ) {
+			$out['panel_max_phone'] = self::clamp( self::toInt( $input['panel_max_phone'], self::PANEL_MAX_PHONE_DEFAULT ), self::PANEL_MAX_PHONE_MIN, self::PANEL_MAX_PHONE_MAX );
 		}
 		if ( isset( $input['min_chars'] ) ) {
 			$out['min_chars'] = self::clamp( self::toInt( $input['min_chars'], self::MIN_CHARS_DEFAULT ), self::MIN_CHARS_MIN, self::MIN_CHARS_MAX );

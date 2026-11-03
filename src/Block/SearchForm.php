@@ -234,6 +234,9 @@ final class SearchForm {
 			'lang'      => $this->lang(),
 			'min'       => $options->minChars,
 			'limit'     => $options->limit,
+			// The whole panel's rows at most, on a desktop and on a phone (D-136).
+			'max'       => $options->panelMax,
+			'maxPhone'  => $options->panelMaxPhone,
 			'prices'    => $options->showPrices,
 			'stock'     => $options->showStock,
 			'terms'     => $options->showTerms,

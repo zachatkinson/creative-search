@@ -1007,3 +1007,15 @@ The Plugin Handbook's header requirements ask for a Description of fewer than 14
 The Canadian French entry was edited in the .po by hand, not through `composer i18n:po`, so that no other entry, comment or header line in it could change; the compiled .mo differs from 1.5.2's in that one entry only.
 
 **Why:** a long Description is cut or wraps badly on the Plugins screen, and a unit test catches it on every run, before Plugin Check or a review would.
+
+### D-136 · One cap on the whole panel, filled in a fixed order · 2026-11-03
+
+From the 3 November UX review (the brief for 1.6.0): for "hood" the panel showed 11 rows on a desktop and 10 on a phone, of which about four fit above the keyboard, because each group (suggested searches, products, categories and scopes, pages) had its own limit and D-092's budget of 10 was their sum. Baymard's autocomplete research: at most 10 suggestions on a desktop, 4 to 8 on a phone.
+
+`panel_max` (default 8, 4 to 12) and `panel_max_phone` (default 5, 3 to 8) cap the whole panel; "See all" is never counted and always shows. A block (`panelMax`, `panelMaxPhone`) or shortcode (`panel_max`, `panel_max_phone`) overrides both, as it does the other panel options; the widget keeps the owner's. A phone is what the panel already treated as one (`(max-width: 600px), (pointer: coarse)`), so the cap is applied in the browser, in `budget()`, and the answer from `/suggest` is unchanged and still cached once for both widths.
+
+Each group keeps its own limit first (the owner's products; 3 suggested searches, 2 on a phone; 3 terms, 2 on a phone, sharing their room with up to 2 scopes; 2 posts or pages). Then the rows are taken in this order until the cap: one suggested search; 3 products (on a phone this is the brief's "at least 3 when there are 3"); one category or scope row (a scope first, D-113); the other products; then, choices the brief left open, the other suggested searches and the other categories and scopes, in that order; and posts or pages last. The rows still show in their groups' order (searches, products, scopes, terms, pages), so taking a category before the fourth product changes which rows show, not where.
+
+This replaces D-092's row budget (10 on a desktop with terms giving way first, 4 products on a phone): a phone's products are now bounded by its cap rather than a fixed 4, so an owner who raises `panel_max_phone` gets more products, not more categories. D-092's `fit()` is unchanged and still drops the last rows when the capped panel does not fit the screen.
+
+**Why:** the panel's length should be one number the owner sets, not a sum nobody chose; and when room is short the shopper should see the one suggested search, the first products and the one category before anything else.
