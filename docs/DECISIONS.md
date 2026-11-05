@@ -1193,3 +1193,10 @@ Found by the check of 1.6.3 on the demo: "8.25 deck" said "See all 122" and open
 2. **A loose typo offers no term by its description.** A category, tag or brand document indexes its description (`TermReader`, the short-description field), and was offered when any field held a word. "hody" read "body" as a loose candidate (D-146) in the HZRD brand's description and offered the brand; the row limit hid it on the demo. A term is now offered only when some word reaches it by more than a loose candidate in its description (`TermMatch::firmIn()`, as for products). The corrected word itself, a word typed in full, or another word naming it still reaches it.
 
 **Why:** "See all" promises the page's number, and WooCommerce decides what that page lists; and a near spelling that finds no product that way shouldn't find a term that way either.
+
+### D-152 · A pull request that touches only the browser tests or the workflows runs the newest leg · 2026-11-05
+A `scope` job compares a pull request with its base branch. When every changed file is under `tests/e2e/` or `.github/workflows/` (or is a doc, which D-148 already skips), the run keeps the PHP and JS standards, the unit tests and the newest leg (its integration tests, Plugin Check, the i18n check and every browser project), and skips the other five legs, mutation testing, the benchmarks and the 10,000-product budgets. Any other file, or a push to main, runs everything; a release still waits for main's run (D-148). The matrix reads its legs from the scope job, so the skipped legs don't appear as checks; main has no required checks to miss them.
+
+What a workflow-only change gives up: a mistake in a step only the skipped jobs run (the database legs, Infection, the budgets) shows on main's run after the merge, not on the pull request.
+
+**Why:** Zach's request, after D-148: a fix to a browser test or a workflow shouldn't spend a full matrix that its change can't affect.

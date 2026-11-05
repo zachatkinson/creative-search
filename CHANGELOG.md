@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 From the check of 1.6.3 on the demo.
 
+### Changed
+- CI: a pull request that touches only the browser tests or the workflows runs the standards, the unit tests and the newest leg, not the full matrix, mutation testing or the budgets; main still runs everything (D-152).
+
 ### Fixed
 - "See all" counts what the filtered page lists when WooCommerce hides sold-out products and filters through its attributes lookup table: a variable product whose variation in the size is sold out is not counted, as WooCommerce's listing leaves it out ("8.25 deck" said 122 on a Decks page of 88) (D-151).
 - A category, tag or brand reached only by a loose typo candidate in its description is no longer offered: "hody" no longer brings a brand whose description says "body" (D-151).
