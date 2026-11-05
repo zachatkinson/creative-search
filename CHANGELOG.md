@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- CI spends fewer minutes: a version tag publishes once CI has passed on the commit's push to main instead of running it again, the 10,000-product catalogue is cached between runs (the reindex and every budget still run), the oldest-versions leg runs two browser projects, Infection on a pull request mutates only its changed lines, and changes to the docs alone run nothing (D-148).
+
 ## [1.6.2] - 2026-11-03
 
 Names before descriptions, the page asked for, and only checked packages installed, from the 3 November check of 1.6.1 on the demo.

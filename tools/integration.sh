@@ -9,9 +9,9 @@ if [ ! -f tools/integration/vendor/bin/phpunit ]; then
 	composer install --working-dir=tools/integration --no-interaction --quiet
 fi
 # The matrix's switches pass into the container (D-083): CSEARCH_HPOS=on|off, CSEARCH_OBJECT_CACHE=persistent,
-# CSEARCH_DB_HOST (another database server on wp-env's network) and CSEARCH_BENCH_PRODUCTS.
+# CSEARCH_DB_HOST (another database server on wp-env's network), CSEARCH_BENCH_PRODUCTS and CSEARCH_BENCH_SNAPSHOT (D-148).
 pass=()
-for name in CSEARCH_HPOS CSEARCH_OBJECT_CACHE CSEARCH_BENCH_PRODUCTS; do
+for name in CSEARCH_HPOS CSEARCH_OBJECT_CACHE CSEARCH_BENCH_PRODUCTS CSEARCH_BENCH_SNAPSHOT; do
 	if [ -n "${!name:-}" ]; then
 		pass+=("$name=${!name}")
 	fi
