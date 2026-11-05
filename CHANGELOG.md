@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- Releases: each commit has its own release queue, so a tag's release can no longer be dropped behind another run, and a re-run finishes a release that published its zip but not its `info.json` (D-153).
+
 ## [1.6.4] - 2026-11-05
 
 From the check of 1.6.3 on the demo.

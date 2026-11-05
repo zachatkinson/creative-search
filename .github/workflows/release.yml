@@ -5,7 +5,8 @@
 # CI is not run again for the tag (D-148): the tagged commit is the merge on main, whose push already ran every CI
 # job. A tag pushed after that run passed publishes at once; a tag pushed while it runs publishes when it passes
 # (the workflow_run trigger); a tag on a commit whose CI failed, or that CI never ran on, fails here and says so.
-# Publishing is skipped when the release already exists, so the two triggers never publish twice.
+# Publishing is skipped when the release already exists, so the two triggers never publish twice; a run that finds
+# the release but not its info.json (an earlier run stopped between the two) writes info.json from the published zip.
 name: Release
 
 on:
@@ -20,8 +21,11 @@ permissions:
   contents: read
   actions: read
 
+# One queue per commit (D-153): GitHub keeps one waiting run per queue and cancels the one already waiting when
+# another arrives, so a single queue could drop a tag's run behind CI completions on other commits. The tag's push
+# and the CI completion for the same commit still wait for each other.
 concurrency:
-  group: release
+  group: release-${{ github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -98,7 +102,9 @@ jobs:
           version="$(grep -E '^ \* Version:' creative-search.php | awk '{print $3}')"
           test "v${version}" = "${TAG}" || { echo "Tag ${TAG} is not v${version}"; exit 1; }
           echo "VERSION=${version}" >> "$GITHUB_ENV"
-      - name: Skip a release already published
+      # Each half is skipped once done (D-153): the release, then info.json. A run that stopped between them is finished
+      # by the next, from the zip already published, so the manifest's checksum is that zip's.
+      - name: Skip what is already published
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
@@ -106,6 +112,18 @@ jobs:
             echo "creative-search-${VERSION} is already published."
             echo "PUBLISHED=yes" >> "$GITHUB_ENV"
           fi
+          current="$(gh api "repos/${RELEASES_REPO}/contents/creative-search/info.json" --jq .content 2>/dev/null | base64 -d 2>/dev/null | jq -r '.version // empty' || true)"
+          if [ "$current" = "$VERSION" ]; then
+            echo "info.json already names ${VERSION}."
+            echo "POINTED=yes" >> "$GITHUB_ENV"
+          fi
+      - name: Download the published zip, for info.json
+        if: env.PUBLISHED == 'yes' && env.POINTED != 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          mkdir -p tmp
+          gh release download "creative-search-${VERSION}" --repo "$RELEASES_REPO" --pattern "creative-search-${VERSION}.zip" --dir tmp
       - uses: actions/setup-node@v4
         if: env.PUBLISHED != 'yes'
         with:
@@ -118,7 +136,7 @@ jobs:
         if: env.PUBLISHED != 'yes'
         run: bash tools/build-zip.sh
       - name: Write the manifest
-        if: env.PUBLISHED != 'yes'
+        if: env.POINTED != 'yes'
         run: php tools/release-manifest.php "tmp/creative-search-${VERSION}.zip" > tmp/info.json
       - name: Publish the release
         if: env.PUBLISHED != 'yes'
@@ -129,7 +147,7 @@ jobs:
           gh release create "$tag" "tmp/creative-search-${VERSION}.zip" --repo "$RELEASES_REPO" --title "Creative Search ${VERSION}" \
             --notes "$(php -r '$m = json_decode(file_get_contents("tmp/info.json"), true); echo "- " . implode("\n- ", $m["changelog"]);')"
       - name: Point info.json at it
-        if: env.PUBLISHED != 'yes'
+        if: env.POINTED != 'yes'
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
