@@ -15,6 +15,7 @@ use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
+use CreativeBranding\Search\Domain\Scorer;
 use CreativeBranding\Search\Domain\Searcher;
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Domain\Synonyms;
@@ -249,8 +250,9 @@ final class SearchService {
 		$store    = $this->index->at( $this->index->generation() )->withTermRefs( array() !== $options->boostRules );
 		$store    = $explain ? $store->explaining() : $store;
 		$langs    = array_values( array_unique( array_filter( array( $lang, $options->fallbackLang ) ) ) );
-		$parser   = new QueryParser( $this->analyzers->tokenizer(), $this->synonymsFor( $langs ) );
-		$searcher = new Searcher( $store, $this->analyzers->analyzer() );
+		$synonyms = $this->synonymsFor( $langs );
+		$parser   = new QueryParser( $this->analyzers->tokenizer(), $synonyms );
+		$searcher = new Searcher( $store, $this->analyzers->analyzer(), new Scorer(), $synonyms );
 		return $searcher->search( $parser->parse( $query, $lang ), $options );
 	}
 

@@ -37,7 +37,15 @@ test.describe( 'Creative Search, milestone 1', () => {
 		await expect(
 			row.getByRole( 'link', { name: 'Deactivate Creative Search' } )
 		).toBeVisible();
-		await axe( page, 'plugins-row', 'tr[data-slug="creative-search"]' );
+		// Core's "View details" link (shown once the update check has reached the manifest) reads "More information
+		// about Creative Search" to a screen reader: WordPress's markup, not the plugin's (D-150).
+		await axe(
+			page,
+			'plugins-row',
+			'tr[data-slug="creative-search"]',
+			[],
+			[ '.open-plugin-details-modal' ]
+		);
 		expect( errors, errors.join( '\n' ) ).toEqual( [] );
 	} );
 

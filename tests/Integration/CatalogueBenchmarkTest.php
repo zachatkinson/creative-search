@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Index\AnalyzerFactory;
+use CreativeBranding\Search\Index\AttributeTerms;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
@@ -21,6 +22,7 @@ use CreativeBranding\Search\Support\Clock;
 use CreativeBranding\Search\Support\Tables;
 use CreativeBranding\Search\Tests\Fixtures\Catalogue;
 use CreativeBranding\Search\Tests\Fixtures\GoldenQueries;
+use CreativeBranding\Search\Tests\Support\CatalogueSnapshot;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
 use CreativeBranding\Search\Tests\Support\WooCommerceCatalogue;
 use WP_REST_Request;
@@ -65,9 +67,22 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 
 		$start = hrtime( true );
 		$specs = ( new Catalogue() )->generate( $count );
-		$ids   = $this->catalogue->load( $specs, true, true );
+		// CI keeps the loaded catalogue between runs (D-148): only the load is skipped, every budget still runs.
+		$file = CatalogueSnapshot::path();
+		$key  = CatalogueSnapshot::key( $count );
+		$ids  = null === $file ? null : CatalogueSnapshot::restore( $file, $key );
+		if ( null === $ids ) {
+			$marks = CatalogueSnapshot::marks();
+			$ids   = $this->catalogue->load( $specs, true, true );
+			if ( null !== $file ) {
+				CatalogueSnapshot::save( $file, $key, $marks, $ids );
+			}
+			$how = 'through WooCommerce' . ( null === $file ? '' : ', snapshot written' );
+		} else {
+			$how = 'from the snapshot';
+		}
 		$this->service( IndexQueue::class )->clear();
-		$this->phase( sprintf( 'loaded %d products through WooCommerce', $count ), $start );
+		$this->phase( sprintf( 'loaded %d products %s', $count, $how ), $start );
 
 		// 1. The full reindex, in English.
 		$start = hrtime( true );
@@ -107,10 +122,14 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 		$this->content( max( 10, intdiv( $count, 100 ) ) );
 		Settings::update(
 			array(
-				'index_pages' => 'yes',
-				'index_posts' => 'yes',
+				'index_pages'       => 'yes',
+				'index_posts'       => 'yes',
+				// Widths are the shop's filter, as on Skatehouse: "8.25" in a golden query then takes the panel's
+				// landing path for its "See all" count (D-145).
+				'filter_attributes' => array( 'pa_width' ),
 			)
 		);
+		$this->service( AttributeTerms::class )->rebuild();
 		self::assertTrue( $this->service( Reindex::class )->runInline() );
 		$this->analyzeAside( self::$analyzed );
 		do_action( 'rest_api_init' );

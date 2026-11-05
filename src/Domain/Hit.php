@@ -26,7 +26,8 @@ final class Hit {
 	}
 
 	/**
-	 * Order for products: score to six decimals, then in stock, then sales, then newest, then id (spec: Matching →
+	 * Order for products: those some word reached only through a loose typo candidate in the description last (D-146),
+	 * then score to six decimals, then in stock, then sales, then newest, then id (spec: Matching →
 	 * Ties). Six decimals, because the SQL store sums the same parts in another order and must tie where PHP ties
 	 * (D-086).
 	 *
@@ -34,8 +35,8 @@ final class Hit {
 	 * @param Hit $b Another.
 	 */
 	public static function compare( Hit $a, Hit $b ): int {
-		return array( round( $b->score->total(), 6 ), $b->document->inStock, $b->document->totalSales, $b->document->recency, $a->document->id )
-			<=> array( round( $a->score->total(), 6 ), $a->document->inStock, $a->document->totalSales, $a->document->recency, $b->document->id );
+		return array( $a->score->looseOnly, round( $b->score->total(), 6 ), $b->document->inStock, $b->document->totalSales, $b->document->recency, $a->document->id )
+			<=> array( $b->score->looseOnly, round( $a->score->total(), 6 ), $a->document->inStock, $a->document->totalSales, $a->document->recency, $b->document->id );
 	}
 
 	/**
@@ -47,7 +48,7 @@ final class Hit {
 	 * @param Hit $b Another.
 	 */
 	public static function stockFirst( Hit $a, Hit $b ): int {
-		$order = array( $a->score->descriptionOnly, $b->document->inStock ) <=> array( $b->score->descriptionOnly, $a->document->inStock );
+		$order = array( $a->score->looseOnly, $a->score->descriptionOnly, $b->document->inStock ) <=> array( $b->score->looseOnly, $b->score->descriptionOnly, $a->document->inStock );
 		return 0 !== $order ? $order : self::compare( $a, $b );
 	}
 

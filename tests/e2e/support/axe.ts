@@ -8,12 +8,14 @@ import AxeBuilder from '@axe-core/playwright';
  * @param name    What is being checked, for the message.
  * @param include The CSS selector of the region.
  * @param exempt  Rules not run here, each with its reason in docs/DECISIONS.md at the call.
+ * @param outside Selectors inside the region that are not ours to check (core's markup), each with its reason at the call.
  */
 export async function axe(
 	page: Page,
 	name: string,
 	include = 'body',
-	exempt: string[] = []
+	exempt: string[] = [],
+	outside: string[] = []
 ) {
 	// The panel fades in over 120 ms; colours read mid-fade are blended with the page, so let every running
 	// animation finish before axe measures contrast.
@@ -27,11 +29,12 @@ export async function axe(
 				.map( ( a ) => a.finished.catch( () => undefined ) )
 		)
 	);
-	const results = await new AxeBuilder( { page } )
+	const builder = new AxeBuilder( { page } )
 		.withTags( [ 'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa' ] )
 		.include( include )
-		.disableRules( exempt )
-		.analyze();
+		.disableRules( exempt );
+	outside.forEach( ( selector ) => builder.exclude( selector ) );
+	const results = await builder.analyze();
 	const serious = results.violations.filter(
 		( v ) => v.impact === 'serious' || v.impact === 'critical'
 	);

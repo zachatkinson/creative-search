@@ -29,6 +29,7 @@ final class Score {
 	 * @param float                                                                                                                           $owner  B_owner.
 	 * @param float                                                                                                                           $coverage For a category, tag or brand: the share of its name's tokens the query matched, a tie-break.
 	 * @param bool                                                                                                                            $descriptionOnly Some searched word reached the product only in its description (D-142).
+	 * @param bool                                                                                                                            $looseOnly       Some searched word reached it only through a loose typo candidate in its description (D-146).
 	 */
 	public function __construct(
 		public readonly array $tokens,
@@ -37,7 +38,8 @@ final class Score {
 		public readonly float $stock = 0.0,
 		public readonly float $owner = 0.0,
 		public readonly float $coverage = 0.0,
-		public readonly bool $descriptionOnly = false
+		public readonly bool $descriptionOnly = false,
+		public readonly bool $looseOnly = false
 	) {
 	}
 

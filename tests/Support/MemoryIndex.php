@@ -232,9 +232,17 @@ final class MemoryIndex implements IndexStore {
 	}
 
 	/**
+	 * How many rankings were asked for.
+	 *
+	 * @var int
+	 */
+	public int $ranks = 0;
+
+	/**
 	 * {@inheritDoc}
 	 */
 	public function rank( RankPlan $plan ): array {
+		++$this->ranks;
 		$this->plans[] = $plan;
 		return ( new Ranker() )->rank(
 			$plan,

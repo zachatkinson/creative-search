@@ -110,10 +110,26 @@ final class Updater {
 			'new_version'  => $manifest->version,
 			'url'          => $manifest->url,
 			'package'      => $manifest->package,
-			'tested'       => $manifest->tested,
+			'tested'       => self::tested( $manifest->tested, get_bloginfo( 'version' ) ),
 			'requires'     => $manifest->requires,
 			'requires_php' => $manifest->requires_php,
 		);
+	}
+
+	/**
+	 * "Tested up to" as WordPress compares it (D-149): a branch such as `7.1`, as the readme states it, covers the
+	 * branch's maintenance releases, so a site on 7.1.4 reads it as 7.1.4, as WordPress.org's own API reports it.
+	 * Core compares the whole version (`version_compare( '7.1.4', '7.1', '<=' )` is false) and would warn that the
+	 * plugin "has not been tested" with it. Any other value is passed on as it is.
+	 *
+	 * @param string $tested The manifest's "Tested up to".
+	 * @param string $site   The site's WordPress version.
+	 */
+	public static function tested( string $tested, string $site ): string {
+		if ( 1 !== preg_match( '/^\d+\.\d+$/', $tested ) || 1 !== preg_match( '/^(\d+\.\d+)\.\d+$/', $site, $m ) ) {
+			return $tested;
+		}
+		return $m[1] === $tested ? $site : $tested;
 	}
 
 	/**
@@ -143,7 +159,7 @@ final class Updater {
 			'homepage'      => $manifest->url,
 			'requires'      => $manifest->requires,
 			'requires_php'  => $manifest->requires_php,
-			'tested'        => $manifest->tested,
+			'tested'        => self::tested( $manifest->tested, get_bloginfo( 'version' ) ),
 			'download_link' => $manifest->package,
 			'sections'      => array(
 				'description' => '<p>' . esc_html__( 'Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, its own index, analytics, an accessible search bar.', 'creative-search' ) . '</p>',

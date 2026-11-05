@@ -48,11 +48,20 @@ final class RankRepository extends Repository {
 		$sql  = array();
 		$dfs  = array();
 		$lead = 0;
+		// A typo's terms (D-146): `lo` 1 for a loose candidate, which ranks a product it alone reaches in a description
+		// last; `nd` 1 for a short word's, whose description postings are dropped. Only a plan that has either carries
+		// the columns.
+		$loose = false;
+		foreach ( $plan->tokens as $matches ) {
+			foreach ( $matches as $match ) {
+				$loose = $loose || $match->loose || ! $match->descriptions;
+			}
+		}
 		foreach ( $plan->tokens as $i => $matches ) {
 			$dfs[ $i ] = 0;
 			foreach ( $matches as $match ) {
 				if ( isset( $ids[ $match->term ] ) ) {
-					$q[]        = $this->prepare( 'SELECT %d AS term_id, %d AS tok, %s + 0E0 AS m, %s + 0E0 AS idf', $ids[ $match->term ], $i, self::number( $match->weight() ), self::number( $plan->idf( $match->df ) ) );
+					$q[]        = $this->prepare( 'SELECT %d AS term_id, %d AS tok, %s + 0E0 AS m, %s + 0E0 AS idf' . ( $loose ? ', %d AS lo, %d AS nd' : '' ), ...array_merge( array( $ids[ $match->term ], $i, self::number( $match->weight() ), self::number( $plan->idf( $match->df ) ) ), $loose ? array( $match->loose ? 1 : 0, $match->descriptions ? 0 : 1 ) : array() ) );
 					$dfs[ $i ] += max( 1, $match->df );
 				}
 			}
@@ -85,15 +94,16 @@ final class RankRepository extends Repository {
 				$lead
 			);
 		}
-		$sql[]   = $this->prepare(
-			'f AS (SELECT p.document_id AS doc, q.tok, p.field, MAX(COALESCE(w.w, 0) * q.m * (1 + LN(1 + p.tf)) * q.idf) AS best, MIN(p.first_pos) AS pos FROM ' . ( $led ? 'c STRAIGHT_JOIN q STRAIGHT_JOIN' : 'q INNER JOIN' ) . ' %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = %d' . ( $led ? ' AND p.document_id = c.doc' : '' ) . ' LEFT JOIN w ON w.field = p.field GROUP BY p.document_id, q.tok, p.field),',
+		$descriptions = implode( ', ', Fields::DESCRIPTIONS );
+		$sql[]        = $this->prepare(
+			'f AS (SELECT p.document_id AS doc, q.tok, p.field, MAX(COALESCE(w.w, 0) * q.m * (1 + LN(1 + p.tf)) * q.idf) AS best, MIN(p.first_pos) AS pos' . ( $loose ? ', MIN(q.lo) AS lo' : '' ) . ' FROM ' . ( $led ? 'c STRAIGHT_JOIN q STRAIGHT_JOIN' : 'q INNER JOIN' ) . ' %i p ON p.term_id = q.term_id AND p.generation = %d AND p.lang = %s AND p.product = %d' . ( $led ? ' AND p.document_id = c.doc' : '' ) . ' LEFT JOIN w ON w.field = p.field' . ( $loose ? " WHERE NOT (q.nd = 1 AND p.field IN ({$descriptions}))" : '' ) . ' GROUP BY p.document_id, q.tok, p.field),',
 			Tables::postings(),
 			$generation,
 			$plan->lang,
 			$plan->kind
 		);
-		$phrased = $count >= 2;
-		$sql[]   = self::scoreTables( $count, $phrased ? $plan->phrases : array(), $phrased );
+		$phrased      = $count >= 2;
+		$sql[]        = self::scoreTables( $count, $phrased ? $plan->phrases : array(), $phrased, $loose );
 
 		$rules  = $this->rulePoints( $plan->boostRules, $taxonomies );
 		$names  = $plan->nameKeys();
@@ -101,7 +111,7 @@ final class RankRepository extends Repository {
 		$stock  = $this->prepare( '(CASE WHEN d.in_stock = 1 THEN 0 ELSE %d END)', (int) Scorer::SOLD_OUT );
 		$owner  = '(d.boost' . ( array() === $rules ? '' : ' + COALESCE(r.points, 0)' ) . ')';
 		$phrase = $phrased ? 's.bonus' : '0';
-		$sql[]  = "SELECT d.id, d.type, d.object_id, d.lang, d.title, d.name_key, d.in_stock, d.visible, d.boost, d.total_sales, s.bests, {$phrase} AS phrase, {$exact} AS exact, {$stock} AS stock, {$owner} AS owner, (sku.doc IS NOT NULL) AS sku_hit, s.reach, ROUND(s.base + {$phrase} + {$exact} + {$stock} + {$owner}, 6) AS total";
+		$sql[]  = "SELECT d.id, d.type, d.object_id, d.lang, d.title, d.name_key, d.in_stock, d.visible, d.boost, d.total_sales, s.bests, {$phrase} AS phrase, {$exact} AS exact, {$stock} AS stock, {$owner} AS owner, (sku.doc IS NOT NULL) AS sku_hit, s.reach, s.firm, ROUND(s.base + {$phrase} + {$exact} + {$stock} + {$owner}, 6) AS total";
 		$sql[]  = $this->prepare( 'FROM s INNER JOIN %i d ON d.id = s.doc', Tables::documents() );
 		$sql[]  = $this->prepare(
 			'LEFT JOIN (SELECT ps.document_id AS doc FROM %i ts INNER JOIN %i ps ON ps.term_id = ts.id AND ps.generation = %d AND ps.lang = %s AND ps.product = %d WHERE ts.term = %s AND ps.field = %d) sku ON sku.doc = s.doc',
@@ -141,7 +151,8 @@ final class RankRepository extends Repository {
 		}
 		// What can be bought first, when the owner asks for it (D-138), among products that match alike (D-142); each
 		// part in score order.
-		$sql[] = $this->prepare( 'ORDER BY ' . ( $plan->inStockFirst ? 's.reach DESC, d.in_stock DESC, ' : '' ) . 'total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
+		// A product only a loose typo candidate reaches, in its description, last (D-146).
+		$sql[] = $this->prepare( 'ORDER BY ' . ( $loose ? 's.firm DESC, ' : '' ) . ( $plan->inStockFirst ? 's.reach DESC, d.in_stock DESC, ' : '' ) . 'total DESC, d.in_stock DESC, d.total_sales DESC, d.object_id DESC, d.id ASC LIMIT %d', $plan->limit );
 
 		return $this->rows( implode( ' ', $sql ) );
 	}
@@ -174,21 +185,26 @@ final class RankRepository extends Repository {
 	 * @param int               $count   Tokens.
 	 * @param array<int, int[]> $phrases Quoted phrases' token indexes.
 	 * @param bool              $phrased Whether to work out the phrase bonus.
+	 * @param bool              $loose   Whether a loose typo candidate is among the terms (D-146): then `firm` is 1
+	 *                                   when every word reached the product outside its description or through a
+	 *                                   term that is not loose; otherwise it is 1.
 	 */
-	private static function scoreTables( int $count, array $phrases, bool $phrased ): string {
+	private static function scoreTables( int $count, array $phrases, bool $phrased, bool $loose = false ): string {
 		$columns  = array();
 		$bests    = array();
 		$named    = array();
 		$held     = array();
 		$reached  = array();
+		$firm     = array();
 		$ordered  = array();
 		$adjacent = array();
 		for ( $i = 0; $i < $count; $i++ ) {
-			$columns[] = "MIN(CASE WHEN tok = {$i} THEN pos END) AS p{$i}, MAX(CASE WHEN tok = {$i} THEN best END) AS b{$i}";
+			$columns[] = "MIN(CASE WHEN tok = {$i} THEN pos END) AS p{$i}, MAX(CASE WHEN tok = {$i} THEN best END) AS b{$i}" . ( $loose ? ", MIN(CASE WHEN tok = {$i} THEN lo END) AS l{$i}" : '' );
 			$bests[]   = "MAX(b{$i})";
 			$named[]   = "CONCAT('{$i}:', MAX(b{$i}))";
 			$held[]    = "MAX(b{$i}) IS NOT NULL";
 			$reached[] = 'MAX(CASE WHEN b' . $i . ' IS NOT NULL AND field NOT IN (' . implode( ', ', Fields::DESCRIPTIONS ) . ') THEN 1 ELSE 0 END)';
+			$firm[]    = 'MAX(CASE WHEN b' . $i . ' IS NOT NULL AND (l' . $i . ' = 0 OR field NOT IN (' . implode( ', ', Fields::DESCRIPTIONS ) . ')) THEN 1 ELSE 0 END)';
 			if ( $i > 0 ) {
 				$previous   = $i - 1;
 				$ordered[]  = "p{$previous} < p{$i}";
@@ -196,7 +212,7 @@ final class RankRepository extends Repository {
 			}
 		}
 		// 1 when every word reached the product outside its description (D-142).
-		$scores = array( '(' . implode( ' + ', $bests ) . ') AS base', "CONCAT_WS(',', " . implode( ', ', $named ) . ') AS bests', '(' . implode( ' * ', $reached ) . ') AS reach' );
+		$scores = array( '(' . implode( ' + ', $bests ) . ') AS base', "CONCAT_WS(',', " . implode( ', ', $named ) . ') AS bests', '(' . implode( ' * ', $reached ) . ') AS reach', ( $loose ? '(' . implode( ' * ', $firm ) . ')' : '1' ) . ' AS firm' );
 		if ( ! $phrased ) {
 			return self::scored( $columns, $scores, $held );
 		}

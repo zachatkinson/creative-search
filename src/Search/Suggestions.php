@@ -12,6 +12,7 @@ namespace CreativeBranding\Search\Search;
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\SearchResult;
+use CreativeBranding\Search\Results\CategoryScope;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use WP_Term;
@@ -41,8 +42,9 @@ final class Suggestions {
 	 * @param MatchDetails     $matches The variation a query named and why each product matched (D-104, D-105).
 	 * @param QuerySuggestions $queries Suggested searches.
 	 * @param CategoryScopes   $scopes  The categories to search within.
+	 * @param Destination      $lands   Where the search lands, for the "See all" count (D-145).
 	 */
-	public function __construct( private SearchService $search, private Cache $cache, private MatchDetails $matches, private QuerySuggestions $queries, private CategoryScopes $scopes ) {
+	public function __construct( private SearchService $search, private Cache $cache, private MatchDetails $matches, private QuerySuggestions $queries, private CategoryScopes $scopes, private Destination $lands ) {
 	}
 
 	/**
@@ -51,12 +53,13 @@ final class Suggestions {
 	 * @param string       $raw   Query as received.
 	 * @param string|null  $lang  Language asked for.
 	 * @param int          $limit Products, 1 to 10.
-	 * @param int[]        $scope Products of these term-taxonomy ids only (the API's `cat`, D-117).
-	 * @param WP_Term|null $here  The category the shopper is in, offered first among the scopes (D-130).
+	 * @param WP_Term|null $within Products of this category and its subcategories only (the API's `cat`, D-117).
+	 * @param WP_Term|null $here   The category the shopper is in, offered first among the scopes (D-130).
 	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
 	 *                      `total`, `query`, `corrected`, `lang`.
 	 */
-	public function answer( string $raw, ?string $lang, int $limit, array $scope = array(), ?WP_Term $here = null ): array {
+	public function answer( string $raw, ?string $lang, int $limit, ?WP_Term $within = null, ?WP_Term $here = null ): array {
+		$scope = CategoryScope::ttIds( $within );
 		$query = SearchService::clean( $raw );
 		$lang  = $this->search->language( $lang );
 		$limit = max( Settings::LIMIT_MIN, min( Settings::LIMIT_MAX, $limit ) );
@@ -76,7 +79,7 @@ final class Suggestions {
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
 		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, get_locale() ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
@@ -89,14 +92,20 @@ final class Suggestions {
 					$shown[] = $hit->document->objectId;
 				}
 			}
+			$content   = $this->search->content( $query, $lang, 'suggest' );
+			$described = self::described( $result, $pinned );
+			// A page the shopper asked for by name (D-143): a product some word reaches only in its description is a
+			// weaker answer than the page, and stays out of the panel (D-146). The results page still lists it.
+			$listed = array() === $content ? $products : array_values( array_filter( $products, static fn( Document $d ): bool => ! isset( $described[ $d->id ] ) ) );
 			$answer = array(
 				'queries'   => $this->queries->for( $query, $lang ),
-				'products'  => $this->products( array_slice( $products, 0, $limit ), $result, $pinned ),
+				'products'  => $this->products( array_slice( $listed, 0, $limit ), $result, $described ),
 				// A panel already limited to a category offers no other category to search within (D-113, D-117).
-				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here ) : array(),
+				// Chosen from the strong matches when there are any (D-147).
+				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here, self::objectIds( $result, $described ) ) : array(),
 				'terms'     => $this->terms( $result->terms ),
-				'content'   => $this->search->content( $query, $lang, 'suggest' ),
-				'total'     => count( $products ),
+				'content'   => $content,
+				'total'     => $this->total( $query, $lang, count( $products ), $within ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
@@ -105,6 +114,55 @@ final class Suggestions {
 		}
 		$this->search->log()->record( $query, $lang, Cast::int( $answer['total'] ?? 0 ), 'suggest' );
 		return $answer;
+	}
+
+	/**
+	 * The number "See all" shows: what the page it opens lists. A size or other value the shop filters by becomes
+	 * that filter on the way to the page (D-101, D-102), so the page lists fewer than the panel's search found and
+	 * the count is the page's (D-145); any other query lists what the panel found.
+	 *
+	 * @param string       $query  Clean query.
+	 * @param string       $lang   Checked language.
+	 * @param int          $found  The products the panel's search found.
+	 * @param WP_Term|null $within The category the search is kept to, or null.
+	 */
+	private function total( string $query, string $lang, int $found, ?WP_Term $within ): int {
+		return $this->lands->filteredCount( $query, $lang, $within ) ?? $found;
+	}
+
+	/**
+	 * The products some searched word reached only in their description (D-142), by document id; a pinned product
+	 * never is one, so it keeps its place (D-143).
+	 *
+	 * @param SearchResult         $result The search.
+	 * @param array<int, Document> $pinned The owner's pinned products, by product id.
+	 * @return array<int, true>
+	 */
+	private static function described( SearchResult $result, array $pinned ): array {
+		$only = array();
+		foreach ( $result->products as $hit ) {
+			if ( $hit->score->descriptionOnly && ! isset( $pinned[ $hit->document->objectId ] ) ) {
+				$only[ $hit->document->id ] = true;
+			}
+		}
+		return $only;
+	}
+
+	/**
+	 * The product ids of some of a search's documents.
+	 *
+	 * @param SearchResult     $result The search.
+	 * @param array<int, true> $ids    Document ids, as keys.
+	 * @return int[]
+	 */
+	private static function objectIds( SearchResult $result, array $ids ): array {
+		$out = array();
+		foreach ( $result->products as $hit ) {
+			if ( isset( $ids[ $hit->document->id ] ) ) {
+				$out[] = $hit->document->objectId;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -128,23 +186,17 @@ final class Suggestions {
 	 * Product rows: a variation the query named shows its own image and opens with it chosen (D-104), and a match
 	 * the row does not show says what it was (D-105).
 	 *
-	 * @param Document[]           $documents Products, in order.
-	 * @param SearchResult         $result    The search they came from.
-	 * @param array<int, Document> $pinned    The owner's pinned products, by product id: never `described`, so they keep their place (D-143).
+	 * @param Document[]       $documents Products, in order.
+	 * @param SearchResult     $result    The search they came from.
+	 * @param array<int, true> $only      The products found only by their description, by document id ({@see described()}).
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $documents, SearchResult $result, array $pinned = array() ): array {
+	private function products( array $documents, SearchResult $result, array $only ): array {
 		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
 		$rows    = $this->search->index()->rows( $ids );
 		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
 		$cart    = Settings::isOn( 'suggest_cart' );
-		$only    = array();
-		foreach ( $result->products as $hit ) {
-			if ( $hit->score->descriptionOnly && ! isset( $pinned[ $hit->document->objectId ] ) ) {
-				$only[ $hit->document->id ] = true;
-			}
-		}
-		$out = array();
+		$out     = array();
 		foreach ( $documents as $document ) {
 			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {

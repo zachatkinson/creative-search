@@ -44,8 +44,12 @@ final class TermMatch {
 	 * @param string $term The term.
 	 * @param string $kind How it was reached: one of the constants.
 	 * @param int    $df   Its document frequency.
+	 * @param bool   $loose        A typo candidate other than the word the query is read as (D-146): found only in a
+	 *                             description, it ranks after every product found elsewhere.
+	 * @param bool   $descriptions Whether its description postings count: not for a loose term of a word of four
+	 *                             letters or fewer (D-146).
 	 */
-	public function __construct( public readonly string $term, public readonly string $kind, public readonly int $df = 0 ) {
+	public function __construct( public readonly string $term, public readonly string $kind, public readonly int $df = 0, public readonly bool $loose = false, public readonly bool $descriptions = true ) {
 	}
 
 	/**
@@ -56,11 +60,21 @@ final class TermMatch {
 	}
 
 	/**
+	 * Whether a posting of this term in a field reaches the product firmly: anywhere but a description, or any term
+	 * but a loose one (D-146).
+	 *
+	 * @param int $field The posting's field.
+	 */
+	public function firmIn( int $field ): bool {
+		return ! $this->loose || ! in_array( $field, Fields::DESCRIPTIONS, true );
+	}
+
+	/**
 	 * A copy with the document frequency filled in.
 	 *
 	 * @param int $df Document frequency.
 	 */
 	public function withDf( int $df ): self {
-		return new self( $this->term, $this->kind, $df );
+		return new self( $this->term, $this->kind, $df, $this->loose, $this->descriptions );
 	}
 }

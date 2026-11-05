@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-05
+
+A true "See all" count, misspellings that find the product, and the scope row that follows the strong matches, from the 4 November Baymard check of the Skatehouse demo; and the "tested" warning on WordPress maintenance releases.
+
+### Changed
+- CI spends fewer minutes: a version tag publishes once CI has passed on the commit's push to main instead of running it again, the 10,000-product catalogue is cached between runs (the reindex and every budget still run), the oldest-versions leg runs two browser projects, Infection on a pull request mutates only its changed lines, and changes to the docs alone run nothing (D-148).
+
+### Fixed
+- The update details window no longer warns that the plugin hasn't been tested with a maintenance release of the WordPress version it was tested with ("Tested up to: 7.1" on 7.1.4) (D-149).
+- A misspelling finds what the word it is read as finds: "hody", read as "hoody", finds every hoodie and sweater through the word's stem and the owner's synonyms (D-146).
+- Other typo candidates found only in a description rank after every other product, and for words of four letters or fewer don't count there at all; when the panel shows a page named for the search, products that only mention its words in their description stay out of the panel (D-146).
+- The panel's "in a category" row is chosen from the products that match by more than their description: "beanie" no longer offers "beanie in Decks" because five decks mention a beanie, and when the cap cuts rows a category row stays ahead of a scope built only on description matches (D-147).
+- "See all" in the panel counts what the page it opens lists: when a size in the query becomes the shop's filter ("8.25 deck" opens Decks in 8.25″), the count is the filtered page's, not every product the words find (D-145).
+
 ## [1.6.2] - 2026-11-03
 
 Names before descriptions, the page asked for, and only checked packages installed, from the 3 November check of 1.6.1 on the demo.

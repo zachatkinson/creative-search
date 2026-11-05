@@ -38,7 +38,9 @@ final class Ranker {
 	public function rank( RankPlan $plan, array $postings, callable $documents ): array {
 		$widenings = array();
 		foreach ( $plan->tokens as $i => $matches ) {
-			$widenings[ $i ] = new TokenWidening( $matches, array_intersect_key( $postings, $matches ), array() );
+			// Per word, as the statement filters per query row: a term another word or a minus word also reads keeps
+			// its description postings there.
+			$widenings[ $i ] = new TokenWidening( $matches, self::withoutDescriptions( $matches, array_intersect_key( $postings, $matches ) ), array() );
 		}
 		$set = null;
 		foreach ( $widenings as $widening ) {
@@ -59,6 +61,28 @@ final class Ranker {
 		}
 		usort( $hits, array( Hit::class, $plan->inStockFirst ? 'stockFirst' : 'compare' ) );
 		return array_slice( $hits, 0, $plan->limit );
+	}
+
+	/**
+	 * One word's postings without the description fields of its terms whose descriptions don't count (D-146): the
+	 * typo candidates of a short word; a product left with none of a term's postings is not reached by it.
+	 *
+	 * @param array<string, TermMatch>                                     $matches  The word's terms.
+	 * @param array<string, array<int, array<int, array{0: int, 1: int}>>> $postings Its terms' postings: term to document to field to [tf, pos].
+	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>>
+	 */
+	private static function withoutDescriptions( array $matches, array $postings ): array {
+		foreach ( array_filter( $matches, static fn( TermMatch $m ): bool => ! $m->descriptions ) as $term => $match ) {
+			$kept = array();
+			foreach ( $postings[ $term ] ?? array() as $doc => $byField ) {
+				$byField = array_diff_key( $byField, array_flip( Fields::DESCRIPTIONS ) );
+				if ( array() !== $byField ) {
+					$kept[ $doc ] = $byField;
+				}
+			}
+			$postings[ $term ] = $kept;
+		}
+		return $postings;
 	}
 
 	/**

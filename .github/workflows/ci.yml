@@ -1,16 +1,19 @@
 name: CI
 
+# A change to the docs alone runs nothing (D-148). A version tag runs nothing either: release.yml publishes once this
+# workflow has passed on the tagged commit's push to main (D-140, D-148).
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '**.md', 'LICENSE']
   pull_request:
-  # A version tag runs these jobs through release.yml, which publishes only when they all pass (D-140).
-  workflow_call:
+    paths-ignore: ['docs/**', '**.md', 'LICENSE']
 
-# A new push to a branch or pull request cancels the run it replaces; tags each keep their own run.
+# A new push to a pull request cancels the run it replaces; each push to main keeps its own run, which a release
+# waits for.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   static:
@@ -52,13 +55,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # A pull request mutates the lines it changes, against its base branch (D-148). Quoted: a bare 0 is falsy in
+          # an expression, so `&& 0 || 1` was always 1 and the base branch never fetched.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
           coverage: pcov
           tools: composer:v2
       - uses: ramsey/composer-install@v3
-      - run: composer infection
+      # The same two configurations and floors either way (90 % outside the Domain, 100 % inside it); a pull request
+      # applies them to its changed lines, and passes when it changed none they mutate. Main runs everything.
+      - name: Infection (a pull request's changed lines; everything on main)
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = pull_request ]; then
+            diff=(--git-diff-lines "--git-diff-base=origin/${BASE}" --ignore-msi-with-no-mutations)
+            vendor/bin/infection --threads=max --configuration=infection.json5 "${diff[@]}"
+            vendor/bin/infection --threads=max --configuration=infection-domain.json5 "${diff[@]}"
+          else
+            composer infection
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -123,9 +142,32 @@ jobs:
       # version legs only; the database, HPOS and cache legs are integration legs.
       - run: npm run plugin-check
         if: matrix.leg == 'newest' || matrix.leg == 'oldest'
-      - run: npx playwright install --with-deps
+      # Newest runs every browser project; oldest, which is there for the WordPress and WooCommerce versions, one
+      # desktop and one phone engine (D-148). The browsers are cached by Playwright's version; the system packages
+      # they need are installed each time.
+      - name: The browser projects for the leg
+        id: browsers
         if: matrix.leg == 'newest' || matrix.leg == 'oldest'
-      - run: npm run test:e2e
+        run: |
+          if [ "${{ matrix.leg }}" = newest ]; then
+            echo "engines=chromium firefox webkit" >> "$GITHUB_OUTPUT"
+            echo "projects=" >> "$GITHUB_OUTPUT"
+          else
+            echo "engines=chromium webkit" >> "$GITHUB_OUTPUT"
+            echo "projects=--project=chromium-desktop --project=webkit-phone" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: playwright-cache
+        if: matrix.leg == 'newest' || matrix.leg == 'oldest'
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.browsers.outputs.version }}-${{ matrix.leg }}
+      - run: npx playwright install --with-deps ${{ steps.browsers.outputs.engines }}
+        if: (matrix.leg == 'newest' || matrix.leg == 'oldest') && steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps ${{ steps.browsers.outputs.engines }}
+        if: (matrix.leg == 'newest' || matrix.leg == 'oldest') && steps.playwright-cache.outputs.cache-hit == 'true'
+      - run: npm run test:e2e -- ${{ steps.browsers.outputs.projects }}
         if: matrix.leg == 'newest' || matrix.leg == 'oldest'
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -152,7 +194,14 @@ jobs:
       - run: npm run build
       - run: npx wp-env start
       - run: composer install --working-dir=tools/integration --no-interaction
-      # Most of this step is loading the catalogue through WooCommerce, quietly (term counts deferred, the plugin's index
-      # hooks detached: about 63 ms a product locally, flat as it grows); each phase's time is in the log.
+      # The catalogue as loaded, kept between runs while the catalogue, its loader, and the WordPress and WooCommerce
+      # versions stay the same (D-148): a hit skips the load, never the reindex or the budgets.
+      - uses: actions/cache@v4
+        with:
+          path: tmp/catalogue-10000.json.gz
+          key: catalogue-10000-${{ hashFiles('tests/Fixtures/Catalogue.php', 'tests/Support/WooCommerceCatalogue.php', 'tests/Support/CatalogueSnapshot.php', '.wp-env.json') }}
+      # Without the cached catalogue, most of this step is loading it through WooCommerce, quietly (term counts deferred,
+      # the plugin's index hooks detached: about 63 ms a product locally, 42 minutes on a runner), and the dump is then
+      # written for the next run; each phase's time is in the log.
       - name: Load 10,000 products, then the full reindex (5-minute budget) and the golden set through the API (p95 budgets)
-        run: npx wp-env run tests-cli --env-cwd=wp-content/plugins/creative-search -- env CSEARCH_BENCH_PRODUCTS=10000 php -d memory_limit=4G tools/integration/vendor/bin/phpunit -c phpunit-integration.xml.dist --group benchmark
+        run: npx wp-env run tests-cli --env-cwd=wp-content/plugins/creative-search -- env CSEARCH_BENCH_PRODUCTS=10000 CSEARCH_BENCH_SNAPSHOT=tmp/catalogue-10000.json.gz php -d memory_limit=4G tools/integration/vendor/bin/phpunit -c phpunit-integration.xml.dist --group benchmark
