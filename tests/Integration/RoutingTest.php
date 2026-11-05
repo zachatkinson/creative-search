@@ -319,8 +319,8 @@ final class RoutingTest extends IndexTestCase {
 		self::assertSame( $ranked( 'kazumi' ), $panel( 'kazumi' ), 'no size: what the search found, as in 1.6.2' );
 		self::assertSame( $ranked( 'wheels' ), $panel( 'wheels' ), 'a category without a size: as in 1.6.2' );
 		self::assertSame( $ranked( 'kazumi 7.25' ), $panel( 'kazumi 7.25' ), 'a size no term has stays a word' );
-		// The shop hides sold-out products: its listing in 8.75 is empty, and so is the count (the panel then shows no
-		// "See all", and the search is logged as finding nothing, as the results page logs it, D-101).
+		// The shop hides sold-out products: its listing in 8.75 is empty, so the size is left out and the page is Decks
+		// (D-154); "See all" counts Decks as listed, and the search is logged as finding nothing.
 		$sized = get_posts(
 			array(
 				'post_type'   => 'product',
@@ -335,8 +335,21 @@ final class RoutingTest extends IndexTestCase {
 		}
 		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
 		do_action( 'csearch_flush_cache' );
-		self::assertSame( 0, $panel( '8.75 deck' ), 'sold out and hidden: the page lists none' );
-		self::assertSame( $landed( '8.75 deck' ), $panel( '8.75 deck' ) );
+		$decks = ( new WP_Query(
+			array(
+				'post_type'      => 'product',
+				'fields'         => 'ids',
+				'posts_per_page' => -1,
+				'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- a test.
+					array( 'taxonomy' => 'product_cat', 'field' => 'slug', 'terms' => array( 'decks' ) ),
+					array( 'taxonomy' => 'product_visibility', 'field' => 'slug', 'terms' => array( 'outofstock', 'exclude-from-catalog' ), 'operator' => 'NOT IN' ),
+				),
+			)
+		) )->post_count;
+		self::assertGreaterThan( 0, $decks );
+		self::assertSame( $decks, $panel( '8.75 deck' ), 'sold out and hidden: Decks as listed, without the size' );
+		self::assertSame( 0, $landed( '8.75 deck' ), 'logged as finding nothing' );
+		self::assertStringNotContainsString( 'filter_width', (string) $this->service( QueryRouter::class )->target() );
 		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
 		do_action( 'csearch_flush_cache' );
 		self::assertSame( 1, $panel( '8.75 deck' ), 'shown: counted' );

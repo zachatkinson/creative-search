@@ -114,4 +114,39 @@ final class ProductIdRepository extends Repository {
 		);
 		return array_map( static fn( array $row ): int => (int) $row['product_or_parent_id'], $rows );
 	}
+
+	/**
+	 * The terms of an attribute some products have in stock, as WooCommerce's attributes lookup table keeps them
+	 * (D-154): the values its filtered listing would list one of them in.
+	 *
+	 * @param string     $taxonomy Attribute taxonomy.
+	 * @param int[]|null $ids      Product ids, or null for every product.
+	 * @return int[] Term ids.
+	 */
+	public function termsInStock( string $taxonomy, ?array $ids ): array {
+		global $wpdb;
+		if ( array() === $ids ) {
+			return array();
+		}
+		$among = null === $ids ? '' : ' AND product_or_parent_id IN (' . self::ints( $ids ) . ')';
+		$rows  = $this->rows( $this->prepare( 'SELECT DISTINCT term_id FROM %i WHERE taxonomy = %s AND in_stock = %d' . $among, $wpdb->prefix . 'wc_product_attributes_lookup', $taxonomy, 1 ) );
+		return array_map( static fn( array $row ): int => (int) $row['term_id'], $rows );
+	}
+
+	/**
+	 * The terms of an attribute some published products carry (D-154, D-156).
+	 *
+	 * @param string     $taxonomy Attribute taxonomy.
+	 * @param int[]|null $ids      Product ids, or null for every product.
+	 * @return int[] Term ids.
+	 */
+	public function termsOf( string $taxonomy, ?array $ids ): array {
+		global $wpdb;
+		if ( array() === $ids ) {
+			return array();
+		}
+		$among = null === $ids ? '' : ' AND p.ID IN (' . self::ints( $ids ) . ')';
+		$rows  = $this->rows( $this->prepare( 'SELECT DISTINCT tt.term_id FROM %i p INNER JOIN %i r ON r.object_id = p.ID INNER JOIN %i tt ON tt.term_taxonomy_id = r.term_taxonomy_id WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = %s' . $among, $wpdb->posts, $wpdb->term_relationships, $wpdb->term_taxonomy, $taxonomy, 'product', 'publish' ) );
+		return array_map( static fn( array $row ): int => (int) $row['term_id'], $rows );
+	}
 }

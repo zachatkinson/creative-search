@@ -171,6 +171,7 @@ final class ResultsView {
 		if ( '' === $from ) {
 			return '';
 		}
+		$html     = $this->unstockedLine( $from );
 		$filters  = self::chosenFilters();
 		$category = is_tax( 'product_cat' ) ? get_queried_object() : null;
 		if ( $category instanceof WP_Term ) {
@@ -183,7 +184,7 @@ final class ResultsView {
 			/* translators: %s: the filters applied, such as "Width 8.25" */
 			$showing = sprintf( __( 'Showing products with %s.', 'creative-search' ), $filters );
 		} else {
-			return '';
+			return $html;
 		}
 		$all = add_query_arg(
 			array(
@@ -193,7 +194,7 @@ final class ResultsView {
 			),
 			home_url( '/' )
 		);
-		return '<p class="csearch-results-routed">' . esc_html( $showing ) . ' <a href="' . esc_url( $all ) . '">' . esc_html(
+		return $html . '<p class="csearch-results-routed">' . esc_html( $showing ) . ' <a href="' . esc_url( $all ) . '">' . esc_html(
 			sprintf(
 				/* translators: %s: the query the shopper typed */
 				__( 'Search all products for “%s”.', 'creative-search' ),
@@ -203,22 +204,91 @@ final class ResultsView {
 	}
 
 	/**
-	 * The attribute filters on the page, as WooCommerce reads them: "Width 8.25 and Wheel size 54mm".
+	 * On a page a query was sent to without a value it named, nothing in it being in stock there (D-154): "Nothing
+	 * in Width 9.00″ is in stock right now.", then the closest values in stock, each a link to this page with it
+	 * applied: "Closest in stock: Width 8.75″." Empty on any other page.
+	 *
+	 * @param string $from The query that sent the shopper here.
 	 */
-	private static function chosenFilters(): string {
+	private function unstockedLine( string $from ): string {
+		$none = QueryRouter::unstocked();
+		if ( array() === $none ) {
+			return '';
+		}
+		$html  = '<p class="csearch-results-unstocked">' . esc_html( self::unstockedText( $none ) ) . '</p>';
+		$here  = remove_query_arg( array( QueryRouter::FROM_ARG, QueryRouter::SIG_ARG, QueryRouter::NONE_ARG, QueryRouter::NEAR_ARG, 'paged', 'product-page' ) );
+		$links = array();
+		foreach ( QueryRouter::closest() as $taxonomy => $slugs ) {
+			foreach ( $slugs as $slug ) {
+				$value = array( $taxonomy => array( $slug ) );
+				// The link's text names the attribute too, so it reads alone (WCAG 2.4.4).
+				$links[] = '<a href="' . esc_url( add_query_arg( QueryRouter::filterArgs( $value ) + QueryRouter::fromArgs( $from ), $here ) ) . '">' . esc_html( self::valuesText( $value ) ) . '</a>';
+			}
+		}
+		if ( array() === $links ) {
+			return $html;
+		}
+		$list = 1 === count( $links )
+			? $links[0]
+			/* translators: 1: the closest value in stock below the one asked for, 2: the closest above it */
+			: sprintf( esc_html_x( '%1$s or %2$s', 'the closest values in stock', 'creative-search' ), $links[0], $links[1] );
+		return $html . '<p class="csearch-results-closest">' . sprintf(
+			/* translators: %s: one or two links, each to a value in stock such as Width 8.75″ */
+			esc_html__( 'Closest in stock: %s', 'creative-search' ),
+			$list
+		) . '</p>';
+	}
+
+	/**
+	 * The line that says a value the query named was left out, nothing in it being in stock there (D-154): "Nothing
+	 * in Width 9.00″ is in stock right now."; an empty string when none was.
+	 *
+	 * @param array<string, string[]> $unstocked Attribute taxonomy to the slugs left out.
+	 */
+	public static function unstockedText( array $unstocked ): string {
+		if ( array() === $unstocked ) {
+			return '';
+		}
+		return sprintf(
+			/* translators: %s: the values the shopper asked for, such as Width 9.00″ */
+			__( 'Nothing in %s is in stock right now.', 'creative-search' ),
+			self::valuesText( $unstocked )
+		);
+	}
+
+	/**
+	 * Attribute values by name: "Width 8.25 and Wheel size 54mm".
+	 *
+	 * @param array<string, string[]> $values Attribute taxonomy to slugs.
+	 */
+	private static function valuesText( array $values ): string {
 		$parts = array();
-		foreach ( class_exists( WC_Query::class ) ? WC_Query::get_layered_nav_chosen_attributes() : array() as $taxonomy => $chosen ) {
+		foreach ( $values as $taxonomy => $slugs ) {
 			$names = array();
-			foreach ( Cast::strings( $chosen['terms'] ?? array() ) as $slug ) {
-				$term    = get_term_by( 'slug', $slug, (string) $taxonomy );
+			foreach ( $slugs as $slug ) {
+				$term    = get_term_by( 'slug', $slug, $taxonomy );
 				$names[] = $term instanceof WP_Term ? $term->name : $slug;
 			}
 			if ( array() !== $names ) {
 				/* translators: 1: an attribute, such as Width, 2: its values, such as 8.25 */
-				$parts[] = sprintf( _x( '%1$s %2$s', 'an attribute and its values, such as Width 8.25', 'creative-search' ), wc_attribute_label( (string) $taxonomy ), wp_sprintf( '%l', $names ) );
+				$parts[] = sprintf( _x( '%1$s %2$s', 'an attribute and its values, such as Width 8.25', 'creative-search' ), wc_attribute_label( $taxonomy ), wp_sprintf( '%l', $names ) );
 			}
 		}
 		return wp_sprintf( '%l', $parts );
+	}
+
+	/**
+	 * The attribute filters on the page, as WooCommerce reads them: "Width 8.25 and Wheel size 54mm".
+	 */
+	private static function chosenFilters(): string {
+		$values = array();
+		foreach ( class_exists( WC_Query::class ) ? WC_Query::get_layered_nav_chosen_attributes() : array() as $taxonomy => $chosen ) {
+			$slugs = Cast::strings( $chosen['terms'] ?? array() );
+			if ( array() !== $slugs ) {
+				$values[ (string) $taxonomy ] = $slugs;
+			}
+		}
+		return self::valuesText( $values );
 	}
 
 	/**

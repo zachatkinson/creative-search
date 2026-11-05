@@ -82,7 +82,8 @@ final class Suggestions {
 		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
-			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
+			$landing = $this->lands->filtered( $query, $lang, $within );
+			$result  = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
 			// A panel limited to a category leaves out the pins: one may sit outside it (D-110, D-117).
 			$pinned   = array() === $scope ? $this->search->pinnedDocuments( $query, $lang, $result->lang ) : array();
 			$products = $this->pinnedFirst( $result->products, $pinned );
@@ -105,29 +106,20 @@ final class Suggestions {
 				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here, self::objectIds( $result, $described ) ) : array(),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $content,
-				'total'     => $this->total( $query, $lang, count( $products ), $within ),
+				// "See all" counts what the page it opens lists (D-145): a size or other value the shop filters by becomes
+				// that filter on the way there, or is left out when nothing in it is in stock (D-154).
+				'total'     => null === $landing ? count( $products ) : $landing->count,
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
+				// The value asked for was left out: the search is logged as finding nothing, as the page logs it (D-154).
+				'logged'    => null === $landing ? count( $products ) : $landing->logged(),
 			);
 			$this->cache->set( $key, $answer );
 		}
-		$this->search->log()->record( $query, $lang, Cast::int( $answer['total'] ?? 0 ), 'suggest' );
+		$this->search->log()->record( $query, $lang, Cast::int( $answer['logged'] ?? 0 ), 'suggest' );
+		unset( $answer['logged'] );
 		return $answer;
-	}
-
-	/**
-	 * The number "See all" shows: what the page it opens lists. A size or other value the shop filters by becomes
-	 * that filter on the way to the page (D-101, D-102), so the page lists fewer than the panel's search found and
-	 * the count is the page's (D-145); any other query lists what the panel found.
-	 *
-	 * @param string       $query  Clean query.
-	 * @param string       $lang   Checked language.
-	 * @param int          $found  The products the panel's search found.
-	 * @param WP_Term|null $within The category the search is kept to, or null.
-	 */
-	private function total( string $query, string $lang, int $found, ?WP_Term $within ): int {
-		return $this->lands->filteredCount( $query, $lang, $within ) ?? $found;
 	}
 
 	/**

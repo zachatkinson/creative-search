@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Changed
+- A size or other value in a search that has nothing in stock where the search lands is no longer applied: "9 deck" opens Decks, says "Nothing in Width 9.00″ is in stock right now." with the closest widths in stock as links, "See all" counts Decks, and Analytics still logs the search as finding nothing (D-154).
 - Releases: each commit has its own release queue, so a tag's release can no longer be dropped behind another run, and a re-run finishes a release that published its zip but not its `info.json` (D-153).
 
 ## [1.6.4] - 2026-11-05

@@ -1333,11 +1333,11 @@ msgstr[1] "%1$s résultats pour « %2$s »"
 msgid "Showing results for %1$s; search instead for %2$s"
 msgstr "Résultats pour %1$s; chercher plutôt %2$s"
 
-#: src/Results/ResultsView.php:424
+#: src/Results/ResultsView.php:494
 msgid "Try one of these categories:"
 msgstr "Essayez une de ces catégories :"
 
-#: src/Results/ResultsView.php:442
+#: src/Results/ResultsView.php:512
 msgid "You might like"
 msgstr "Vous aimerez peut-être"
 
@@ -1486,7 +1486,7 @@ msgid "Leave the wording empty to use the default shown."
 msgstr "Laissez le libellé vide pour utiliser celui affiché par défaut."
 
 #: src/Admin/ToolsTab.php:211
-#: src/Results/ResultsView.php:318
+#: src/Results/ResultsView.php:388
 msgid "Posts"
 msgstr "Articles"
 
@@ -1495,7 +1495,7 @@ msgid "Search the blog’s posts too, shown apart from the products."
 msgstr "Chercher aussi dans les articles du blogue, affichés à part des produits."
 
 #: src/Admin/ToolsTab.php:212
-#: src/Results/ResultsView.php:316
+#: src/Results/ResultsView.php:386
 msgid "Pages"
 msgstr "Pages"
 
@@ -1557,30 +1557,30 @@ msgid_plural "%1$d of %2$d ids indexed."
 msgstr[0] "%1$d identifiant sur %2$d indexé."
 msgstr[1] "%1$d identifiants sur %2$d indexés."
 
-#: src/Results/ResultsView.php:318
+#: src/Results/ResultsView.php:388
 msgid "Pages and posts"
 msgstr "Pages et articles"
 
-#: src/Results/ResultsView.php:327
+#: src/Results/ResultsView.php:397
 msgid "Can’t find what you need? Contact us"
 msgstr "Vous ne trouvez pas ce qu’il vous faut? Écrivez-nous"
 
-#: src/Results/ResultsView.php:327
+#: src/Results/ResultsView.php:397
 msgid "Need help choosing? Read our guides"
 msgstr "Besoin d’aide pour choisir? Lisez nos guides"
 
 #. translators: %s: the search query
-#: src/Results/ResultsView.php:413
+#: src/Results/ResultsView.php:483
 #, php-format
 msgid "No products match “%s”, but these do:"
 msgstr "Aucun produit ne correspond à « %s », mais ceci oui :"
 
-#: src/Results/ResultsView.php:480
+#: src/Results/ResultsView.php:550
 msgid "Try one word:"
 msgstr "Essayez un seul mot :"
 
 #. translators: 1: a word of the shopper's query, 2: how many products it finds alone
-#: src/Results/ResultsView.php:492
+#: src/Results/ResultsView.php:562
 #, php-format
 msgid "%1$s (%2$s result)"
 msgid_plural "%1$s (%2$s results)"
@@ -1630,26 +1630,26 @@ msgid "Categories: %s"
 msgstr "Catégories : %s"
 
 #. translators: %s: a category
-#: src/Results/ResultsView.php:179
+#: src/Results/ResultsView.php:180
 #, php-format
 msgid "Showing %s."
 msgstr "Affichage de %s."
 
 #. translators: 1: a category, 2: the filters applied, such as "Width 8.25"
-#: src/Results/ResultsView.php:181
+#: src/Results/ResultsView.php:182
 #, php-format
 msgid "Showing %1$s with %2$s."
 msgstr "Affichage de %1$s avec %2$s."
 
 #. translators: %s: the filters applied, such as "Width 8.25"
-#: src/Results/ResultsView.php:184
+#: src/Results/ResultsView.php:185
 #, php-format
 msgid "Showing products with %s."
 msgstr "Affichage des produits avec %s."
 
 #. translators: %s: the query the shopper typed
 #: src/Results/ResultsView.php:100
-#: src/Results/ResultsView.php:199
+#: src/Results/ResultsView.php:200
 #, php-format
 msgid "Search all products for “%s”."
 msgstr "Chercher « %s » dans tous les produits."
@@ -1662,7 +1662,7 @@ msgid "%1$s (%2$s)"
 msgstr "%1$s (%2$s)"
 
 #. translators: 1: an attribute, such as Width, 2: its values, such as 8.25
-#: src/Results/ResultsView.php:218
+#: src/Results/ResultsView.php:274
 #, php-format
 msgctxt "an attribute and its values, such as Width 8.25"
 msgid "%1$s %2$s"
@@ -1948,7 +1948,7 @@ msgstr "%s n’est pas un index de la liste."
 msgid "No rule has that index."
 msgstr "Aucune règle n’a cet index."
 
-#: src/Results/ResultsView.php:270
+#: src/Results/ResultsView.php:340
 msgctxt "the result count on search results"
 msgid "Sorted by relevance"
 msgstr "Triés par pertinence"
@@ -2083,3 +2083,22 @@ msgstr "Dans les suggestions, sur la page de résultats et par l’API, les prod
 #: src/Updates/Updater.php:188
 msgid "This Creative Search update could not be checked against its published release, so it was not installed. Check for updates again, then update."
 msgstr "Cette mise à jour de Creative Search n’a pas pu être vérifiée par rapport à sa version publiée; elle n’a donc pas été installée. Vérifiez de nouveau les mises à jour, puis mettez à jour."
+
+#. translators: 1: the closest value in stock below the one asked for, 2: the closest above it
+#: src/Results/ResultsView.php:234
+#, php-format
+msgctxt "the closest values in stock"
+msgid "%1$s or %2$s"
+msgstr "%1$s ou %2$s"
+
+#. translators: %s: one or two links, each to a value in stock such as Width 8.75″
+#: src/Results/ResultsView.php:237
+#, php-format
+msgid "Closest in stock: %s"
+msgstr "Le plus proche en stock : %s"
+
+#. translators: %s: the values the shopper asked for, such as Width 9.00″
+#: src/Results/ResultsView.php:254
+#, php-format
+msgid "Nothing in %s is in stock right now."
+msgstr "Aucun produit en %s n’est en stock pour l’instant."
