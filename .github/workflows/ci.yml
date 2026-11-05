@@ -56,8 +56,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # A pull request mutates the lines it changes, against its base branch (D-148).
-          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
+          # A pull request mutates the lines it changes, against its base branch (D-148). Quoted: a bare 0 is falsy in
+          # an expression, so `&& 0 || 1` was always 1 and the base branch never fetched.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5'
