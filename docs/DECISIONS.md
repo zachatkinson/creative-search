@@ -1200,3 +1200,11 @@ A `scope` job compares a pull request with its base branch. When every changed f
 What a workflow-only change gives up: a mistake in a step only the skipped jobs run (the database legs, Infection, the budgets) shows on main's run after the merge, not on the pull request.
 
 **Why:** Zach's request, after D-148: a fix to a browser test or a workflow shouldn't spend a full matrix that its change can't affect.
+
+### D-153 · The release waits in a queue of its own commit, and finishes what a stopped run left · 2026-11-05
+Two cases found in a review of D-148's release workflow (shared by the sibling plugins):
+
+1. **A release could stall.** The workflow ran in one concurrency queue, `release`. GitHub keeps one waiting run per queue and cancels it when another arrives, and D-148 starts this workflow each time CI finishes on main: a tag's run waiting behind a busy run could be cancelled by the next CI completion, leaving the tag to be re-run by hand. The queue is now per commit (`release-<sha>`): the tag's push and CI's completion on the same commit still wait for each other, and nothing else shares their queue.
+2. **A re-run couldn't finish a half-done release.** Publishing was one switch: a run that found the GitHub release skipped everything, so one that had created the release and then failed to update `info.json` left sites without the update until it was fixed by hand. The two halves are now checked apart: the release (skipped when it exists) and `info.json` (skipped when it already names the version). A run that finds the release but not `info.json` downloads the published zip and writes the manifest from it, so its checksum is the zip's sites will verify (D-144).
+
+**Why:** a release should either publish or say why, and a re-run should finish it.
