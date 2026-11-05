@@ -21,7 +21,13 @@ use CreativeBranding\Search\Search\Suggestions;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
+use Automattic\WooCommerce\Internal\ProductAttributesLookup\Filterer;
+use Automattic\WooCommerce\Internal\ProductAttributesLookup\LookupDataStore;
+use WC_Product_Attribute;
 use WC_Product_Simple;
+use WC_Product_Variable;
+use WC_Product_Variation;
+use WP_Query;
 
 /**
  * D-101 and D-102 (Skatehouse handoff items 9 and 10), against WooCommerce: the golden queries, the cases that
@@ -338,6 +344,88 @@ final class RoutingTest extends IndexTestCase {
 		Settings::set( 'filter_attributes', array() );
 		$this->service( AttributeTerms::class )->rebuild();
 		self::assertSame( $ranked( '8.75 deck' ), $panel( '8.75 deck' ), 'no attribute filtered by: what the search found' );
+	}
+
+	public function test_see_all_leaves_out_a_product_whose_size_is_sold_out(): void {
+		// The demo's decks are variable, one variation per width: WooCommerce's filtered listing, when it hides what is
+		// sold out, leaves out a deck whose 8.25 is sold out though the deck itself is in stock (D-151).
+		$decks = $this->catalogue->term( 'product_cat', 'Decks', 0, 'decks' );
+		$sizes = array();
+		foreach ( array( '8-25', '8-5' ) as $slug ) {
+			$term = get_term_by( 'slug', $slug, 'pa_width' );
+			self::assertInstanceOf( \WP_Term::class, $term, $slug );
+			$sizes[ $slug ] = $term->term_id;
+		}
+		$width = new WC_Product_Attribute();
+		$width->set_id( wc_attribute_taxonomy_id_by_name( 'pa_width' ) );
+		$width->set_name( 'pa_width' );
+		$width->set_options( array_values( $sizes ) );
+		$width->set_visible( true );
+		$width->set_variation( true );
+		$deck = new WC_Product_Variable();
+		$deck->set_name( 'Split Deck' );
+		$deck->set_category_ids( array( $decks ) );
+		$deck->set_attributes( array( $width ) );
+		$id = $deck->save();
+		foreach ( array( '8-25' => 'outofstock', '8-5' => 'instock' ) as $slug => $status ) {
+			$variation = new WC_Product_Variation();
+			$variation->set_parent_id( $id );
+			$variation->set_regular_price( '60' );
+			$variation->set_attributes( array( 'pa_width' => $slug ) );
+			$variation->set_stock_status( $status );
+			$variation->save();
+		}
+		WC_Product_Variable::sync( $id );
+		$this->runQueue();
+		update_option( 'woocommerce_attribute_lookup_enabled', 'yes' );
+		$lookup = wc_get_container()->get( LookupDataStore::class );
+		foreach ( get_posts( array( 'post_type' => 'product', 'fields' => 'ids', 'numberposts' => -1 ) ) as $product ) {
+			$lookup->create_data_for_product( (int) $product );
+		}
+
+		$panel  = fn( string $q ): int => (int) $this->service( Suggestions::class )->answer( $q, 'en', 6 )['total'];
+		$log    = $this->service( SearchLog::class );
+		$landed = function ( string $q ) use ( $log ): int {
+			$log->clear();
+			self::assertNotNull( $this->target( $q ), $q . ' is sent on' );
+			return (int) array_column( $log->pending(), 'results' )[0];
+		};
+		// What WooCommerce's own filter lists on Decks in a width: its lookup-table clause on a catalogue query.
+		$woo = static function ( string $slug ) use ( $decks ): int {
+			$filterer = wc_get_container()->get( Filterer::class );
+			$on       = static fn(): bool => true;
+			$clauses  = static fn( array $args, WP_Query $query ): array => $filterer->filter_by_attribute_post_clauses( $args, $query, array( 'pa_width' => array( 'terms' => array( $slug ), 'query_type' => 'and' ) ) );
+			add_filter( 'woocommerce_enable_post_clause_filtering', $on );
+			add_filter( 'posts_clauses', $clauses, 10, 2 );
+			$visibility = wc_get_product_visibility_term_ids();
+			$query      = new WP_Query(
+				array(
+					'post_type'      => 'product',
+					'post_status'    => 'publish',
+					'fields'         => 'ids',
+					'posts_per_page' => -1,
+					'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- a test.
+						array( 'taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => array( $decks ) ),
+						array( 'taxonomy' => 'product_visibility', 'field' => 'term_taxonomy_id', 'terms' => array( $visibility['exclude-from-catalog'], $visibility['outofstock'] ), 'operator' => 'NOT IN' ),
+					),
+				)
+			);
+			remove_filter( 'woocommerce_enable_post_clause_filtering', $on );
+			remove_filter( 'posts_clauses', $clauses, 10 );
+			return count( $query->posts );
+		};
+
+		$shown = $panel( '8.25 deck' );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
+		do_action( 'csearch_flush_cache' );
+		self::assertSame( $shown - 2, $panel( '8.25 deck' ), 'hidden: the Split Deck and the catalogue\'s deck sold out in 8.25 are not counted' );
+		self::assertSame( $woo( '8-25' ), $panel( '8.25 deck' ), 'as WooCommerce lists it' );
+		self::assertSame( $landed( '8.25 deck' ), $panel( '8.25 deck' ), 'as the router logs it' );
+		self::assertSame( $woo( '8-5' ), $panel( '8.5 deck' ), 'in stock in 8.5: counted' );
+		update_option( 'woocommerce_attribute_lookup_enabled', 'no' );
+		do_action( 'csearch_flush_cache' );
+		self::assertSame( $shown, $panel( '8.25 deck' ), 'without the lookup table WooCommerce filters by the terms alone, and so does the count' );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
 	}
 
 	public function test_the_attribute_values_follow_the_terms(): void {
