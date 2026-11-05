@@ -88,6 +88,27 @@ final class UpdaterTest extends IntegrationTestCase {
 		$this->assertFalse( $updater->details( false, 'query_plugins', (object) array( 'slug' => 'creative-search' ) ) );
 	}
 
+	public function test_a_branch_tested_up_to_covers_its_maintenance_releases(): void {
+		// The demo's 7.1.4 against "Tested up to: 7.1": core compares whole versions and warned (D-149).
+		$this->assertSame( '7.1.4', Updater::tested( '7.1', '7.1.4' ) );
+		$this->assertSame( '7.1', Updater::tested( '7.1', '7.1' ), 'the branch\'s first release is the branch' );
+		$this->assertSame( '7.1', Updater::tested( '7.1', '7.2.1' ), 'a newer branch is not covered: core warns, rightly' );
+		$this->assertSame( '7.1', Updater::tested( '7.1', '7.0.9' ) );
+		$this->assertSame( '7.1.2', Updater::tested( '7.1.2', '7.1.4' ), 'a patch named is taken as named' );
+		$this->assertSame( '7.1', Updater::tested( '7.1', '7.1-RC1' ), 'a pre-release keeps the branch' );
+		$this->assertSame( '', Updater::tested( '', '7.1.4' ) );
+
+		$site    = get_bloginfo( 'version' );
+		$updater = new Updater( $this->source( $this->manifest() ), self::BASENAME );
+		$info    = $updater->details( false, 'plugin_information', (object) array( 'slug' => 'creative-search' ) );
+		$update  = $updater->check( false, array(), self::BASENAME );
+		$this->assertIsObject( $info );
+		$this->assertIsArray( $update );
+		$this->assertSame( Updater::tested( '7.1', $site ), $info->tested );
+		$this->assertSame( $info->tested, $update['tested'] );
+		$this->assertTrue( version_compare( $site, $info->tested, '<=' ) || ! str_starts_with( $site, '7.1.' ), 'no warning on a 7.1 maintenance release' );
+	}
+
 	public function test_package_checked_against_its_sha256(): void {
 		$file = wp_tempnam( 'csearch' );
 		file_put_contents( $file, 'zip bytes' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents

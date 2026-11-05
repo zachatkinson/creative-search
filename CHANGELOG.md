@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Fixed
+- The update details window no longer warns that the plugin hasn't been tested with a maintenance release of the WordPress version it was tested with ("Tested up to: 7.1" on 7.1.4) (D-149).
 - A misspelling finds what the word it is read as finds: "hody", read as "hoody", finds every hoodie and sweater through the word's stem and the owner's synonyms (D-146).
 - Other typo candidates found only in a description rank after every other product, and for words of four letters or fewer don't count there at all; when the panel shows a page named for the search, products that only mention its words in their description stay out of the panel (D-146).
 - The panel's "in a category" row is chosen from the products that match by more than their description: "beanie" no longer offers "beanie in Decks" because five decks mention a beanie, and when the cap cuts rows a category row stays ahead of a scope built only on description matches (D-147).

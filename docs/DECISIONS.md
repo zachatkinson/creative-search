@@ -1155,3 +1155,13 @@ The sibling plugins use the same `Updater`; the brief carries this fix to each o
 
 **Why:** a scope row says "this is where what you asked for is"; products that only mention the word are not what was asked for, and the category row they would push out is.
 
+### D-149 · "Tested up to" covers the branch's maintenance releases · 2026-11-04
+
+Zach, 4 November: every Creative plugin's "View details" window warned that it "has not been tested with your current version of WordPress". The manifest says 7.1 (the readme's "Tested up to"), the demo runs 7.1.4, and core compares whole versions: `version_compare( '7.1.4', '7.1', '<=' )` is false. WordPress.org avoids this because its API reports the branch as its newest maintenance release.
+
+`Updater::tested()` does the same for the update check and the details window: a `major.minor` value reads as the site's version when the site runs a maintenance release of that branch (7.1 on 7.1.4 is 7.1.4). A newer branch (7.2.1), an older site, a pre-release, a value naming a patch, or an empty value pass as they are, so a site that has outgrown the tested branch is still warned. The readme and the manifest keep the branch, as WordPress.org's readme standard writes it.
+
+The sibling plugins share the `Updater`; the same change belongs in each of them.
+
+**Why:** a warning that fires on every maintenance release teaches the owner to ignore it.
+
