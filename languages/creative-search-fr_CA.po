@@ -26,7 +26,7 @@ msgstr "https://creativebranding.ca"
 
 #. Description of the plugin
 #: creative-search.php
-#: src/Updates/Updater.php:147
+#: src/Updates/Updater.php:165
 msgid "Search for WooCommerce: live suggestions, typo tolerance, SKU and attribute matching, its own index, analytics, an accessible search bar."
 msgstr "La recherche pour WooCommerce : suggestions en direct, tolérance aux fautes de frappe, recherche par UGS et par attribut, un index qui lui est propre, des statistiques et une barre de recherche accessible."
 
@@ -2072,7 +2072,7 @@ msgstr[1] "Statistiques effacées : %s recherches supprimées, avec les comptes
 msgid "Rows in the whole panel on a computer, besides “See all”."
 msgstr "Lignes dans tout le panneau sur un ordinateur, en plus de « Voir tous »."
 
-#: src/Updates/Updater.php:179
+#: src/Updates/Updater.php:197
 msgid "The Creative Search update did not match its published checksum, so it was not installed."
 msgstr "La mise à jour de Creative Search ne correspondait pas à sa somme de contrôle publiée; elle n’a donc pas été installée."
 
@@ -2080,6 +2080,6 @@ msgstr "La mise à jour de Creative Search ne correspondait pas à sa somme de c
 msgid "In the suggestions, on the results page and through the API, products in stock or on backorder come before sold-out ones among products that match as well: products found by their name, SKU, attributes, brand or category still come before products that only mention the search in their description. Each part stays in order of relevance, and pinned products keep their place. Off, a sold-out product only ranks a little lower."
 msgstr "Dans les suggestions, sur la page de résultats et par l’API, les produits en stock ou en réapprovisionnement passent avant ceux en rupture de stock parmi les produits qui correspondent aussi bien : les produits trouvés par leur nom, leur UGS, leurs attributs, leur marque ou leur catégorie passent toujours avant ceux qui ne mentionnent la recherche que dans leur description. Chaque partie reste par ordre de pertinence, et les produits épinglés gardent leur place. Désactivé, un produit en rupture de stock est seulement classé un peu plus bas."
 
-#: src/Updates/Updater.php:170
+#: src/Updates/Updater.php:188
 msgid "This Creative Search update could not be checked against its published release, so it was not installed. Check for updates again, then update."
 msgstr "Cette mise à jour de Creative Search n’a pas pu être vérifiée par rapport à sa version publiée; elle n’a donc pas été installée. Vérifiez de nouveau les mises à jour, puis mettez à jour."

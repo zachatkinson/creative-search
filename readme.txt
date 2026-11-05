@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.2
+Stable tag: 1.6.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.6.3 =
+"See all" counts what its page lists when a size becomes a filter; a misspelling finds what the word finds; the "in a category" row follows the products that match by name; no false "not tested" warning on WordPress maintenance releases. No index rebuild is needed.
+
 = 1.6.2 =
 With "Show products that can be bought first" on, products named for the search stay ahead of products that only mention it; the page a search names gets its row; updates are checked even when the release changed since WordPress last looked. No index rebuild is needed.
 
@@ -97,6 +100,13 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.3 =
+* "See all" in the suggestions counts what the page it opens lists: when a size in the search becomes the shop's filter ("8.25 deck" opens Decks in 8.25″), the number is that page's.
+* A misspelling finds what the word it is read as finds: "hody", read as "hoody", finds every hoodie and sweater. Other near spellings found only in a description come last, and for words of four letters or fewer don't count there.
+* When the suggestions show a page named for the search, products that only mention its words in their description stay out of the suggestions.
+* The "in a category" suggestion is chosen from the products that match by more than their description, and the category row stays ahead of one built only on description matches when space is short.
+* The update details window no longer warns that the plugin hasn't been tested with a maintenance release of the WordPress version it was tested with.
 
 = 1.6.2 =
 * "Show products that can be bought first" now applies among products that match as well: products found by their name, SKU, attributes, brand or category come before products that only mention the search in their description, each group with what can be bought first.

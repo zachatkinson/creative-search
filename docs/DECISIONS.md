@@ -1181,3 +1181,7 @@ The sibling plugins share the `Updater`; the same change belongs in each of them
 
 **Why:** a warning that fires on every maintenance release teaches the owner to ignore it.
 
+### D-150 · The Plugins-row accessibility check leaves core's "View details" link out · 2026-11-05
+Once the update check has reached the release manifest, WordPress shows a "View details" link in the plugin's row whose accessible name is "More information about Creative Search", and axe 4.14 reports `label-content-name-mismatch` on it. The markup is core's (`wp-admin/includes/class-wp-plugins-list-table.php`), not the plugin's, and it appears or not depending on whether the site has fetched the manifest. The smoke test's axe check now excludes `.open-plugin-details-modal` from the row; every rule still runs over the rest of it.
+
+**Why:** a check that fails on core's markup, depending on a network fetch, says nothing about the plugin.

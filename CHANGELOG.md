@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-05
+
+A true "See all" count, misspellings that find the product, and the scope row that follows the strong matches, from the 4 November Baymard check of the Skatehouse demo; and the "tested" warning on WordPress maintenance releases.
+
 ### Changed
 - CI spends fewer minutes: a version tag publishes once CI has passed on the commit's push to main instead of running it again, the 10,000-product catalogue is cached between runs (the reindex and every budget still run), the oldest-versions leg runs two browser projects, Infection on a pull request mutates only its changed lines, and changes to the docs alone run nothing (D-148).
 
