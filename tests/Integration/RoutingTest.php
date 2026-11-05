@@ -313,6 +313,28 @@ final class RoutingTest extends IndexTestCase {
 		self::assertSame( $ranked( 'kazumi' ), $panel( 'kazumi' ), 'no size: what the search found, as in 1.6.2' );
 		self::assertSame( $ranked( 'wheels' ), $panel( 'wheels' ), 'a category without a size: as in 1.6.2' );
 		self::assertSame( $ranked( 'kazumi 7.25' ), $panel( 'kazumi 7.25' ), 'a size no term has stays a word' );
+		// The shop hides sold-out products: its listing in 8.75 is empty, and so is the count (the panel then shows no
+		// "See all", and the search is logged as finding nothing, as the results page logs it, D-101).
+		$sized = get_posts(
+			array(
+				'post_type'   => 'product',
+				'fields'      => 'ids',
+				'tax_query'   => array( array( 'taxonomy' => 'pa_width', 'field' => 'slug', 'terms' => array( '8-75' ) ) ), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- a test fixture.
+			)
+		);
+		self::assertNotEmpty( $sized, 'the deck in 8.75' );
+		foreach ( $sized as $id ) {
+			// What WooCommerce marks a sold-out product with (a variable product takes it from its variations).
+			wp_set_object_terms( $id, 'outofstock', 'product_visibility', true );
+		}
+		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
+		do_action( 'csearch_flush_cache' );
+		self::assertSame( 0, $panel( '8.75 deck' ), 'sold out and hidden: the page lists none' );
+		self::assertSame( $landed( '8.75 deck' ), $panel( '8.75 deck' ) );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
+		do_action( 'csearch_flush_cache' );
+		self::assertSame( 1, $panel( '8.75 deck' ), 'shown: counted' );
+
 		Settings::set( 'filter_attributes', array() );
 		$this->service( AttributeTerms::class )->rebuild();
 		self::assertSame( $ranked( '8.75 deck' ), $panel( '8.75 deck' ), 'no attribute filtered by: what the search found' );

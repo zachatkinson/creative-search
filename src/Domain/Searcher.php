@@ -76,12 +76,12 @@ final class Searcher {
 
 		$products = $this->index->rank( RankPlan::of( $query, $widenings, $lang, $n, $excluded, $options ) );
 		$forms    = array( array( $query, $widenings ) );
-		foreach ( $query->alternatives as $alternative ) {
+		$typos    = self::typos( $widenings );
+		foreach ( array_merge( $query->alternatives, $this->correctedForms( $query, $typos, $lang ) ) as $alternative ) {
 			$widened  = $this->widenAll( $alternative, $lang, $kind, $options->strict );
 			$forms[]  = array( $alternative, $widened );
 			$products = self::merge( $products, $this->index->rank( RankPlan::of( $alternative, $widened, $lang, $n, $excluded, $options ) ), $options->limit, $options->inStockFirst );
 		}
-		$typos    = self::typos( $widenings );
 		$drop     = null;
 		$answered = $query;
 		$used     = $widenings;
@@ -113,6 +113,22 @@ final class Searcher {
 		$terms = array_slice( self::best( $terms, 'compareTerms' ), 0, $options->termLimit );
 
 		return new SearchResult( $products, $terms, $lang, $corrected, array_map( static fn( TokenWidening $w ): array => self::termsOf( $w->matches ), $used ), $answered->key(), null !== $corrected && null !== $drop );
+	}
+
+	/**
+	 * The other forms the owner's phrase synonyms give the query as it is read when a typo is corrected (D-146):
+	 * "fingerbord", read as "fingerboard", also finds what "tech deck" finds, as "fingerboard" typed does (D-109).
+	 *
+	 * @param Query              $query The query.
+	 * @param array<int, string> $typos Token index to the term each typo is read as.
+	 * @param string             $lang  Language code.
+	 * @return Query[]
+	 */
+	private function correctedForms( Query $query, array $typos, string $lang ): array {
+		if ( array() === $typos ) {
+			return array(); // Nothing was corrected: the query's own forms are already ranked.
+		}
+		return ( new QueryParser( $this->analyzer->tokenizer(), $this->synonyms ) )->parse( $query->rewritten( $typos ), $lang )->alternatives;
 	}
 
 	/**
@@ -257,7 +273,7 @@ final class Searcher {
 
 	/**
 	 * A typo read as its closest term finds what that term finds when typed (D-146): the term, its stem and the
-	 * owner's synonyms of it with theirs, at the typo's weight, in every field. The other candidates stay loose:
+	 * owner's synonyms of it with theirs, at the typo's weight, in every field but a short word's descriptions. The other candidates stay loose:
 	 * found only in a description they rank last, and for a short word not at all there. The closest stays first,
 	 * so the query is still read as it (D-114).
 	 *
@@ -271,7 +287,8 @@ final class Searcher {
 		foreach ( array( $first->term, ...$this->synonyms->alternatives( $first->term, $lang ) ) as $word ) {
 			// An empty stem is a term no document carries: the lookup leaves it out.
 			foreach ( array( $word, $this->analyzer->stemOf( $word, $lang ) ) as $term ) {
-				$family[ $term ] = new TermMatch( $term, $first->kind );
+				// A short word's family counts nowhere in a description either: a four-letter typo finds nothing there.
+				$family[ $term ] = new TermMatch( $term, $first->kind, descriptions: $first->descriptions );
 			}
 		}
 		return $this->lookup( $family + $level->matches, $lang, $kind );

@@ -799,6 +799,102 @@ test( 'a phone shows the page asked for, and leaves the other pages out unless t
 	);
 } );
 
+test( 'a scope built on description matches gives way to the category row at the cap (D-147)', async () => {
+	// "beanie": 4 hats found through their category, then 5 decks that only mention a beanie.
+	const beanie = ( described, scopes = null ) => ( {
+		...ANSWER,
+		queries: [],
+		content: [],
+		products: Array.from( { length: 9 }, ( _, i ) => ( {
+			...ANSWER.products[ 0 ],
+			id: 100 + i,
+		} ) ),
+		scopes: scopes || [
+			{
+				id: 7,
+				name: 'Decks',
+				url: '/?s=beanie&product_cat=decks',
+				...( described ? { described: true } : {} ),
+			},
+		],
+		terms: [ { ...ANSWER.terms[ 0 ], name: 'Hats and toques' } ],
+		total: 9,
+	} );
+	const matchMedia = window.matchMedia;
+	window.matchMedia = () => ( { matches: true } );
+	dom.fetch = () => respond( beanie( true ) );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 6 } );
+	type( 'beanie' );
+	await settle();
+	let keys = scope.ctx.rows.map( ( r ) => r.key );
+	assert.equal( keys.length, 6, 'five rows and See all' );
+	assert.ok(
+		keys.includes( `t${ ANSWER.terms[ 0 ].taxonomy }Hats and toques` ),
+		'the category row stays'
+	);
+	assert.ok(
+		! keys.includes( 's7' ),
+		'the scope on description matches goes'
+	);
+
+	const decks = { id: 7, name: 'Decks', url: '/?s=beanie&product_cat=decks' };
+	const wheels = {
+		id: 8,
+		name: 'Wheels',
+		url: '/?s=beanie&product_cat=wheels',
+	};
+	dom.fetch = () =>
+		respond(
+			beanie( true, [
+				{ ...decks, described: true },
+				{ ...wheels, described: true },
+			] )
+		);
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 6, maxPhone: 8 } );
+	type( 'beanie' );
+	await settle();
+	keys = scope.ctx.rows.map( ( r ) => r.key );
+	assert.ok(
+		keys.includes( `t${ ANSWER.terms[ 0 ].taxonomy }Hats and toques` ),
+		'two scopes on description matches still leave the category row its room on a phone'
+	);
+	assert.ok( keys.includes( 's7' ) && ! keys.includes( 's8' ) );
+
+	// The category the shopper is in (D-130) comes first, whatever the scope after it rests on.
+	dom.fetch = () =>
+		respond( beanie( true, [ decks, { ...wheels, described: true } ] ) );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 6 } );
+	type( 'beanie' );
+	await settle();
+	keys = scope.ctx.rows.map( ( r ) => r.key );
+	assert.ok(
+		keys.includes( 's7' ),
+		'the category the shopper is in keeps its row'
+	);
+
+	dom.fetch = () => respond( beanie( false ) );
+	form++;
+	input = dom.element( `csearch-${ form }-input` );
+	scope.ctx = context( { limit: 6 } );
+	type( 'beanie' );
+	await settle();
+	window.matchMedia = matchMedia;
+	keys = scope.ctx.rows.map( ( r ) => r.key );
+	assert.ok(
+		keys.includes( 's7' ),
+		'a scope on strong matches keeps its place, as in 1.6.2'
+	);
+	assert.ok(
+		! keys.includes( `t${ ANSWER.terms[ 0 ].taxonomy }Hats and toques` )
+	);
+} );
+
 test( 'the page asked for gets its row at the cap; the other pages only the room the cap leaves (D-143)', async () => {
 	dom.fetch = () =>
 		respond( {

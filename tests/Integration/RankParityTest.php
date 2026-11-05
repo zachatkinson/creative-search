@@ -267,7 +267,12 @@ final class RankParityTest extends IndexTestCase {
 				}
 				if ( 5 === strlen( $w ) ) {
 					$seen[ $w ] = true;
-					$out[]      = array( substr( $w, 0, 2 ) . substr( $w, 3 ), 'en' );
+					$typoed     = substr( $w, 0, 2 ) . substr( $w, 3 );
+					$out[]      = array( $typoed, 'en' );
+					// The word beside the typo, or excluded: one word's descriptions not counting must leave another
+					// word's, and the minus word's, alone.
+					$out[] = array( "{$typoed} {$w}", 'en' );
+					$out[] = array( "{$typoed} -{$w}", 'en' );
 				} elseif ( strlen( $w ) >= 6 ) {
 					$seen[ $w ] = true;
 					$out[]      = array( $typo( $w ), 'en' );

@@ -101,7 +101,8 @@ final class Suggestions {
 				'queries'   => $this->queries->for( $query, $lang ),
 				'products'  => $this->products( array_slice( $listed, 0, $limit ), $result, $described ),
 				// A panel already limited to a category offers no other category to search within (D-113, D-117).
-				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here ) : array(),
+				// Chosen from the strong matches when there are any (D-147).
+				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here, self::objectIds( $result, $described ) ) : array(),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $content,
 				'total'     => $this->total( $query, $lang, count( $products ), $within ),
@@ -145,6 +146,23 @@ final class Suggestions {
 			}
 		}
 		return $only;
+	}
+
+	/**
+	 * The product ids of some of a search's documents.
+	 *
+	 * @param SearchResult     $result The search.
+	 * @param array<int, true> $ids    Document ids, as keys.
+	 * @return int[]
+	 */
+	private static function objectIds( SearchResult $result, array $ids ): array {
+		$out = array();
+		foreach ( $result->products as $hit ) {
+			if ( isset( $ids[ $hit->document->id ] ) ) {
+				$out[] = $hit->document->objectId;
+			}
+		}
+		return $out;
 	}
 
 	/**

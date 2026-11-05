@@ -317,13 +317,14 @@ final class SearcherTest extends TestCase {
 		self::assertSame( 'hoody', $typo->corrected, 'still read as the closest word' );
 		self::assertSame( TermMatch::TYPO1, $typo->products[0]->score->tokens[0]['kind'], 'at the typo\'s weight' );
 		self::assertSame( array( 'Light Deck' ), self::titles( $this->search( 'body' ) ), 'typed, "body" finds the deck through its description' );
-		self::assertSame( array( 'Light Deck' ), self::titles( $this->search( 'bodu' ) ), 'and so does a typo read as "body"' );
+		self::assertSame( array(), self::titles( $this->search( 'bodu' ) ), 'a four-letter typo read as "body" finds nothing through a description alone' );
+		self::assertSame( array( 'KAZUMI Skate Deck, Dealer' ), self::titles( $this->search( 'mapel' ) ), 'five letters: read as "maple", the description counts' );
 
 		$widening = ( new Searcher( $this->index, new Analyzer(), new Scorer(), $synonyms ) )->widen( new QueryToken( 'hody', 'hody' ), 'en' );
 		self::assertSame( 'hoody', array_key_first( $widening->matches ), 'the closest first' );
 		foreach ( array( 'hoody', 'hoodi', 'sweater' ) as $term ) {
 			self::assertFalse( $widening->matches[ $term ]->loose, $term . ' is the corrected word\'s' );
-			self::assertTrue( $widening->matches[ $term ]->descriptions );
+			self::assertFalse( $widening->matches[ $term ]->descriptions, 'four letters: not in a description, the corrected word\'s family included' );
 			self::assertSame( TermMatch::TYPO1, $widening->matches[ $term ]->kind );
 		}
 		self::assertTrue( $widening->matches['body']->loose, 'another candidate stays loose' );
@@ -339,6 +340,22 @@ final class SearcherTest extends TestCase {
 		$pads = $this->search( 'hody', 'en', null, $synonyms );
 		self::assertContains( 'Body Pads', self::titles( $pads ), 'the loose "body" in a name still counts' );
 		self::assertNotContains( 'Light Deck', self::titles( $pads ) );
+	}
+
+	public function test_a_typo_brings_its_word_s_phrase_synonyms(): void {
+		$this->product( 'Tech Deck Mini', 'TDK-MIN-00001', array(), true, 10, array() );
+		$this->product( 'Fingerboard Ramp', 'FBR-RMP-00002', array(), true, 20, array() );
+		$synonyms = new Synonyms( array( new Synonym( 'en', 'tech deck', 'fingerboard', true ) ) );
+		$typed    = $this->search( 'fingerboard ', 'en', null, $synonyms );
+		self::assertEqualsCanonicalizing( array( 'Tech Deck Mini', 'Fingerboard Ramp' ), self::titles( $typed ), 'typed: the word and its phrase synonym (D-109)' );
+		$typo = $this->search( 'fingerbord ', 'en', null, $synonyms );
+		self::assertSame( 'fingerboard', $typo->corrected );
+		self::assertEqualsCanonicalizing( self::titles( $typed ), self::titles( $typo ), 'read as "fingerboard", it finds "tech deck" too (D-146)' );
+		self::assertSame( array( 'Fingerboard Ramp' ), self::titles( $this->search( 'fingerbord ' ) ), 'no synonyms: the word alone' );
+		$this->index->ranks = 0;
+		$this->search( 'fingerboard ', 'en', null, $synonyms );
+		self::assertSame( 2, $this->index->ranks, 'no typo: the query and its one other form, ranked once each' );
+		self::assertSame( array( 'Fingerboard Ramp' ), self::titles( $this->search( 'fingerboard ', 'en', null, new Synonyms( array( new Synonym( 'en', 'tech deck', 'skate' ) ) ) ) ), 'no typo: no other form from a rule that isn\'t the word\'s' );
 	}
 
 	public function test_a_loose_candidate_found_only_in_a_description_ranks_last(): void {

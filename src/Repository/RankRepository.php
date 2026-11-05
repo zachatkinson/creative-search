@@ -48,12 +48,13 @@ final class RankRepository extends Repository {
 		$sql  = array();
 		$dfs  = array();
 		$lead = 0;
-		// A loose typo candidate (D-146): `lo` 1 ranks a product it alone reaches in a description last, `nd` 1 drops
-		// its description postings. Only a plan that has one carries the columns.
+		// A typo's terms (D-146): `lo` 1 for a loose candidate, which ranks a product it alone reaches in a description
+		// last; `nd` 1 for a short word's, whose description postings are dropped. Only a plan that has either carries
+		// the columns.
 		$loose = false;
 		foreach ( $plan->tokens as $matches ) {
 			foreach ( $matches as $match ) {
-				$loose = $loose || $match->loose;
+				$loose = $loose || $match->loose || ! $match->descriptions;
 			}
 		}
 		foreach ( $plan->tokens as $i => $matches ) {

@@ -569,19 +569,22 @@ function contentRow( ctx, c, index, first ) {
  * reached only there (`described`). The whole panel is filled to its cap in this order: one suggested search,
  * three products, the page asked for, the rest of the three products from the described ones, one category or
  * scope row, the other products, the other described products, the other suggested searches and categories, and
- * the other posts or pages last. "See all" is not counted.
+ * the other posts or pages last. "See all" is not counted. A scope row built on description matches alone
+ * (`scopesDescribed`, D-147) gives way to a category row: the category row is taken first.
  *
  * @param {Object} ctx   The block's context.
  * @param {Object} found How many of each the answer has: `{queries, products, described, scopes, terms, content}`;
- *                       `described` is 0 when there is no page asked for, every product then in `products`.
+ *                       `described` is 0 when there is no page asked for, every product then in `products`;
+ *                       `scopesDescribed` is true when the scopes rest on description matches alone (D-147).
  * @return {{queries: number, products: number, described: number, scopes: number, terms: number, page: number, content: number}} The budget.
  */
 export function budget( ctx, found ) {
 	const phone = Boolean( window.matchMedia?.( PHONE ).matches );
 	const room = phone ? PHONE_TERMS : TERMS;
+	// A scope on description matches leaves the category row its room (D-147).
 	const scopes = Math.min(
 		SCOPES,
-		room,
+		room - ( found.scopesDescribed && found.terms && ctx.terms ? 1 : 0 ),
 		found.products + ( found.described || 0 ) ? found.scopes : 0
 	);
 	const products = Math.min( ctx.limit, found.products );
@@ -620,6 +623,9 @@ export function budget( ctx, found ) {
 		left -= n;
 	};
 	const category = ( upTo ) => {
+		if ( found.scopesDescribed ) {
+			take( 'terms', upTo - out.scopes );
+		}
 		take( 'scopes', upTo - out.terms );
 		take( 'terms', upTo - out.scopes );
 	};
@@ -752,6 +758,8 @@ function showAnswer( ctx, data, input ) {
 		scopes: found.scopes.length,
 		terms: found.terms.length,
 		content: content.length,
+		// The first scope decides: the category the shopper is in comes first whatever the others rest on (D-130).
+		scopesDescribed: Boolean( found.scopes[ 0 ]?.described ),
 	} );
 	const query = data.query || ctx.query.trim();
 	const rows = [];

@@ -11,6 +11,7 @@ namespace CreativeBranding\Search\Tests\Integration;
 
 use CreativeBranding\Search\Domain\Synonym;
 use CreativeBranding\Search\Index\AnalyzerFactory;
+use CreativeBranding\Search\Index\AttributeTerms;
 use CreativeBranding\Search\Index\IndexQueue;
 use CreativeBranding\Search\Index\IndexState;
 use CreativeBranding\Search\Index\Reindex;
@@ -107,10 +108,14 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 		$this->content( max( 10, intdiv( $count, 100 ) ) );
 		Settings::update(
 			array(
-				'index_pages' => 'yes',
-				'index_posts' => 'yes',
+				'index_pages'       => 'yes',
+				'index_posts'       => 'yes',
+				// Widths are the shop's filter, as on Skatehouse: "8.25" in a golden query then takes the panel's
+				// landing path for its "See all" count (D-145).
+				'filter_attributes' => array( 'pa_width' ),
 			)
 		);
+		$this->service( AttributeTerms::class )->rebuild();
 		self::assertTrue( $this->service( Reindex::class )->runInline() );
 		$this->analyzeAside( self::$analyzed );
 		do_action( 'rest_api_init' );

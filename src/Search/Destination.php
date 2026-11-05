@@ -198,6 +198,15 @@ final class Destination {
 				'operator' => 'NOT IN',
 			),
 		);
+		if ( 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' ) ) {
+			// WooCommerce's own listing leaves sold-out products out then, so the count does too.
+			$tax[] = array(
+				'taxonomy' => 'product_visibility',
+				'field'    => 'term_taxonomy_id',
+				'terms'    => array( Cast::int( $visibility['outofstock'] ?? 0 ) ),
+				'operator' => 'NOT IN',
+			);
+		}
 		if ( null !== $term ) {
 			$tax[] = array(
 				'taxonomy' => 'product_cat',

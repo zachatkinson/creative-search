@@ -133,7 +133,7 @@ final class CorrectionTest extends IndexTestCase {
 	public function test_a_short_typo_reaches_no_product_through_its_description_alone(): void {
 		self::assertNotContains( 'HZRD Deck', $this->page( 'hody' ), '"body" is in its description only' );
 		self::assertSame( array( 'HZRD Deck' ), $this->page( 'body' ), 'typed, the word finds it' );
-		self::assertSame( array( 'HZRD Deck' ), $this->page( 'bodu' ), 'a typo read as "body" itself still does' );
+		self::assertSame( array(), $this->page( 'bodu' ), 'nor does a four-letter typo read as "body" itself' );
 	}
 
 	public function test_a_page_asked_for_keeps_the_products_that_only_mention_it_out_of_the_panel(): void {

@@ -27,6 +27,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * and one of the terms; the results page narrows the search by WooCommerce's own `product_cat` parameter.
  * On a category page the shopper is in comes first, when it holds any of the ranked products (D-130): the way to
  * search within it, in place of 1.3's checkbox. Switched off by `suggest_scopes`.
+ *
+ * The categories are chosen from the strong matches (D-147): products found by more than their description. Only
+ * when every product was found by its description alone do those choose, and the row then says so (`described`), so
+ * the panel's cap keeps a category row ahead of it.
  */
 final class CategoryScopes {
 
@@ -48,9 +52,10 @@ final class CategoryScopes {
 	 * @param int[]        $productIds The ranked product ids.
 	 * @param int[]        $shown      Category ids already suggested.
 	 * @param WP_Term|null $here       The category the shopper is in, or null.
-	 * @return array<int, array{id: int, name: string, url: string}>
+	 * @param int[]        $described  The ranked products some word reached only in their description (D-142).
+	 * @return array<int, array{id: int, name: string, url: string, described?: bool}>
 	 */
-	public function for( string $query, array $productIds, array $shown, ?WP_Term $here = null ): array {
+	public function for( string $query, array $productIds, array $shown, ?WP_Term $here = null, array $described = array() ): array {
 		if ( '' === $query || ! Settings::isOn( 'suggest_scopes' ) || array() === $productIds ) {
 			return array();
 		}
@@ -65,9 +70,11 @@ final class CategoryScopes {
 		if ( count( $productIds ) < Scopes::MINIMUM ) {
 			return $out;
 		}
-		$top   = array_slice( $productIds, 0, Scopes::TOP );
-		$read  = $this->documents->categoriesOf( $top );
-		$ranks = array();
+		$strong = array_values( array_diff( $productIds, $described ) );
+		$weak   = array() === $strong;
+		$top    = array_slice( $weak ? $productIds : $strong, 0, Scopes::TOP );
+		$read   = $this->documents->categoriesOf( $top );
+		$ranks  = array();
 		foreach ( $top as $id ) {
 			$ranks[ $id ] = $read[ $id ] ?? array();
 		}
@@ -90,11 +97,15 @@ final class CategoryScopes {
 		}
 		foreach ( Scopes::pick( $ranks, $parents, count( $productIds ), $shown ) as $id ) {
 			if ( isset( $byId[ $id ] ) && count( $out ) < Scopes::MOST && ( null === $first || $id !== $first['id'] ) ) {
-				$out[] = array(
+				$row = array(
 					'id'   => $id,
 					'name' => Tokenizer::decode( $byId[ $id ]->name ),
 					'url'  => self::url( $query, $byId[ $id ]->slug ),
 				);
+				if ( $weak && array() !== $described ) {
+					$row['described'] = true; // Built on description matches alone (D-147).
+				}
+				$out[] = $row;
 			}
 		}
 		return $out;

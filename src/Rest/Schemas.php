@@ -64,12 +64,14 @@ final class Schemas {
 					'items' => array(
 						'type'       => 'object',
 						'properties' => array(
-							'id'   => array( 'type' => 'integer' ),
-							'name' => array( 'type' => 'string' ),
-							'url'  => array(
+							'id'        => array( 'type' => 'integer' ),
+							'name'      => array( 'type' => 'string' ),
+							'url'       => array(
 								'type'   => 'string',
 								'format' => 'uri',
 							),
+							// Present and true when chosen from description matches alone (D-147).
+							'described' => array( 'type' => 'boolean' ),
 						),
 					),
 				),
