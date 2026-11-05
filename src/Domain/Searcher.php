@@ -391,6 +391,27 @@ final class Searcher {
 		foreach ( $widenings as $widening ) {
 			$set += $widening->termDocs();
 		}
-		return $this->index->documents( array_keys( array_diff_key( $set, $excluded ) ) );
+		$set = array_filter( array_diff_key( $set, $excluded ), static fn( int $doc ): bool => self::firmlyReached( $widenings, $doc ), ARRAY_FILTER_USE_KEY );
+		return $this->index->documents( array_keys( $set ) );
+	}
+
+	/**
+	 * Whether some word reaches a category, tag or brand by more than a loose typo candidate in its description
+	 * (D-151): "hody" offers no brand whose description says "body", as it finds no product that way (D-146).
+	 *
+	 * @param TokenWidening[] $widenings One per token.
+	 * @param int             $doc       The term's document id.
+	 */
+	private static function firmlyReached( array $widenings, int $doc ): bool {
+		foreach ( $widenings as $widening ) {
+			foreach ( $widening->postingsIn( $doc, false ) as $term => $byField ) {
+				foreach ( array_keys( $byField ) as $field ) {
+					if ( $widening->matches[ $term ]->firmIn( $field ) ) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
 	}
 }

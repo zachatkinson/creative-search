@@ -121,11 +121,17 @@ final class SearcherTest extends TestCase {
 	 * @param int    $count Product count.
 	 * @param string $lang  Language.
 	 */
-	private function term( string $type, string $name, int $count, string $lang = 'en' ): void {
+	private function term( string $type, string $name, int $count, string $lang = 'en', string $description = '' ): void {
 		$id = ++$this->nextId;
 		$this->index->add(
 			new Document( $id, $type, $id, $lang, $name, $this->analyzer->tokenizer()->key( $name, $lang ), array(), true, true, 0, $count ),
-			$this->analyzer->analyze( array( Fields::NAME => $name ), $lang )
+			$this->analyzer->analyze(
+				array(
+					Fields::NAME  => $name,
+					Fields::SHORT => $description,
+				),
+				$lang
+			)
 		);
 	}
 
@@ -356,6 +362,20 @@ final class SearcherTest extends TestCase {
 		$this->search( 'fingerboard ', 'en', null, $synonyms );
 		self::assertSame( 2, $this->index->ranks, 'no typo: the query and its one other form, ranked once each' );
 		self::assertSame( array( 'Fingerboard Ramp' ), self::titles( $this->search( 'fingerboard ', 'en', null, new Synonyms( array( new Synonym( 'en', 'tech deck', 'skate' ) ) ) ) ), 'no typo: no other form from a rule that isn\'t the word\'s' );
+	}
+
+	public function test_a_term_reached_only_by_a_loose_candidate_in_its_description_is_not_offered(): void {
+		$this->product( 'Blotto Hoody', 'BLO-HOO-00001', array(), true, 5, array() );
+		$this->term( Document::BRAND, 'HZRD', 3, 'en', 'A light body with a stiff pop.' );
+		$this->term( Document::CATEGORY, 'Hoodies', 4 );
+		$this->term( Document::TAG, 'Winter', 2, 'en', 'Every hoody we carry.' );
+		$names = static fn( SearchResult $r ): array => array_map( static fn( Hit $h ): string => $h->document->title, $r->terms );
+		$typo  = $this->search( 'hody' );
+		self::assertSame( 'hoody', $typo->corrected );
+		self::assertNotContains( 'HZRD', $names( $typo ), '"body" in its description only, a loose candidate of "hody"' );
+		self::assertContains( 'Winter', $names( $typo ), 'the corrected word itself in a description still reaches it' );
+		self::assertContains( 'HZRD', $names( $this->search( 'body' ) ), 'typed, the word reaches it' );
+		self::assertContains( 'HZRD', $names( $this->search( 'hzrd hody' ) ), 'another word reaches it by name' );
 	}
 
 	public function test_a_loose_candidate_found_only_in_a_description_ranks_last(): void {

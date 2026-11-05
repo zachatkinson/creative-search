@@ -16,6 +16,38 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # What a pull request needs (D-152): one that touches only the browser tests or the workflows (and the docs) runs the standards, the
+  # unit tests and the newest leg (its integration tests, Plugin Check and every browser project), not the other legs,
+  # mutation testing or the budgets. Main always runs everything; a release waits for that run.
+  scope:
+    name: What this change runs
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+      legs: ${{ steps.scope.outputs.legs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+      - id: scope
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          full=true
+          if [ "${GITHUB_EVENT_NAME}" = pull_request ]; then
+            others=$(git diff --name-only "origin/${BASE}...HEAD" | grep -Ev '^(tests/e2e/|\.github/workflows/|docs/|LICENSE$)|\.md$' || true)
+            if [ -z "$others" ]; then
+              full=false
+            fi
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          if [ "$full" = true ]; then
+            echo 'legs=["newest","oldest","mysql80","mariadb106","hpos-off","object-cache"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'legs=["newest"]' >> "$GITHUB_OUTPUT"
+          fi
+          echo "Full run: $full"
+
   static:
     name: Lint, analyse, gates, unit tests (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
@@ -52,6 +84,8 @@ jobs:
 
   mutation:
     name: Mutation testing (Infection)
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +120,8 @@ jobs:
 
   benchmarks:
     name: Benchmarks (the budgets are tests)
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,13 +134,15 @@ jobs:
 
   integration:
     name: Integration, Plugin Check, browser (${{ matrix.leg }})
+    needs: scope
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         # The spec's matrix (Compatibility; D-011, D-083): both ends of WordPress and WooCommerce, MySQL 8.0 and
         # MariaDB 10.6 beside wp-env's own MariaDB, HPOS off (WooCommerce's default is on), a persistent object cache.
-        leg: ['newest', 'oldest', 'mysql80', 'mariadb106', 'hpos-off', 'object-cache']
+        # Newest alone for a pull request that touches only the browser tests or the workflows (D-152).
+        leg: ${{ fromJSON(needs.scope.outputs.legs) }}
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -177,6 +215,8 @@ jobs:
 
   index-budgets:
     name: Index and API budgets at 10,000 products
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:

@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Search;
 
 use CreativeBranding\Search\Index\TermReader;
+use CreativeBranding\Search\Repository\ProductIdRepository;
 use CreativeBranding\Search\Results\CategoryScope;
 use CreativeBranding\Search\Results\QueryRouter;
 use CreativeBranding\Search\Settings\Settings;
@@ -31,10 +32,11 @@ final class Destination {
 	/**
 	 * Constructor.
 	 *
-	 * @param QueryRoutes   $routes The reading of the query.
-	 * @param SearchService $search The search.
+	 * @param QueryRoutes         $routes   The reading of the query.
+	 * @param SearchService       $search   The search.
+	 * @param ProductIdRepository $products Product ids, for WooCommerce's sold-out variations (D-151).
 	 */
-	public function __construct( private QueryRoutes $routes, private SearchService $search ) {
+	public function __construct( private QueryRoutes $routes, private SearchService $search, private ProductIdRepository $products ) {
 	}
 
 	/**
@@ -118,7 +120,7 @@ final class Destination {
 		} else {
 			$base = wc_get_page_permalink( 'shop' );
 		}
-		return self::landing( $base, $args, $term, $route['filters'], $ids );
+		return $this->landing( $base, $args, $term, $route['filters'], $ids );
 	}
 
 	/**
@@ -150,7 +152,7 @@ final class Destination {
 		} else {
 			$base = get_term_link( $scope );
 		}
-		return self::landing( $base, $args, $term, $route['filters'], $ids );
+		return $this->landing( $base, $args, $term, $route['filters'], $ids );
 	}
 
 	/**
@@ -163,13 +165,13 @@ final class Destination {
 	 * @param int[]|null              $ids     The other words' products, or null when there were none.
 	 * @return array{url: string, count: int, filtered: bool}|null
 	 */
-	private static function landing( mixed $base, array $args, ?WP_Term $term, array $filters, ?array $ids ): ?array {
+	private function landing( mixed $base, array $args, ?WP_Term $term, array $filters, ?array $ids ): ?array {
 		if ( ! is_string( $base ) || '' === $base ) {
 			return null;
 		}
 		return array(
 			'url'      => add_query_arg( $args, $base ),
-			'count'    => self::count( $term, $filters, $ids ),
+			'count'    => $this->count( $term, $filters, $ids ),
 			'filtered' => array() !== $filters,
 		);
 	}
@@ -181,11 +183,12 @@ final class Destination {
 	 * @param array<string, string[]> $filters Attribute taxonomy to slugs.
 	 * @param int[]|null              $ids     The other words' products, or null when there were none.
 	 */
-	private static function count( ?WP_Term $term, array $filters, ?array $ids ): int {
+	private function count( ?WP_Term $term, array $filters, ?array $ids ): int {
 		if ( null !== $term && array() === $filters ) {
 			return TermReader::count( $term );
 		}
-		if ( array() === $ids ) {
+		$listed = $this->inStock( $filters, $ids );
+		if ( array() === $listed ) {
 			return 0;
 		}
 		$visibility = wc_get_product_visibility_term_ids();
@@ -228,11 +231,41 @@ final class Destination {
 				'fields'              => 'ids',
 				'posts_per_page'      => 1,
 				'ignore_sticky_posts' => true,
-				'post__in'            => $ids ?? array(),
+				'post__in'            => $listed ?? array(),
 				'tax_query'           => $tax, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- once per query sent on, and once per uncached panel answer that names a filter.
 			)
 		);
 		return $found->found_posts;
+	}
+
+	/**
+	 * The products the filtered page can list, when WooCommerce filters by attribute through its lookup table and
+	 * hides what is sold out (D-151): a variable product whose variation in the size is sold out is not listed, even
+	 * though the product itself is in stock. Otherwise the ids are passed on as they are.
+	 *
+	 * @param array<string, string[]> $filters Attribute taxonomy to slugs.
+	 * @param int[]|null              $ids     The other words' products, or null when there were none.
+	 * @return int[]|null
+	 */
+	private function inStock( array $filters, ?array $ids ): ?array {
+		/** This filter is documented in woocommerce/src/Internal/ProductAttributesLookup/Filterer.php */
+		$hide = (bool) apply_filters( 'woocommerce_product_attributes_filterer_hide_out_of_stock', 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own filter, read as its listing reads it.
+		if ( ! $hide || 'yes' !== get_option( 'woocommerce_attribute_lookup_enabled' ) ) {
+			return $ids;
+		}
+		foreach ( $filters as $taxonomy => $slugs ) {
+			$terms = get_terms(
+				array(
+					'taxonomy'   => $taxonomy,
+					'slug'       => $slugs,
+					'fields'     => 'ids',
+					'hide_empty' => false,
+				)
+			);
+			$found = $this->products->inStockWithTerms( is_array( $terms ) ? array_map( Cast::int( ... ), $terms ) : array() );
+			$ids   = null === $ids ? $found : array_values( array_intersect( $ids, $found ) );
+		}
+		return $ids;
 	}
 
 	/**

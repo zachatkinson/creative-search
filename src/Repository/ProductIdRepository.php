@@ -91,4 +91,27 @@ final class ProductIdRepository extends Repository {
 		);
 		return array_map( static fn( array $row ): int => (int) $row['ID'], $rows );
 	}
+
+	/**
+	 * The products WooCommerce's filtered listing shows for some attribute terms when it hides what is sold out
+	 * (D-151): a product, or the parent of a variation, with an in-stock row in WooCommerce's attributes lookup table
+	 * for one of the terms, as its `Filterer` writes the clause. Only read when that table is in use.
+	 *
+	 * @param int[] $termIds Attribute term ids, of one taxonomy.
+	 * @return int[]
+	 */
+	public function inStockWithTerms( array $termIds ): array {
+		global $wpdb;
+		if ( array() === $termIds ) {
+			return array();
+		}
+		$rows = $this->rows(
+			$this->prepare(
+				'SELECT DISTINCT product_or_parent_id FROM %i WHERE term_id IN (' . self::ints( $termIds ) . ') AND in_stock = %d',
+				$wpdb->prefix . 'wc_product_attributes_lookup',
+				1
+			)
+		);
+		return array_map( static fn( array $row ): int => (int) $row['product_or_parent_id'], $rows );
+	}
 }

@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.3
+Stable tag: 1.6.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.6.4 =
+"See all" leaves out products whose size is sold out when the shop hides sold-out products, as the filtered page does; a misspelling no longer suggests a brand or category that only mentions a near spelling in its description. No index rebuild is needed.
+
 = 1.6.3 =
 "See all" counts what its page lists when a size becomes a filter; a misspelling finds what the word finds; the "in a category" row follows the products that match by name; no false "not tested" warning on WordPress maintenance releases. No index rebuild is needed.
 
@@ -100,6 +103,10 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.4 =
+* "See all" in the suggestions counts what the filtered page lists when the shop hides sold-out products: a product whose variation in the size searched is sold out is no longer counted ("8.25 deck" on Decks in 8.25″).
+* A misspelling no longer suggests a category, tag or brand that only mentions a near spelling in its description.
 
 = 1.6.3 =
 * "See all" in the suggestions counts what the page it opens lists: when a size in the search becomes the shop's filter ("8.25 deck" opens Decks in 8.25″), the number is that page's.
