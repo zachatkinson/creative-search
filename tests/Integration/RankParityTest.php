@@ -256,6 +256,24 @@ final class RankParityTest extends IndexTestCase {
 				++$two;
 			}
 		}
+		// Typos of words the descriptions carry (D-146): a letter dropped from a five-letter word reads as four letters,
+		// whose loose candidates count nowhere in a description; a transposed longer word, whose loose candidates found
+		// only in a description rank last. Appended, so the queries above stay the same.
+		$seen = array();
+		foreach ( array_slice( $specs, 0, 80 ) as $spec ) {
+			foreach ( $words( (string) $spec['short'] . ' ' . (string) $spec['long'] ) as $w ) {
+				if ( count( $seen ) >= 40 || isset( $seen[ $w ] ) || ! preg_match( '/^\p{L}+$/u', $w ) ) {
+					continue;
+				}
+				if ( 5 === strlen( $w ) ) {
+					$seen[ $w ] = true;
+					$out[]      = array( substr( $w, 0, 2 ) . substr( $w, 3 ), 'en' );
+				} elseif ( strlen( $w ) >= 6 ) {
+					$seen[ $w ] = true;
+					$out[]      = array( $typo( $w ), 'en' );
+				}
+			}
+		}
 		// Every hidden product's SKU, so hidden-by-SKU is always exercised.
 		foreach ( $specs as $spec ) {
 			if ( ! $spec['visible'] ) {

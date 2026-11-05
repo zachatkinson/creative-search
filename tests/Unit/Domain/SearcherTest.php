@@ -17,6 +17,8 @@ use CreativeBranding\Search\Domain\Kind;
 use CreativeBranding\Search\Domain\Query;
 use CreativeBranding\Search\Domain\QueryParser;
 use CreativeBranding\Search\Domain\QueryToken;
+use CreativeBranding\Search\Domain\Score;
+use CreativeBranding\Search\Domain\Scorer;
 use CreativeBranding\Search\Domain\Searcher;
 use CreativeBranding\Search\Domain\SearchOptions;
 use CreativeBranding\Search\Domain\SearchResult;
@@ -128,8 +130,9 @@ final class SearcherTest extends TestCase {
 	}
 
 	private function search( string $raw, string $lang = 'en', ?SearchOptions $options = null, ?Synonyms $synonyms = null ): SearchResult {
-		$parser = new QueryParser( new Tokenizer(), $synonyms ?? new Synonyms( array() ) );
-		return ( new Searcher( $this->index ) )->search( $parser->parse( $raw, $lang ), $options ?? new SearchOptions() );
+		$synonyms ??= new Synonyms( array() );
+		$parser     = new QueryParser( new Tokenizer(), $synonyms );
+		return ( new Searcher( $this->index, new Analyzer(), new Scorer(), $synonyms ) )->search( $parser->parse( $raw, $lang ), $options ?? new SearchOptions() );
 	}
 
 	/**
@@ -299,6 +302,64 @@ final class SearcherTest extends TestCase {
 		$long = ( new Searcher( $this->index ) )->widen( new QueryToken( 'wxyzqqqq', 'wxyzqqqq' ), 'en' );
 		self::assertSame( array( 'wxyzqq' ), array_keys( $long->matches ), 'two edits at eight characters' );
 		self::assertSame( TermMatch::TYPO2, $long->matches['wxyzqq']->kind );
+	}
+
+	public function test_a_typo_finds_what_its_closest_word_finds_typed(): void {
+		$this->product( 'Blotto Hoody', 'BLO-HOO-00001', array(), true, 10, array() );
+		$this->product( 'Classic Hoodies', 'SKH-CLA-00002', array(), true, 20, array() );
+		$this->product( 'Crew Sweater', 'SKH-CRE-00003', array(), true, 30, array() );
+		$this->product( 'Light Deck', 'HZR-LIG-00004', array(), true, 90, array(), 'A light body with a stiff pop.' );
+		$synonyms = new Synonyms( array( new Synonym( 'en', 'hoody', 'sweater', true ) ) );
+		$typed    = $this->search( 'hoody', 'en', null, $synonyms );
+		self::assertEqualsCanonicalizing( array( 'Blotto Hoody', 'Classic Hoodies', 'Crew Sweater', 'Skatehouse Hoodie, Logo' ), self::titles( $typed ), 'typed: the word, its stem and its synonym' );
+		$typo = $this->search( 'hody', 'en', null, $synonyms );
+		self::assertEqualsCanonicalizing( self::titles( $typed ), self::titles( $typo ), 'read as "hoody", it brings what "hoody" brings (D-146)' );
+		self::assertSame( 'hoody', $typo->corrected, 'still read as the closest word' );
+		self::assertSame( TermMatch::TYPO1, $typo->products[0]->score->tokens[0]['kind'], 'at the typo\'s weight' );
+		self::assertSame( array( 'Light Deck' ), self::titles( $this->search( 'body' ) ), 'typed, "body" finds the deck through its description' );
+		self::assertSame( array( 'Light Deck' ), self::titles( $this->search( 'bodu' ) ), 'and so does a typo read as "body"' );
+
+		$widening = ( new Searcher( $this->index, new Analyzer(), new Scorer(), $synonyms ) )->widen( new QueryToken( 'hody', 'hody' ), 'en' );
+		self::assertSame( 'hoody', array_key_first( $widening->matches ), 'the closest first' );
+		foreach ( array( 'hoody', 'hoodi', 'sweater' ) as $term ) {
+			self::assertFalse( $widening->matches[ $term ]->loose, $term . ' is the corrected word\'s' );
+			self::assertTrue( $widening->matches[ $term ]->descriptions );
+			self::assertSame( TermMatch::TYPO1, $widening->matches[ $term ]->kind );
+		}
+		self::assertTrue( $widening->matches['body']->loose, 'another candidate stays loose' );
+		self::assertFalse( $widening->matches['body']->descriptions, 'four letters: its descriptions don\'t count' );
+		$this->product( 'Cyrillic Tee', 'SKH-CYR-00006', array(), true, 1, array(), 'тожа тожи' );
+		$cyrillic = ( new Searcher( $this->index ) )->widen( new QueryToken( 'тоже', 'тоже' ), 'en' );
+		self::assertSame( 'тожа', array_key_first( $cyrillic->matches ) );
+		self::assertFalse( $cyrillic->matches['тожи']->descriptions, 'four letters, eight bytes: counted in letters' );
+		$long = ( new Searcher( $this->index ) )->widen( new QueryToken( 'tigerz', 'tigerz' ), 'en' );
+		self::assertTrue( $long->matches['tiger']->descriptions, 'six letters: they count, last' );
+		self::assertFalse( ( new Searcher( $this->index ) )->widen( new QueryToken( 'kazumi', 'kazumi' ), 'en' )->matches['kazumi']->loose, 'no typo, nothing loose' );
+		$this->product( 'Body Pads', 'PAD-BOD-00005', array(), true, 1, array(), 'Soft body armour.' );
+		$pads = $this->search( 'hody', 'en', null, $synonyms );
+		self::assertContains( 'Body Pads', self::titles( $pads ), 'the loose "body" in a name still counts' );
+		self::assertNotContains( 'Light Deck', self::titles( $pads ) );
+	}
+
+	public function test_a_loose_candidate_found_only_in_a_description_ranks_last(): void {
+		$this->product( 'Plane Bag', 'BAG-PLA-00001', array(), false, 0, array() );
+		$this->product( 'Plant Tee', 'SKH-PLA-00002', array(), true, 5, array() );
+		$this->product( 'Ramp Kit', 'RMP-KIT-00003', array(), true, 900, array(), 'Every plank is birch.' );
+		$r = $this->search( 'planx' );
+		self::assertSame( 'plane', $r->corrected, 'the closest, then the most trigrams shared, then the first in order' );
+		self::assertSame( array( 'Plant Tee', 'Plane Bag', 'Ramp Kit' ), self::titles( $r ), 'the loose "plant" in a name counts; "plank" in a description only, last, its 900 sales notwithstanding' );
+		self::assertFalse( $r->products[0]->score->looseOnly );
+		self::assertFalse( $r->products[1]->score->looseOnly );
+		self::assertTrue( $r->products[2]->score->looseOnly );
+		self::assertSame( array( 'Plant Tee', 'Plane Bag', 'Ramp Kit' ), self::titles( $this->search( 'planx', 'en', new SearchOptions( inStockFirst: true ) ) ), 'in stock first keeps the loose match last, behind a sold-out name match' );
+
+		$doc   = static fn( int $id ): Document => new Document( $id, Document::PRODUCT, $id, 'en', 'x', 'x', array(), true, true, 0, 0, 0 );
+		$loose = new Hit( $doc( 1 ), new Score( array(), 50.0, looseOnly: true ) );
+		$firm  = new Hit( $doc( 2 ), new Score( array(), 1.0 ) );
+		self::assertSame( 1, Hit::compare( $loose, $firm ), 'whatever its score' );
+		self::assertSame( -1, Hit::compare( $firm, $loose ) );
+		self::assertSame( 1, Hit::stockFirst( $loose, $firm ) );
+		self::assertSame( -1, Hit::stockFirst( $firm, $loose ) );
 	}
 
 	public function test_and_across_tokens_then_the_least_matched_token_is_dropped_once(): void {

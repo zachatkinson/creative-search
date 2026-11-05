@@ -36,6 +36,7 @@ final class Ranker {
 	 * @return Hit[] In rank order, at most the plan's limit.
 	 */
 	public function rank( RankPlan $plan, array $postings, callable $documents ): array {
+		$postings  = self::withoutDescriptions( $plan, $postings );
 		$widenings = array();
 		foreach ( $plan->tokens as $i => $matches ) {
 			$widenings[ $i ] = new TokenWidening( $matches, array_intersect_key( $postings, $matches ), array() );
@@ -59,6 +60,33 @@ final class Ranker {
 		}
 		usort( $hits, array( Hit::class, $plan->inStockFirst ? 'stockFirst' : 'compare' ) );
 		return array_slice( $hits, 0, $plan->limit );
+	}
+
+	/**
+	 * The postings without the description fields of the terms whose descriptions don't count (D-146): a loose typo
+	 * candidate of a short word; a product left with none of the term's postings is not reached by it.
+	 *
+	 * @param RankPlan                                                     $plan     The plan.
+	 * @param array<string, array<int, array<int, array{0: int, 1: int}>>> $postings Term to document to field to (tf, first position).
+	 * @return array<string, array<int, array<int, array{0: int, 1: int}>>>
+	 */
+	private static function withoutDescriptions( RankPlan $plan, array $postings ): array {
+		foreach ( $plan->tokens as $matches ) {
+			foreach ( $matches as $match ) {
+				if ( $match->descriptions || ! isset( $postings[ $match->term ] ) ) {
+					continue;
+				}
+				$kept = array();
+				foreach ( $postings[ $match->term ] as $doc => $byField ) {
+					$byField = array_diff_key( $byField, array_flip( Fields::DESCRIPTIONS ) );
+					if ( array() !== $byField ) {
+						$kept[ $doc ] = $byField;
+					}
+				}
+				$postings[ $match->term ] = $kept;
+			}
+		}
+		return $postings;
 	}
 
 	/**

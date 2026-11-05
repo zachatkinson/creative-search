@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Fixed
+- A misspelling finds what the word it is read as finds: "hody", read as "hoody", finds every hoodie and sweater through the word's stem and the owner's synonyms (D-146).
+- Other typo candidates found only in a description rank after every other product, and for words of four letters or fewer don't count there at all; when the panel shows a page named for the search, products that only mention its words in their description stay out of the panel (D-146).
 - "See all" in the panel counts what the page it opens lists: when a size in the query becomes the shop's filter ("8.25 deck" opens Decks in 8.25″), the count is the filtered page's, not every product the words find (D-145).
 
 ## [1.6.2] - 2026-11-03

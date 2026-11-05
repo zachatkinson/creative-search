@@ -92,13 +92,18 @@ final class Suggestions {
 					$shown[] = $hit->document->objectId;
 				}
 			}
+			$content   = $this->search->content( $query, $lang, 'suggest' );
+			$described = self::described( $result, $pinned );
+			// A page the shopper asked for by name (D-143): a product some word reaches only in its description is a
+			// weaker answer than the page, and stays out of the panel (D-146). The results page still lists it.
+			$listed = array() === $content ? $products : array_values( array_filter( $products, static fn( Document $d ): bool => ! isset( $described[ $d->id ] ) ) );
 			$answer = array(
 				'queries'   => $this->queries->for( $query, $lang ),
-				'products'  => $this->products( array_slice( $products, 0, $limit ), $result, $pinned ),
+				'products'  => $this->products( array_slice( $listed, 0, $limit ), $result, $described ),
 				// A panel already limited to a category offers no other category to search within (D-113, D-117).
 				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here ) : array(),
 				'terms'     => $this->terms( $result->terms ),
-				'content'   => $this->search->content( $query, $lang, 'suggest' ),
+				'content'   => $content,
 				'total'     => $this->total( $query, $lang, count( $products ), $within ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
@@ -125,6 +130,24 @@ final class Suggestions {
 	}
 
 	/**
+	 * The products some searched word reached only in their description (D-142), by document id; a pinned product
+	 * never is one, so it keeps its place (D-143).
+	 *
+	 * @param SearchResult         $result The search.
+	 * @param array<int, Document> $pinned The owner's pinned products, by product id.
+	 * @return array<int, true>
+	 */
+	private static function described( SearchResult $result, array $pinned ): array {
+		$only = array();
+		foreach ( $result->products as $hit ) {
+			if ( $hit->score->descriptionOnly && ! isset( $pinned[ $hit->document->objectId ] ) ) {
+				$only[ $hit->document->id ] = true;
+			}
+		}
+		return $only;
+	}
+
+	/**
 	 * The ranked products' documents with the owner's pinned products first, in the pins' order (D-110): a pinned
 	 * product that is ranked moves up, one that is not is added.
 	 *
@@ -145,23 +168,17 @@ final class Suggestions {
 	 * Product rows: a variation the query named shows its own image and opens with it chosen (D-104), and a match
 	 * the row does not show says what it was (D-105).
 	 *
-	 * @param Document[]           $documents Products, in order.
-	 * @param SearchResult         $result    The search they came from.
-	 * @param array<int, Document> $pinned    The owner's pinned products, by product id: never `described`, so they keep their place (D-143).
+	 * @param Document[]       $documents Products, in order.
+	 * @param SearchResult     $result    The search they came from.
+	 * @param array<int, true> $only      The products found only by their description, by document id ({@see described()}).
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function products( array $documents, SearchResult $result, array $pinned = array() ): array {
+	private function products( array $documents, SearchResult $result, array $only ): array {
 		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
 		$rows    = $this->search->index()->rows( $ids );
 		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
 		$cart    = Settings::isOn( 'suggest_cart' );
-		$only    = array();
-		foreach ( $result->products as $hit ) {
-			if ( $hit->score->descriptionOnly && ! isset( $pinned[ $hit->document->objectId ] ) ) {
-				$only[ $hit->document->id ] = true;
-			}
-		}
-		$out = array();
+		$out     = array();
 		foreach ( $documents as $document ) {
 			$row = $rows[ $document->id ] ?? null;
 			if ( null === $row ) {

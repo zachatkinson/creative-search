@@ -44,9 +44,11 @@ final class Scorer {
 		$tokens  = array();
 		$fields  = array();
 		$only    = false;
+		$loose   = false;
 		foreach ( $widenings as $i => $widening ) {
 			$best  = null;
 			$named = false;
+			$firm  = false;
 			foreach ( $widening->postingsIn( $document->id, true ) as $term => $byField ) {
 				$match = $widening->matches[ $term ];
 				$term  = (string) $term;
@@ -67,11 +69,13 @@ final class Scorer {
 					}
 					$fields[ $field ][ $i ] = min( $fields[ $field ][ $i ] ?? PHP_INT_MAX, $position );
 					$named                  = $named || ! in_array( $field, Fields::DESCRIPTIONS, true );
+					$firm                   = $firm || $match->firmIn( $field );
 				}
 			}
 			if ( null !== $best ) {
 				$tokens[ $i ] = $best;
 				$only         = $only || ! $named;
+				$loose        = $loose || ! $firm;
 			}
 		}
 		$owner = $document->boost;
@@ -84,7 +88,8 @@ final class Scorer {
 			( in_array( $document->nameKey, $plan->nameKeys(), true ) ? self::EXACT_NAME : 0.0 ) + ( in_array( $plan->key, $document->skuKeys, true ) ? self::EXACT_SKU : 0.0 ),
 			$document->inStock ? 0.0 : self::SOLD_OUT,
 			(float) $owner,
-			descriptionOnly: $only
+			descriptionOnly: $only,
+			looseOnly: $loose
 		);
 	}
 
