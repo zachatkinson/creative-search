@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- CI spends fewer minutes: a version tag publishes once CI has passed on the commit's push to main instead of running it again, the 10,000-product catalogue is cached between runs (the reindex and every budget still run), the oldest-versions leg runs two browser projects, Infection on a pull request mutates only its changed lines, and changes to the docs alone run nothing (D-148).
+
 ### Fixed
 - The update details window no longer warns that the plugin hasn't been tested with a maintenance release of the WordPress version it was tested with ("Tested up to: 7.1" on 7.1.4) (D-149).
 - A misspelling finds what the word it is read as finds: "hody", read as "hoody", finds every hoodie and sweater through the word's stem and the owner's synonyms (D-146).

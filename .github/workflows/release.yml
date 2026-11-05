@@ -1,14 +1,24 @@
 # On a version tag (v1.6.1), once CI passes on it: build the zip, write its manifest, and publish both to the public releases repo that
 # client sites check for updates (Updates\Updater). Needs a RELEASES_TOKEN secret: a fine-grained token with
 # Contents read and write on zachatkinson/creative-releases only.
+#
+# CI is not run again for the tag (D-148): the tagged commit is the merge on main, whose push already ran every CI
+# job. A tag pushed after that run passed publishes at once; a tag pushed while it runs publishes when it passes
+# (the workflow_run trigger); a tag on a commit whose CI failed, or that CI never ran on, fails here and says so.
+# Publishing is skipped when the release already exists, so the two triggers never publish twice.
 name: Release
 
 on:
   push:
     tags: ['v*.*.*']
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release
@@ -16,15 +26,57 @@ concurrency:
 
 jobs:
   # Every CI job (lint, analysis, gates, unit, mutation, the integration and browser matrix, Plugin Check, the
-  # budgets) on the tagged commit; nothing is published unless they all pass.
+  # budgets) passed on the tagged commit's push to main; nothing is published otherwise.
   ci:
-    uses: ./.github/workflows/ci.yml
+    name: CI passed on the tagged commit
+    if: github.event_name == 'push' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.gate.outputs.publish }}
+      sha: ${{ steps.gate.outputs.sha }}
+      tag: ${{ steps.gate.outputs.tag }}
+    steps:
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            sha="$RUN_SHA"
+            tag="$(gh api "repos/${GITHUB_REPOSITORY}/tags?per_page=100" --jq "[.[] | select(.commit.sha == \"${sha}\") | .name | select(test(\"^v[0-9]+[.][0-9]+[.][0-9]+$\"))] | first // empty")"
+            if [ -z "$tag" ]; then
+              echo "CI passed on ${sha}, which has no version tag yet: its tag's push will publish it."
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            sha="$GITHUB_SHA"
+            tag="$GITHUB_REF_NAME"
+            run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${sha}&event=push&branch=main&per_page=1" --jq '.workflow_runs[0] // {} | "\(.status // "none") \(.conclusion // "")"')"
+            case "$run" in
+              "completed success") ;;
+              "none"*)
+                echo "::error::CI never ran on ${sha} as a push to main. Tag the merge commit on main, after its CI has run."
+                exit 1 ;;
+              "completed "*)
+                echo "::error::CI on ${sha} ended ${run#completed }. Fix it on main and tag the new commit."
+                exit 1 ;;
+              *)
+                echo "::notice::CI on ${sha} is still running (${run}); ${tag} publishes when it passes."
+                echo "publish=false" >> "$GITHUB_OUTPUT"
+                exit 0 ;;
+            esac
+          fi
+          printf 'publish=true\nsha=%s\ntag=%s\n' "$sha" "$tag" >> "$GITHUB_OUTPUT"
 
   release:
     needs: ci
+    if: needs.ci.outputs.publish == 'true'
     runs-on: ubuntu-latest
     env:
       RELEASES_REPO: zachatkinson/creative-releases
+      TAG: ${{ needs.ci.outputs.tag }}
     steps:
       - name: Check RELEASES_TOKEN can write to the releases repo
         env:
@@ -34,6 +86,8 @@ jobs:
           push="$(gh api "repos/${RELEASES_REPO}" --jq .permissions.push)" || { echo "RELEASES_TOKEN can't read ${RELEASES_REPO} (expired, or not given that repo)."; exit 1; }
           test "$push" = "true" || { echo "RELEASES_TOKEN can't write to ${RELEASES_REPO}: give it Contents read and write."; exit 1; }
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.ci.outputs.sha }}
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
@@ -42,19 +96,32 @@ jobs:
       - name: Check the tag matches the plugin version
         run: |
           version="$(grep -E '^ \* Version:' creative-search.php | awk '{print $3}')"
-          test "v${version}" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} is not v${version}"; exit 1; }
+          test "v${version}" = "${TAG}" || { echo "Tag ${TAG} is not v${version}"; exit 1; }
           echo "VERSION=${version}" >> "$GITHUB_ENV"
+      - name: Skip a release already published
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          if gh release view "creative-search-${VERSION}" --repo "$RELEASES_REPO" > /dev/null 2>&1; then
+            echo "creative-search-${VERSION} is already published."
+            echo "PUBLISHED=yes" >> "$GITHUB_ENV"
+          fi
       - uses: actions/setup-node@v4
+        if: env.PUBLISHED != 'yes'
         with:
           node-version-file: .nvmrc
           cache: npm
       # The zip carries the built blocks (build/), so the scripts are installed and built first.
       - run: npm ci
+        if: env.PUBLISHED != 'yes'
       - name: Build
+        if: env.PUBLISHED != 'yes'
         run: bash tools/build-zip.sh
       - name: Write the manifest
+        if: env.PUBLISHED != 'yes'
         run: php tools/release-manifest.php "tmp/creative-search-${VERSION}.zip" > tmp/info.json
       - name: Publish the release
+        if: env.PUBLISHED != 'yes'
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
@@ -62,6 +129,7 @@ jobs:
           gh release create "$tag" "tmp/creative-search-${VERSION}.zip" --repo "$RELEASES_REPO" --title "Creative Search ${VERSION}" \
             --notes "$(php -r '$m = json_decode(file_get_contents("tmp/info.json"), true); echo "- " . implode("\n- ", $m["changelog"]);')"
       - name: Point info.json at it
+        if: env.PUBLISHED != 'yes'
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
