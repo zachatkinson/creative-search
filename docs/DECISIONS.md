@@ -1116,3 +1116,14 @@ The sibling plugins use the same `Updater`; the brief carries this fix to each o
 
 **Why:** a check that can be skipped by timing is not a check; refusing costs the owner one "Check again".
 
+
+### D-145 · "See all" counts what the page it opens lists · 2026-11-04
+
+1.6.3 brief, item 1. "8.25 deck" showed "See all 122 results" and opened Decks filtered to Width 8.25″, which lists 88: a size becomes the shop's filter only on the way to the page (D-101, D-102), and the panel counted the search for every word, the size as a word (Skatehouse's decks name the widths they come in, in the description).
+
+1. **One reading of where a query lands.** `Search\Destination` holds what `Results\QueryRouter::route()` worked out (the owner's redirect, pins, the filters, the category, a search kept to a category, and the count the page lists); the router asks it and still logs, sets the target and leaves the page. The `csearch_query_filters` and `csearch_category_redirect` filters now also run for the panel.
+2. **The panel's total.** When the query names a value of an attribute the shop filters by, `total` in `/suggest` is the landing page's count (the filtered category, the other words' products in the filter, or the shop in the filter; the same `WP_Query` the log already used). Any other query keeps the number of products the panel's search found, as in 1.6.2, including a category without a size ("wheels" still counts its search, not the category's products) and the owner's redirects.
+3. **Cost.** A query that names no filter costs its parse (the options it reads are autoloaded); one that does costs the landing's search and one counting query, once per cached panel answer. `category_redirect` and `filter_attributes` join the panel's cache key.
+4. **`Suggestions::answer()`** takes the category it is kept to (the API's `cat`) as a term instead of its term-taxonomy ids, so the landing for a search kept to a category is the one the results page would use.
+
+**Why:** a number that changes between the panel and the page reads as a mistake; the panel should promise what the page delivers.

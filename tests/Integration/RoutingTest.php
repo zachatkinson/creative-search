@@ -16,6 +16,8 @@ use CreativeBranding\Search\Results\ProductSearch;
 use CreativeBranding\Search\Results\QueryRouter;
 use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Search\SearchLog;
+use CreativeBranding\Search\Search\SearchService;
+use CreativeBranding\Search\Search\Suggestions;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Options;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
@@ -281,6 +283,39 @@ final class RoutingTest extends IndexTestCase {
 			)
 		);
 		self::assertCount( 4, $log->pending(), 'the page landed on is not logged again' );
+	}
+
+	public function test_see_all_counts_what_the_page_it_opens_lists(): void {
+		$log    = $this->service( SearchLog::class );
+		$panel  = fn( string $q ): int => (int) $this->service( Suggestions::class )->answer( $q, 'en', 6 )['total'];
+		$landed = function ( string $q ) use ( $log ): int {
+			$log->clear();
+			self::assertNotNull( $this->target( $q ), $q . ' is sent on' );
+			return (int) array_column( $log->pending(), 'results' )[0];
+		};
+		// Skatehouse's decks name every width they come in, in the description: the search for every word finds a deck
+		// the filter leaves out.
+		$wide = new WC_Product_Simple();
+		$wide->set_name( 'Wide Deck' );
+		$wide->set_regular_price( '60' );
+		$wide->set_description( 'Also comes in 8.75 and 9.' );
+		$wide->set_category_ids( array( $this->catalogue->term( 'product_cat', 'Decks', 0, 'decks' ) ) );
+		$wide->save();
+		$this->runQueue();
+		$ranked = fn( string $q ): int => count( $this->service( SearchService::class )->rankedIds( $q, 'en', '' )['ids'] );
+		self::assertGreaterThan( 1, $ranked( '8.75 deck' ), 'the search for every word finds more decks than 8.75 holds' );
+		self::assertSame( 1, $panel( '8.75 deck' ), 'Decks in 8.75, not every deck (D-145)' );
+		self::assertSame( $landed( '8.75 deck' ), $panel( '8.75 deck' ), 'a category and a size' );
+		self::assertSame( 1, $panel( 'philly 8.75' ) );
+		self::assertSame( $landed( 'philly 8.75' ), $panel( 'philly 8.75' ), 'a brand and a size' );
+		self::assertSame( $landed( '8.25' ), $panel( '8.25' ), 'a size alone: the shop in that size' );
+
+		self::assertSame( $ranked( 'kazumi' ), $panel( 'kazumi' ), 'no size: what the search found, as in 1.6.2' );
+		self::assertSame( $ranked( 'wheels' ), $panel( 'wheels' ), 'a category without a size: as in 1.6.2' );
+		self::assertSame( $ranked( 'kazumi 7.25' ), $panel( 'kazumi 7.25' ), 'a size no term has stays a word' );
+		Settings::set( 'filter_attributes', array() );
+		$this->service( AttributeTerms::class )->rebuild();
+		self::assertSame( $ranked( '8.75 deck' ), $panel( '8.75 deck' ), 'no attribute filtered by: what the search found' );
 	}
 
 	public function test_the_attribute_values_follow_the_terms(): void {

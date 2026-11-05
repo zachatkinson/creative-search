@@ -90,7 +90,7 @@ final class SuggestRoute implements Route {
 		$query = SearchService::clean( Cast::str( $request->get_param( 'q' ) ) );
 		$lang  = $this->search->language( Args::langOf( $request ) );
 		$limit = Cast::int( $request->get_param( 'limit' ), Settings::LIMIT_DEFAULT );
-		$scope = CategoryScope::ttIds( CategoryScope::bySlug( Cast::str( $request->get_param( 'cat' ) ) ) );
+		$scope = CategoryScope::bySlug( Cast::str( $request->get_param( 'cat' ) ) );
 		$here  = CategoryScope::bySlug( Cast::str( $request->get_param( 'here' ) ) );
 		return Responses::cacheable(
 			$request,

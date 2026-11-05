@@ -392,7 +392,7 @@ A "Search" box in the post and page editors ("Exclude from search", nonce `csear
 - **Since:** 1.2.0
 - **Signature:** `apply_filters( 'csearch_query_filters', array $filters, string $query ): array`
 - **What it does:** the shop filters a results-page query names (D-101), attribute taxonomy to term slugs (`array( 'pa_width' => array( '8-25' ) )`), read from the attributes ticked under Tools → Results page. Return an empty array to search those words instead; add an entry to filter by a value the plugin did not read. Only attribute taxonomies that exist are kept. A word whose filter is removed is searched again.
-- **Where it runs:** `Search\QueryRoutes::route()`, from `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), for the main product search on its first page.
+- **Where it runs:** `Search\QueryRoutes::route()`, from `Search\Destination`: `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), for the main product search on its first page, and the panel's answer, for its "See all" count (D-145).
 - **Example:**
 
 ```php
@@ -405,7 +405,7 @@ add_filter( 'csearch_query_filters', static fn( array $filters ): array => array
 - **Since:** 1.2.0
 - **Signature:** `apply_filters( 'csearch_category_redirect', ?WP_Term $term, string $query ): ?WP_Term`
 - **What it does:** the category a results-page query opens (D-102): the one category with products whose name the query reads as, when no product is named exactly as the query reads and `category_redirect` is on; null otherwise. Return null to show the results; return another `product_cat` term to open it instead.
-- **Where it runs:** `Results\QueryRouter::route()`, on `pre_get_posts` (priority 4). The shopper is sent there on `template_redirect` (priority 5, a 302), before WooCommerce's own single-result redirect.
+- **Where it runs:** `Search\Destination`, called by `Results\QueryRouter::route()` on `pre_get_posts` (priority 4) and, since 1.6.3, by the panel's answer when a size in the query becomes a filter (D-145). The shopper is sent there on `template_redirect` (priority 5, a 302), before WooCommerce's own single-result redirect.
 - **Example:**
 
 ```php
@@ -426,7 +426,7 @@ add_filter( 'csearch_category_redirect', static fn( ?WP_Term $term, string $quer
 - **Since:** 1.3.0
 - **Signature:** `apply_filters( 'csearch_query_redirect', ?string $url, string $words, string $lang ): ?string`
 - **What it does:** where a results-page search goes instead of the results (D-108): the owner's redirect for the query's words in its language, or null. Return an address to send it there, null to show the results. The address must be on this site: it goes through `wp_validate_redirect()` after the filter, and one that fails is ignored.
-- **Where it runs:** `Search\OwnerRules::redirect()`, called by `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), before the filters and categories of D-101 and D-102.
+- **Where it runs:** `Search\OwnerRules::redirect()`, called by `Search\Destination` (from `Results\QueryRouter::route()` on `pre_get_posts`, priority 4, and from the panel's answer), before the filters and categories of D-101 and D-102.
 - **Example:**
 
 ```php
@@ -439,7 +439,7 @@ add_filter( 'csearch_query_redirect', static fn( ?string $url, string $words ): 
 - **Since:** 1.3.0
 - **Signature:** `apply_filters( 'csearch_pinned_products', int[] $ids, string $words, string $lang ): int[]`
 - **What it does:** the products shown first for a search, in order (D-110): the owner's pins for the query's words in its language, or none. At most five are used; a product that is not published, is hidden from search or has no document in the language is still left out.
-- **Where it runs:** `Search\OwnerRules::pins()`, called by `SearchService::rankedIds()` (results page and `/search`), `Suggestions` (the panel) and `Results\QueryRouter` (a pinned search is not routed).
+- **Where it runs:** `Search\OwnerRules::pins()`, called by `SearchService::rankedIds()` (results page and `/search`), `Suggestions` (the panel) and `Search\Destination` (a pinned search is not routed, and its "See all" counts what the panel found).
 - **Example:**
 
 ```php

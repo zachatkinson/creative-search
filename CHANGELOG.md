@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- "See all" in the panel counts what the page it opens lists: when a size in the query becomes the shop's filter ("8.25 deck" opens Decks in 8.25″), the count is the filtered page's, not every product the words find (D-145).
+
 ## [1.6.2] - 2026-11-03
 
 Names before descriptions, the page asked for, and only checked packages installed, from the 3 November check of 1.6.1 on the demo.

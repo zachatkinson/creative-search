@@ -12,6 +12,7 @@ namespace CreativeBranding\Search\Search;
 use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\SearchResult;
+use CreativeBranding\Search\Results\CategoryScope;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use WP_Term;
@@ -41,8 +42,9 @@ final class Suggestions {
 	 * @param MatchDetails     $matches The variation a query named and why each product matched (D-104, D-105).
 	 * @param QuerySuggestions $queries Suggested searches.
 	 * @param CategoryScopes   $scopes  The categories to search within.
+	 * @param Destination      $lands   Where the search lands, for the "See all" count (D-145).
 	 */
-	public function __construct( private SearchService $search, private Cache $cache, private MatchDetails $matches, private QuerySuggestions $queries, private CategoryScopes $scopes ) {
+	public function __construct( private SearchService $search, private Cache $cache, private MatchDetails $matches, private QuerySuggestions $queries, private CategoryScopes $scopes, private Destination $lands ) {
 	}
 
 	/**
@@ -51,12 +53,13 @@ final class Suggestions {
 	 * @param string       $raw   Query as received.
 	 * @param string|null  $lang  Language asked for.
 	 * @param int          $limit Products, 1 to 10.
-	 * @param int[]        $scope Products of these term-taxonomy ids only (the API's `cat`, D-117).
-	 * @param WP_Term|null $here  The category the shopper is in, offered first among the scopes (D-130).
+	 * @param WP_Term|null $within Products of this category and its subcategories only (the API's `cat`, D-117).
+	 * @param WP_Term|null $here   The category the shopper is in, offered first among the scopes (D-130).
 	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
 	 *                      `total`, `query`, `corrected`, `lang`.
 	 */
-	public function answer( string $raw, ?string $lang, int $limit, array $scope = array(), ?WP_Term $here = null ): array {
+	public function answer( string $raw, ?string $lang, int $limit, ?WP_Term $within = null, ?WP_Term $here = null ): array {
+		$scope = CategoryScope::ttIds( $within );
 		$query = SearchService::clean( $raw );
 		$lang  = $this->search->language( $lang );
 		$limit = max( Settings::LIMIT_MIN, min( Settings::LIMIT_MAX, $limit ) );
@@ -76,7 +79,7 @@ final class Suggestions {
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
 		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, get_locale() ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale() ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
 			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
@@ -96,7 +99,7 @@ final class Suggestions {
 				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here ) : array(),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $this->search->content( $query, $lang, 'suggest' ),
-				'total'     => count( $products ),
+				'total'     => $this->total( $query, $lang, count( $products ), $within ),
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
@@ -105,6 +108,20 @@ final class Suggestions {
 		}
 		$this->search->log()->record( $query, $lang, Cast::int( $answer['total'] ?? 0 ), 'suggest' );
 		return $answer;
+	}
+
+	/**
+	 * The number "See all" shows: what the page it opens lists. A size or other value the shop filters by becomes
+	 * that filter on the way to the page (D-101, D-102), so the page lists fewer than the panel's search found and
+	 * the count is the page's (D-145); any other query lists what the panel found.
+	 *
+	 * @param string       $query  Clean query.
+	 * @param string       $lang   Checked language.
+	 * @param int          $found  The products the panel's search found.
+	 * @param WP_Term|null $within The category the search is kept to, or null.
+	 */
+	private function total( string $query, string $lang, int $found, ?WP_Term $within ): int {
+		return $this->lands->filteredCount( $query, $lang, $within ) ?? $found;
 	}
 
 	/**
