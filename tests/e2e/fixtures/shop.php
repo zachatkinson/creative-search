@@ -101,6 +101,11 @@ if ( array( 'pa_width' ) !== Settings::get( 'filter_attributes' ) ) {
 	Settings::set( 'filter_attributes', array( 'pa_width' ) );
 }
 
+// A width the shop's decks don't come in: "9.5 decks" leaves it out and says so (D-154, D-155).
+if ( taxonomy_exists( 'pa_width' ) && ! term_exists( '9-5', 'pa_width' ) ) {
+	wp_insert_term( '9.5', 'pa_width', array( 'slug' => '9-5' ) );
+}
+
 // A variable grip in three designs, two with their own photo (D-104: "mumber fur fire" shows the Fire design).
 $csearch_grip_new = false;
 if ( ! wc_get_product_id_by_sku( 'MUM-FUR' ) && is_string( $csearch_file ) && file_exists( $csearch_file ) ) {

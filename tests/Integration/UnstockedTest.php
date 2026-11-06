@@ -32,7 +32,8 @@ use WP_Query;
  * left out, the page says so with the closest widths in stock, and the search is logged as finding nothing.
  *
  * Decks here: Alpha in 7.75 (sold out), 8.0, 8.25 and 9.0 (sold out), Mellow concave; Bravo in 8.25, 8.5 (sold
- * out), 8.75 and 9.0 (sold out), Steep concave. In stock in Decks: 8.0, 8.25 and 8.75.
+ * out), 8.75 and 9.0 (sold out), Steep concave; Charlie in 8.25 (sold out) and 8.75, Flat concave. In stock in
+ * Decks: 8.0, 8.25 and 8.75.
  */
 final class UnstockedTest extends IndexTestCase {
 
@@ -48,12 +49,18 @@ final class UnstockedTest extends IndexTestCase {
 		$decks = $this->catalogue->term( 'product_cat', 'Decks', 0, 'decks' );
 		$this->deck( 'Alpha', $decks, array( '7.75' => false, '8.0' => true, '8.25' => true, '9.0' => false ), 'Mellow' );
 		$this->deck( 'Bravo', $decks, array( '8.25' => true, '8.5' => false, '8.75' => true, '9.0' => false ), 'Steep' );
+		$this->deck( 'Charlie', $decks, array( '8.25' => false, '8.75' => true ), 'Flat' );
 		update_option( 'woocommerce_attribute_lookup_enabled', 'yes' );
 		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
 		$lookup = wc_get_container()->get( LookupDataStore::class );
 		foreach ( get_posts( array( 'post_type' => 'product', 'fields' => 'ids', 'numberposts' => -1 ) ) as $product ) {
 			$lookup->create_data_for_product( (int) $product );
 		}
+		// WooCommerce reads its attribute labels once a process: the rows are made again in each test.
+		delete_transient( 'wc_attribute_taxonomies' );
+		\WC_Cache_Helper::invalidate_cache_group( 'woocommerce-attributes' );
+		$GLOBALS['wc_product_attributes']['pa_width']   = get_taxonomy( 'pa_width' );
+		$GLOBALS['wc_product_attributes']['pa_concave'] = get_taxonomy( 'pa_concave' );
 		Settings::set( 'filter_attributes', array( 'pa_width', 'pa_concave' ) );
 		$this->service( AttributeTerms::class )->rebuild();
 		$this->service( Reindex::class )->runInline();
@@ -213,7 +220,7 @@ final class UnstockedTest extends IndexTestCase {
 		self::assertSame( 'pa_width:9-0', $args[ QueryRouter::NONE_ARG ] );
 		self::assertSame( 'pa_width:8-75', $args[ QueryRouter::NEAR_ARG ], 'stock on one side only: one closest value' );
 		self::assertSame( 0, $logged, 'Analytics counts it among the searches that found nothing' );
-		self::assertSame( 2, self::decksListed() );
+		self::assertSame( 3, self::decksListed() );
 		self::assertSame( self::decksListed(), $this->panel( '9 deck' )['total'], 'See all counts Decks' );
 
 		// The page landed on.
@@ -221,8 +228,8 @@ final class UnstockedTest extends IndexTestCase {
 		self::assertSame( '9 deck', QueryRouter::from() );
 		$line = $this->service( ResultsView::class )->routedLine();
 		self::assertStringContainsString( '<p class="csearch-results-unstocked">Nothing in Width 9.0 is in stock right now.</p>', $line );
-		self::assertStringContainsString( '<p class="csearch-results-closest">Closest in stock: <a href="', $line );
-		self::assertStringContainsString( '>Width 8.75</a></p>', $line, 'the link names the attribute, so it reads alone' );
+		self::assertStringContainsString( '<p class="csearch-results-closest">Closest in stock:</p><ul class="csearch-results-closest-list"><li><a href="', $line );
+		self::assertStringContainsString( '>Width 8.75</a></li></ul>', $line, 'the link names the attribute, so it reads alone' );
 		self::assertStringContainsString( 'Showing Decks.', $line, 'the D-102 line follows' );
 		self::assertLessThan( strpos( $line, 'Showing Decks.' ), strpos( $line, 'Nothing in' ) );
 
@@ -244,7 +251,7 @@ final class UnstockedTest extends IndexTestCase {
 		[ $target ] = $this->send( '8.5 deck' );
 		self::assertSame( 'pa_width:8-25,pa_width:8-75', self::args( $target )[ QueryRouter::NEAR_ARG ], 'lower first' );
 		$this->visit( $target );
-		self::assertMatchesRegularExpression( '/Closest in stock: <a href="[^"]+">Width 8.25<\/a> or <a href="[^"]+">Width 8.75<\/a>/', $this->service( ResultsView::class )->routedLine() );
+		self::assertMatchesRegularExpression( '/Closest in stock:<\/p><ul class="csearch-results-closest-list"><li><a href="[^"]+">Width 8.25<\/a><\/li><li><a href="[^"]+">Width 8.75<\/a><\/li><\/ul>/', $this->service( ResultsView::class )->routedLine() );
 	}
 
 	public function test_a_size_in_stock_still_filters(): void {
@@ -292,5 +299,32 @@ final class UnstockedTest extends IndexTestCase {
 		$args = self::args( $this->send( '9 deck' )[0] );
 		self::assertSame( '9-0', $args['filter_width'], 'shown when sold out: 9.0 lists the two decks, so it applies' );
 		self::assertArrayNotHasKey( QueryRouter::NONE_ARG, $args );
+	}
+
+	public function test_the_panel_says_what_the_page_says(): void {
+		$answer = $this->panel( '9 deck' );
+		self::assertSame( 'Nothing in Width 9.0 is in stock right now.', $answer['unstocked'], 'the page\'s line (D-155)' );
+		self::assertSame( 3, $answer['total'], 'See all is back, counting Decks' );
+		self::assertNotEmpty( $answer['products'] );
+		foreach ( $answer['products'] as $product ) {
+			self::assertStringNotContainsString( '9.0', (string) $product['matched'], $product['name'] . ': its 9.0 is sold out' );
+		}
+		self::assertSame( '', $this->panel( '8.25 deck' )['unstocked'] );
+		self::assertSame( '', $this->panel( 'deck' )['unstocked'], 'no value named' );
+	}
+
+	public function test_the_panel_suggests_what_the_page_lists(): void {
+		$answer = $this->panel( '8.25 deck' );
+		$names  = array_column( $answer['products'], 'name' );
+		sort( $names );
+		self::assertSame( array( 'Alpha Deck', 'Bravo Deck' ), $names, 'Charlie\'s 8.25 is sold out: Decks in 8.25 doesn\'t list it' );
+		self::assertSame( count( $names ), $answer['total'] );
+		foreach ( $answer['products'] as $product ) {
+			self::assertSame( 'Matches Width: 8.25', $product['matched'], $product['name'] . ' has 8.25 in stock' );
+		}
+		// Without the lookup table WooCommerce filters by the terms alone: Charlie is listed, and its line stays.
+		update_option( 'woocommerce_attribute_lookup_enabled', 'no' );
+		do_action( 'csearch_flush_cache' );
+		self::assertContains( 'Charlie Deck', array_column( $this->panel( '8.25 deck' )['products'], 'name' ) );
 	}
 }

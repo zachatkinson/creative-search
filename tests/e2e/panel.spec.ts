@@ -44,6 +44,32 @@ for ( const theme of [ 'twentytwentyfive', 'storefront' ] ) {
 			wp( `theme activate ${ theme }` );
 		} );
 
+		test( 'a size with nothing in stock is said in the panel and announced with the count (D-155)', async ( {
+			page,
+		} ) => {
+			await page.goto( '/search-block/' );
+			await typeInto( page, '9.5 decks' );
+			const line = page.locator( '.csearch-unstocked' );
+			await expect( line ).toHaveText(
+				'Nothing in Width 9.5 is in stock right now.'
+			);
+			// Outside the listbox: it is not an option.
+			await expect(
+				page.getByRole( 'listbox' ).locator( '.csearch-unstocked' )
+			).toHaveCount( 0 );
+			await expect( page.locator( '.csearch-live' ) ).toContainText(
+				'Nothing in Width 9.5 is in stock right now.'
+			);
+			await expect(
+				page.getByRole( 'listbox' ).locator( '.csearch-option-all' )
+			).toHaveCount( 1 );
+			await axe(
+				page,
+				`${ theme } panel nothing in stock`,
+				'.wp-block-creative-search-search'
+			);
+		} );
+
 		test( 'the whole panel stops at its cap: eight rows on a desktop, five on a phone (D-136)', async ( {
 			page,
 			isMobile,

@@ -649,10 +649,20 @@ export function budget( ctx, found ) {
 	return out;
 }
 
+/**
+ * What screen readers hear when the suggestions change: the count, then the line that says a value asked for was
+ * left out (D-155), then the corrected query.
+ *
+ * @param {Object} ctx   The block's context.
+ * @param {number} count How many suggestions are shown.
+ * @return {string} The message.
+ */
 function liveWords( ctx, count ) {
 	const words =
 		ctx.i18n.counts[ Math.min( count, ctx.i18n.counts.length - 1 ) ];
-	return ctx.corrected ? `${ words }. ${ ctx.corrected }` : words;
+	return [ words, ctx.unstocked, ctx.corrected ]
+		.filter( Boolean )
+		.join( '. ' );
 }
 
 /**
@@ -820,6 +830,7 @@ function showAnswer( ctx, data, input ) {
 		typeof data.corrected === 'string' && data.corrected
 			? fill( ctx.i18n.corrected, data.corrected )
 			: '';
+	ctx.unstocked = typeof data.unstocked === 'string' ? data.unstocked : '';
 	ctx.searching = false;
 	ctx.empty = count === 0;
 	ctx.live = liveWords( ctx, count );
@@ -843,6 +854,7 @@ function showRecent( ctx, input ) {
 	} ) );
 	ctx.rows = rows;
 	ctx.corrected = '';
+	ctx.unstocked = '';
 	ctx.searching = false;
 	ctx.empty = false;
 	ctx.live = ctx.i18n.recents[ Math.min( rows.length, RECENT ) ];
@@ -857,6 +869,7 @@ function showRecent( ctx, input ) {
 function fail( ctx ) {
 	ctx.rows = [];
 	ctx.corrected = '';
+	ctx.unstocked = '';
 	ctx.live = '';
 	closePanel( ctx );
 }
@@ -1135,6 +1148,7 @@ const { state, actions, callbacks } = store( 'creative-search/search', {
 			ctx.rows = [];
 			ctx.live = '';
 			ctx.corrected = '';
+			ctx.unstocked = '';
 			closePanel( ctx );
 			const input = document.getElementById( `${ ctx.id }-input` );
 			if ( input ) {

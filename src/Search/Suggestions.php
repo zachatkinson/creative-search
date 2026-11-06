@@ -13,6 +13,7 @@ use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Results\CategoryScope;
+use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use WP_Term;
@@ -56,7 +57,7 @@ final class Suggestions {
 	 * @param WP_Term|null $within Products of this category and its subcategories only (the API's `cat`, D-117).
 	 * @param WP_Term|null $here   The category the shopper is in, offered first among the scopes (D-130).
 	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
-	 *                      `total`, `query`, `corrected`, `lang`.
+	 *                      `total`, `query`, `corrected`, `lang`, `unstocked` (1.6.5).
 	 */
 	public function answer( string $raw, ?string $lang, int $limit, ?WP_Term $within = null, ?WP_Term $here = null ): array {
 		$scope = CategoryScope::ttIds( $within );
@@ -73,6 +74,7 @@ final class Suggestions {
 			'query'     => $query,
 			'corrected' => null,
 			'lang'      => $lang,
+			'unstocked' => '',
 		);
 		if ( '' === $query ) {
 			return $empty;
@@ -98,6 +100,11 @@ final class Suggestions {
 			// A page the shopper asked for by name (D-143): a product some word reaches only in its description is a
 			// weaker answer than the page, and stays out of the panel (D-146). The results page still lists it.
 			$listed = array() === $content ? $products : array_values( array_filter( $products, static fn( Document $d ): bool => ! isset( $described[ $d->id ] ) ) );
+			if ( null !== $landing && array() !== $landing->filters ) {
+				// The page Enter opens applies a value: the panel suggests only what that page lists (D-155).
+				$keep   = array_flip( $this->lands->lists( $landing, array_map( static fn( Document $d ): int => $d->objectId, $listed ) ) );
+				$listed = array_values( array_filter( $listed, static fn( Document $d ): bool => isset( $keep[ $d->objectId ] ) ) );
+			}
 			$answer = array(
 				'queries'   => $this->queries->for( $query, $lang ),
 				'products'  => $this->products( array_slice( $listed, 0, $limit ), $result, $described ),
@@ -112,6 +119,8 @@ final class Suggestions {
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
+				// A value asked for left out, nothing in it being in stock there: the line the page says too (D-155).
+				'unstocked' => null === $landing ? '' : ResultsView::unstockedText( $landing->unstocked ),
 				// The value asked for was left out: the search is logged as finding nothing, as the page logs it (D-154).
 				'logged'    => null === $landing ? count( $products ) : $landing->logged(),
 			);
@@ -186,7 +195,7 @@ final class Suggestions {
 	private function products( array $documents, SearchResult $result, array $only ): array {
 		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
 		$rows    = $this->search->index()->rows( $ids );
-		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
+		$details = $this->matches->of( array_combine( $ids, array_map( static fn( Document $d ): int => $d->objectId, $documents ) ), $result->tokens, $result->key, $result->lang );
 		$cart    = Settings::isOn( 'suggest_cart' );
 		$out     = array();
 		foreach ( $documents as $document ) {

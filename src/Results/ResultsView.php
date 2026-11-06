@@ -205,8 +205,8 @@ final class ResultsView {
 
 	/**
 	 * On a page a query was sent to without a value it named, nothing in it being in stock there (D-154): "Nothing
-	 * in Width 9.00″ is in stock right now.", then the closest values in stock, each a link to this page with it
-	 * applied: "Closest in stock: Width 8.75″." Empty on any other page.
+	 * in Width 9.00″ is in stock right now.", then "Closest in stock:" and the closest values in stock, each a link to
+	 * this page with it applied ("Width 8.75″"). Empty on any other page.
 	 *
 	 * @param string $from The query that sent the shopper here.
 	 */
@@ -228,15 +228,9 @@ final class ResultsView {
 		if ( array() === $links ) {
 			return $html;
 		}
-		$list = 1 === count( $links )
-			? $links[0]
-			/* translators: 1: the closest value in stock below the one asked for, 2: the closest above it */
-			: sprintf( esc_html_x( '%1$s or %2$s', 'the closest values in stock', 'creative-search' ), $links[0], $links[1] );
-		return $html . '<p class="csearch-results-closest">' . sprintf(
-			/* translators: %s: one or two links, each to a value in stock such as Width 8.75″ */
-			esc_html__( 'Closest in stock: %s', 'creative-search' ),
-			$list
-		) . '</p>';
+		// A lead line and a list, as the no-results page offers its words: a link alone in a list item reads as a link
+		// in any theme, underlined or not.
+		return $html . '<p class="csearch-results-closest">' . esc_html__( 'Closest in stock:', 'creative-search' ) . '</p><ul class="csearch-results-closest-list"><li>' . implode( '</li><li>', $links ) . '</li></ul>';
 	}
 
 	/**

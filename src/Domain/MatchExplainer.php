@@ -43,7 +43,9 @@ final class MatchExplainer {
 			$args,
 			$reason[0],
 			$reason[1],
-			$reason[2]
+			$reason[2],
+			$reason[3],
+			$reason[4]
 		);
 	}
 
@@ -97,24 +99,25 @@ final class MatchExplainer {
 	}
 
 	/**
-	 * Why the product matched: the kind, the attribute's name and the label, or three empty strings.
+	 * Why the product matched: the kind, the attribute's name, the label, and for an attribute value its key and slug;
+	 * empty strings for nothing to say.
 	 *
 	 * @param array<int, string[]> $tokens The terms each token reached.
 	 * @param string               $skuKey The query's SKU key term, or empty.
 	 * @param array<int, string[]> $fields Field id to the query's terms found there.
 	 * @param Fact[]               $facts  The facts, the named variation's first.
-	 * @return array{0: string, 1: string, 2: string}
+	 * @return array{0: string, 1: string, 2: string, 3: string, 4: string}
 	 */
 	private function reason( array $tokens, string $skuKey, array $fields, array $facts ): array {
 		$name    = $fields[ Fields::NAME ] ?? array();
 		$outside = array_filter( $tokens, static fn( array $terms ): bool => array() === array_intersect( $terms, $name ) );
 		if ( array() === $outside ) {
-			return array( '', '', '' );
+			return array( '', '', '', '', '' );
 		}
 		if ( in_array( $skuKey, $fields[ Fields::SKU ] ?? array(), true ) ) {
 			$fact = self::first( $facts, Fields::SKU, array( $skuKey ) );
 			if ( null !== $fact ) {
-				return array( MatchDetail::SKU, '', $fact->label );
+				return array( MatchDetail::SKU, '', $fact->label, '', '' );
 			}
 		}
 		$description = array_merge( $fields[ Fields::SHORT ] ?? array(), $fields[ Fields::LONG ] ?? array() );
@@ -122,17 +125,17 @@ final class MatchExplainer {
 			// A value the shopper can read ("Design: Fire") says more than the part of a SKU that holds the same word.
 			$fact = array() === array_intersect( $terms, $fields[ Fields::ATTRIBUTE ] ?? array() ) ? null : self::first( $facts, Fields::ATTRIBUTE, $terms );
 			if ( null !== $fact ) {
-				return array( MatchDetail::ATTRIBUTE, $fact->name, $fact->label );
+				return array( MatchDetail::ATTRIBUTE, $fact->name, $fact->label, $fact->attribute, $fact->value );
 			}
 			$fact = array() === array_intersect( $terms, $fields[ Fields::SKU ] ?? array() ) ? null : self::first( $facts, Fields::SKU, $terms );
 			if ( null !== $fact ) {
-				return array( MatchDetail::SKU, '', $fact->label );
+				return array( MatchDetail::SKU, '', $fact->label, '', '' );
 			}
 			if ( array() !== array_intersect( $terms, $description ) ) {
-				return array( MatchDetail::DESCRIPTION, '', '' );
+				return array( MatchDetail::DESCRIPTION, '', '', '', '' );
 			}
 		}
-		return array( '', '', '' );
+		return array( '', '', '', '', '' );
 	}
 
 	/**
