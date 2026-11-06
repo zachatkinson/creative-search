@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.4
+Stable tag: 1.6.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.6.5 =
+A size with nothing in stock where a search lands is no longer applied: the page and the suggestions say so, with the closest sizes in stock; a number becomes a size only for products that have sizes. No index rebuild is needed.
+
 = 1.6.4 =
 "See all" leaves out products whose size is sold out when the shop hides sold-out products, as the filtered page does; a misspelling no longer suggests a brand or category that only mentions a near spelling in its description. No index rebuild is needed.
 
@@ -103,6 +106,11 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.5 =
+* A size or other value in a search that has nothing in stock where the search lands is no longer applied: "9 deck" opens Decks and says "Nothing in Width 9.00″ is in stock right now.", with links to the closest widths in stock. "See all" counts that page, and Analytics still counts the search among those that found nothing.
+* The suggestions say the same, outside the list and in what screen readers hear; when the page applies a size, they suggest only products that page lists; and "Matches Width: 9.00″" shows only on a product that has 9.00″ in stock.
+* A number becomes a size only when the products the search lands on have sizes at all: "9 hoodie" opens the hoodies, not an empty page.
 
 = 1.6.4 =
 * "See all" in the suggestions counts what the filtered page lists when the shop hides sold-out products: a product whose variation in the size searched is sold out is no longer counted ("8.25 deck" on Decks in 8.25″).
