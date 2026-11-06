@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.5
+Stable tag: 1.6.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.6.6 =
+A number becomes a size only when the products that really match the search have sizes, not products that only mention its words in their descriptions; French spacing fixed before colons and inside « ». No index rebuild is needed.
+
 = 1.6.5 =
 A size with nothing in stock where a search lands is no longer applied: the page and the suggestions say so, with the closest sizes in stock; a number becomes a size only for products that have sizes. No index rebuild is needed.
 
@@ -106,6 +109,11 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.6.6 =
+* A number becomes a size filter only when the products that match by more than their description have that attribute: "9 hoodie" opens the results for the words, not hoodies filtered by a deck width because a few decks mention a hoodie.
+* A product hidden from the catalogue or from search no longer makes a number filter a page that can't list it, and a number that is part of a product's name ("cloud 9") is searched as a word when that product doesn't have the size.
+* French (Canada): a no-break space before colons and inside « » in nine strings, and a check that keeps it so.
 
 = 1.6.5 =
 * A size or other value in a search that has nothing in stock where the search lands is no longer applied: "9 deck" opens Decks and says "Nothing in Width 9.00″ is in stock right now.", with links to the closest widths in stock. "See all" counts that page, and Analytics still counts the search among those that found nothing.

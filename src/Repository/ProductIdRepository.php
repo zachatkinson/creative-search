@@ -185,8 +185,9 @@ final class ProductIdRepository extends Repository {
 	 * @param int[]|null $ids        Product ids, or null for any product.
 	 * @param int[]      $categories Term taxonomy ids of a category and its subcategories the products are in, or
 	 *                               none for any category.
+	 * @param int        $hidden     A visibility term taxonomy id whose products don't count, or 0.
 	 */
-	public function carries( string $taxonomy, ?array $ids, array $categories = array() ): bool {
+	public function carries( string $taxonomy, ?array $ids, array $categories = array(), int $hidden = 0 ): bool {
 		global $wpdb;
 		if ( array() === $ids ) {
 			return false;
@@ -198,6 +199,12 @@ final class ProductIdRepository extends Repository {
 			$args[] = $wpdb->term_relationships;
 		}
 		array_push( $args, $taxonomy, 'product', 'publish' );
-		return null !== $this->value( $this->prepare( 'SELECT 1 FROM %i p INNER JOIN %i r ON r.object_id = p.ID INNER JOIN %i tt ON tt.term_taxonomy_id = r.term_taxonomy_id' . $in . ' WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = %s' . $among . ' LIMIT 1', ...$args ) );
+		$shown = '';
+		if ( $hidden > 0 ) {
+			// A product the page doesn't list (hidden from the catalogue or from search) can't make it filter (D-157).
+			$shown = ' AND NOT EXISTS (SELECT 1 FROM %i h WHERE h.object_id = p.ID AND h.term_taxonomy_id = %d)';
+			array_push( $args, $wpdb->term_relationships, $hidden );
+		}
+		return null !== $this->value( $this->prepare( 'SELECT 1 FROM %i p INNER JOIN %i r ON r.object_id = p.ID INNER JOIN %i tt ON tt.term_taxonomy_id = r.term_taxonomy_id' . $in . ' WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = %s' . $among . $shown . ' LIMIT 1', ...$args ) );
 	}
 }
