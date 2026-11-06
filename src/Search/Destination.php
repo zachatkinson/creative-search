@@ -233,9 +233,9 @@ final class Destination {
 			// What the page lists without the filters, as WooCommerce lists it (sold-out products hidden or not).
 			$without = $this->query( $term, array(), $ids, 1 )->found_posts ?? 0;
 			if ( $without > 0 ) {
-				[ $applied, $unstocked ] = $this->leaveOut( $term, $filters, $ids );
-				$count                   = array() === $applied ? $without : $this->count( $term, $applied, $ids );
-				$taxonomy                = (string) array_key_first( $unstocked );
+				[ $applied, $unstocked, $kept ] = $this->leaveOut( $term, $filters, $ids );
+				$count                          = array() === $applied ? $without : $kept;
+				$taxonomy                       = (string) array_key_first( $unstocked );
 				// One value left out, none of its attribute kept: the closest in stock replace it on the page's links.
 				if ( ! $panel && 1 === count( $unstocked, COUNT_RECURSIVE ) - count( $unstocked ) && ! isset( $applied[ $taxonomy ] ) ) {
 					$closest = $this->closest( $term, $applied, $ids, $taxonomy, $unstocked[ $taxonomy ][0] );
@@ -252,11 +252,12 @@ final class Destination {
 	 * @param WP_Term|null            $term    The category, or null.
 	 * @param array<string, string[]> $filters Attribute taxonomy to slugs.
 	 * @param int[]|null              $ids     The other words' products, or null.
-	 * @return array{0: array<string, string[]>, 1: array<string, string[]>} The values kept, and those left out.
+	 * @return array{0: array<string, string[]>, 1: array<string, string[]>, 2: int} The values kept, those left out,
+	 *     and what the page lists with the values kept.
 	 */
 	private function leaveOut( ?WP_Term $term, array $filters, ?array $ids ): array {
 		if ( 1 === count( $filters, COUNT_RECURSIVE ) - count( $filters ) ) {
-			return array( array(), $filters ); // One value: the page already lists nothing with it.
+			return array( array(), $filters, 0 ); // One value: the page already lists nothing with it.
 		}
 		$kept = array();
 		$out  = array();
@@ -269,10 +270,11 @@ final class Destination {
 				}
 			}
 		}
-		if ( array() !== $kept && 0 === $this->count( $term, $kept, $ids ) ) {
-			return array( array(), $filters ); // What is left still lists nothing: every value goes.
+		$listed = array() === $kept ? 0 : $this->count( $term, $kept, $ids );
+		if ( 0 === $listed ) {
+			return array( array(), $filters, 0 ); // What is left still lists nothing: every value goes.
 		}
-		return array( $kept, $out );
+		return array( $kept, $out, $listed );
 	}
 
 	/**
@@ -287,11 +289,10 @@ final class Destination {
 	 * @return array<string, string[]> The attribute to its closest values, lower first; empty when there are none.
 	 */
 	private function closest( ?WP_Term $term, array $filters, ?array $ids, string $taxonomy, string $slug ): array {
-		$listed = null;
-		if ( null !== $term || null !== $ids || array() !== $filters ) {
-			$found  = $this->query( $term, $filters, $ids, -1 );
-			$listed = null === $found ? array() : Cast::ints( $found->posts );
-		}
+		// What the page lists, published, visible and (when the shop hides them) not sold out: a value only a draft or a
+		// hidden product has is no way on.
+		$found   = $this->query( $term, $filters, $ids, -1 );
+		$listed  = null === $found ? array() : Cast::ints( $found->posts );
 		$stocked = array_flip( $this->hidesSoldOut() ? $this->products->termsInStock( $taxonomy, $listed ) : $this->products->termsOf( $taxonomy, $listed ) );
 		$values  = get_terms(
 			array(

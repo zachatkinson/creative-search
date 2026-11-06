@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Creative Search 1.6.4\n"
+"Project-Id-Version: Creative Search 1.6.5\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/creative-search\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-05T23:58:50+00:00\n"
+"POT-Creation-Date: 2026-11-06T00:27:08+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: creative-search\n"
@@ -1095,7 +1095,7 @@ msgid "Find a variable product by any of its variations’ SKUs."
 msgstr ""
 
 #: src/Admin/ToolsTab.php:211
-#: src/Results/ResultsView.php:382
+#: src/Results/ResultsView.php:351
 msgid "Posts"
 msgstr ""
 
@@ -1104,7 +1104,7 @@ msgid "Search the blog’s posts too, shown apart from the products."
 msgstr ""
 
 #: src/Admin/ToolsTab.php:212
-#: src/Results/ResultsView.php:380
+#: src/Results/ResultsView.php:349
 msgid "Pages"
 msgstr ""
 
@@ -1851,7 +1851,7 @@ msgid "The product category the shopper is in: offered first as “kazumi in Dec
 msgstr ""
 
 #. translators: 1: number of products found, 2: the search query
-#: src/Results/ResultsView.php:81
+#: src/Results/ResultsView.php:82
 #, php-format
 msgid "%1$s result for “%2$s”"
 msgid_plural "%1$s results for “%2$s”"
@@ -1859,7 +1859,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: 1: number of products found, 2: the search query, 3: the category searched
-#: src/Results/ResultsView.php:87
+#: src/Results/ResultsView.php:88
 #, php-format
 msgid "%1$s result for “%2$s” in %3$s"
 msgid_plural "%1$s results for “%2$s” in %3$s"
@@ -1867,109 +1867,99 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: the query the shopper typed
-#: src/Results/ResultsView.php:100
-#: src/Results/ResultsView.php:200
+#: src/Results/ResultsView.php:101
+#: src/Results/ResultsView.php:203
 #, php-format
 msgid "Search all products for “%s”."
 msgstr ""
 
 #. translators: %s: the query the results are for, with a typo corrected
-#: src/Results/ResultsView.php:109
+#: src/Results/ResultsView.php:110
 #, php-format
 msgid "Showing results for %s"
 msgstr ""
 
 #. translators: 1: the query the results are for, 2: a link to search the shopper's words exactly
-#: src/Results/ResultsView.php:117
+#: src/Results/ResultsView.php:118
 #, php-format
 msgid "Showing results for %1$s; search instead for %2$s"
 msgstr ""
 
 #. translators: 1: a category, 2: the category it is in
-#: src/Results/ResultsView.php:154
+#: src/Results/ResultsView.php:155
 #, php-format
 msgctxt "a category and its parent"
 msgid "%1$s (%2$s)"
 msgstr ""
 
 #. translators: %s: a list of links to categories
-#: src/Results/ResultsView.php:160
+#: src/Results/ResultsView.php:161
 #, php-format
 msgid "Categories: %s"
 msgstr ""
 
 #. translators: %s: a category
-#: src/Results/ResultsView.php:180
+#: src/Results/ResultsView.php:181
 #, php-format
 msgid "Showing %s."
 msgstr ""
 
 #. translators: 1: a category, 2: the filters applied, such as "Width 8.25"
-#: src/Results/ResultsView.php:182
+#: src/Results/ResultsView.php:183
 #, php-format
 msgid "Showing %1$s with %2$s."
 msgstr ""
 
 #. translators: %s: the filters applied, such as "Width 8.25"
-#: src/Results/ResultsView.php:185
+#: src/Results/ResultsView.php:186
 #, php-format
 msgid "Showing products with %s."
 msgstr ""
 
-#: src/Results/ResultsView.php:233
+#. translators: leads a list of one or two values in stock, such as Width 8.75″
+#: src/Results/ResultsView.php:239
 msgid "Closest in stock:"
-msgstr ""
+msgid_plural "Closest in stock:"
+msgstr[0] ""
+msgstr[1] ""
 
-#. translators: %s: the values the shopper asked for, such as Width 9.00″
-#: src/Results/ResultsView.php:248
-#, php-format
-msgid "Nothing in %s is in stock right now."
-msgstr ""
-
-#. translators: 1: an attribute, such as Width, 2: its values, such as 8.25
-#: src/Results/ResultsView.php:268
-#, php-format
-msgctxt "an attribute and its values, such as Width 8.25"
-msgid "%1$s %2$s"
-msgstr ""
-
-#: src/Results/ResultsView.php:334
+#: src/Results/ResultsView.php:303
 msgctxt "the result count on search results"
 msgid "Sorted by relevance"
 msgstr ""
 
-#: src/Results/ResultsView.php:382
+#: src/Results/ResultsView.php:351
 msgid "Pages and posts"
 msgstr ""
 
-#: src/Results/ResultsView.php:391
+#: src/Results/ResultsView.php:360
 msgid "Can’t find what you need? Contact us"
 msgstr ""
 
-#: src/Results/ResultsView.php:391
+#: src/Results/ResultsView.php:360
 msgid "Need help choosing? Read our guides"
 msgstr ""
 
 #. translators: %s: the search query
-#: src/Results/ResultsView.php:477
+#: src/Results/ResultsView.php:446
 #, php-format
 msgid "No products match “%s”, but these do:"
 msgstr ""
 
-#: src/Results/ResultsView.php:488
+#: src/Results/ResultsView.php:457
 msgid "Try one of these categories:"
 msgstr ""
 
-#: src/Results/ResultsView.php:506
+#: src/Results/ResultsView.php:475
 msgid "You might like"
 msgstr ""
 
-#: src/Results/ResultsView.php:544
+#: src/Results/ResultsView.php:513
 msgid "Try one word:"
 msgstr ""
 
 #. translators: 1: a word of the shopper's query, 2: how many products it finds alone
-#: src/Results/ResultsView.php:556
+#: src/Results/ResultsView.php:525
 #, php-format
 msgid "%1$s (%2$s result)"
 msgid_plural "%1$s (%2$s results)"
@@ -1977,25 +1967,25 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: a product's or variation's SKU
-#: src/Search/MatchDetails.php:173
+#: src/Search/MatchDetails.php:197
 #, php-format
 msgid "Matches SKU %s"
 msgstr ""
 
 #. translators: %s: an attribute value, such as 8.25
-#: src/Search/MatchDetails.php:177
+#: src/Search/MatchDetails.php:201
 #, php-format
 msgid "Matches %s"
 msgstr ""
 
 #. translators: 1: an attribute's name, such as Width, 2: its value, such as 8.25
-#: src/Search/MatchDetails.php:179
+#: src/Search/MatchDetails.php:203
 #, php-format
 msgctxt "an attribute and its value"
 msgid "Matches %1$s: %2$s"
 msgstr ""
 
-#: src/Search/MatchDetails.php:181
+#: src/Search/MatchDetails.php:205
 msgid "Matches the description"
 msgstr ""
 
@@ -2015,6 +2005,19 @@ msgstr ""
 #: src/Search/OwnerRules.php:240
 #, php-format
 msgid "There are already %s rules of this kind; remove one first."
+msgstr ""
+
+#. translators: %s: the values the shopper asked for, such as Width 9.00″
+#: src/Search/ValueText.php:35
+#, php-format
+msgid "Nothing in %s is in stock right now."
+msgstr ""
+
+#. translators: 1: an attribute, such as Width, 2: its values, such as 8.25
+#: src/Search/ValueText.php:55
+#, php-format
+msgctxt "an attribute and its values, such as Width 8.25"
+msgid "%1$s %2$s"
 msgstr ""
 
 #: src/Updates/Updater.php:188

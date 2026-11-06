@@ -13,7 +13,6 @@ use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Domain\Hit;
 use CreativeBranding\Search\Domain\SearchResult;
 use CreativeBranding\Search\Results\CategoryScope;
-use CreativeBranding\Search\Results\ResultsView;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use WP_Term;
@@ -81,7 +80,7 @@ final class Suggestions {
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
 		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale() ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest2', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale(), get_option( 'woocommerce_hide_out_of_stock_items' ), get_option( 'woocommerce_attribute_lookup_enabled' ) ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
 			$landing = $this->lands->filtered( $query, $lang, $within );
@@ -120,7 +119,7 @@ final class Suggestions {
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
 				// A value asked for left out, nothing in it being in stock there: the line the page says too (D-155).
-				'unstocked' => null === $landing ? '' : ResultsView::unstockedText( $landing->unstocked ),
+				'unstocked' => null === $landing ? '' : ValueText::unstocked( $landing->unstocked ),
 				// The value asked for was left out: the search is logged as finding nothing, as the page logs it (D-154).
 				'logged'    => null === $landing ? count( $products ) : $landing->logged(),
 			);

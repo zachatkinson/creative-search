@@ -203,10 +203,12 @@ final class SkatehouseTest extends IndexTestCase {
 			self::assertSame( 0, $this->logged( $query ), $query . ' is logged as finding nothing' );
 		}
 		self::assertStringContainsString( QueryRouter::NEAR_ARG . '=pa_width%3A8-00', (string) $this->target( '7.75 deck' ), '7.75 offers 8.00 alone' );
-		self::assertDoesNotMatchRegularExpression( '/[?&]filter_/', (string) $this->target( '9 hoodie' ), 'hoodies have no width (D-156)' );
+		self::assertNull( $this->target( '9 hoodie' ), 'hoodies have no width: the results for the words (D-156)' );
+		self::assertNotEmpty( $GLOBALS['wp_query']->posts, 'and they list products' );
 		self::assertMatchesRegularExpression( '/[?&]filter_[a-z0-9_-]+=8-25(&|$)/', (string) $this->target( '8.25 deck' ), '8.25 deck as in 1.6.4' );
 		self::assertSame( 88, $this->logged( '8.25 deck' ) );
 		self::assertStringContainsString( '8-5', (string) $this->target( 'philly 8.5' ), 'philly 8.5 as in 1.6.4' );
+		self::assertGreaterThan( 0, $this->logged( 'philly 8.5' ), 'and lists Philly\'s decks in 8.50' );
 		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
 		update_option( 'woocommerce_attribute_lookup_enabled', 'no' );
 	}

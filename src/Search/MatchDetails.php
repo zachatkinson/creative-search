@@ -55,7 +55,7 @@ final class MatchDetails {
 		if ( array() === $documents || array() === $tokens ) {
 			return array();
 		}
-		$cacheKey = Cache::key( 0, 'match2', array( $documents, $tokens, $key, $lang ) );
+		$cacheKey = Cache::key( 0, 'match2', array( $documents, $tokens, $key, $lang, get_option( 'woocommerce_attribute_lookup_enabled' ) ) );
 		$cached   = $this->cache->get( $cacheKey );
 		if ( null === $cached ) {
 			$cached = array();
@@ -89,9 +89,8 @@ final class MatchDetails {
 		}
 		$terms = array(); // Document id to the term its line names.
 		foreach ( $details as $id => $detail ) {
-			$taxonomy = str_starts_with( $detail->attribute, 'attribute_pa_' ) ? substr( $detail->attribute, strlen( 'attribute_' ) ) : '';
-			$term     = MatchDetail::ATTRIBUTE === $detail->reason && '' !== $taxonomy && '' !== $detail->value ? get_term_by( 'slug', $detail->value, $taxonomy ) : false;
-			if ( $term instanceof \WP_Term ) {
+			$term = MatchDetail::ATTRIBUTE === $detail->reason ? self::term( $detail ) : null;
+			if ( null !== $term ) {
 				$terms[ $id ] = $term->term_id;
 			}
 		}
@@ -108,6 +107,31 @@ final class MatchDetails {
 			}
 		}
 		return $details;
+	}
+
+	/**
+	 * The attribute term a match line names, or null. A variation's value carries its key and slug; a value of the
+	 * product itself carries only its attribute's name and the term's name, since WooCommerce leaves sold-out
+	 * variations out of a product's visible children when it hides what is sold out, and the product's own value is
+	 * then the one matched: it is found by the attribute's label and the term's name.
+	 *
+	 * @param MatchDetail $detail The details.
+	 */
+	private static function term( MatchDetail $detail ): ?\WP_Term {
+		if ( str_starts_with( $detail->attribute, 'attribute_pa_' ) && '' !== $detail->value ) {
+			$term = get_term_by( 'slug', $detail->value, substr( $detail->attribute, strlen( 'attribute_' ) ) );
+			return $term instanceof \WP_Term ? $term : null;
+		}
+		if ( '' !== $detail->attribute || '' === $detail->name || '' === $detail->label ) {
+			return null;
+		}
+		foreach ( wc_get_attribute_taxonomies() as $attribute ) {
+			if ( $detail->name === $attribute->attribute_label ) {
+				$term = get_term_by( 'name', $detail->label, wc_attribute_taxonomy_name( $attribute->attribute_name ) );
+				return $term instanceof \WP_Term ? $term : null;
+			}
+		}
+		return null;
 	}
 
 	/**

@@ -392,7 +392,7 @@ A "Search" box in the post and page editors ("Exclude from search", nonce `csear
 - **Since:** 1.2.0
 - **Signature:** `apply_filters( 'csearch_query_filters', array $filters, string $query ): array`
 - **What it does:** the shop filters a results-page query names (D-101), attribute taxonomy to term slugs (`array( 'pa_width' => array( '8-25' ) )`), read from the attributes ticked under Tools → Results page. Return an empty array to search those words instead; add an entry to filter by a value the plugin did not read. Only attribute taxonomies that exist are kept. A word whose filter is removed is searched again.
-- **Where it runs:** `Search\QueryRoutes::route()`, from `Search\Destination`: `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), for the main product search on its first page, and the panel's answer, for its "See all" count (D-145).
+- **Where it runs:** `Search\QueryRoutes::route()`, from `Search\Destination`: `Results\QueryRouter::route()` on `pre_get_posts` (priority 4), for the main product search on its first page, and the panel's answer, for its "See all" count (D-145). Since 1.6.5 it can run more than once for one query: when no product of the page the query would land on carries an attribute, that attribute's values go back to being words and the query is read again, and the answer is cut to the attributes still carried, so a filter no product of the page could match is never applied (D-156). Values left out for having nothing in stock (D-154) are left out after this filter.
 - **Example:**
 
 ```php

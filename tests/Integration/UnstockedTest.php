@@ -48,12 +48,14 @@ final class UnstockedTest extends IndexTestCase {
 		foreach ( self::WIDTHS as $width ) {
 			$this->catalogue->term( 'pa_width', $width );
 		}
+		// The demo's configuration before the decks are made: with sold-out products hidden WooCommerce leaves sold-out
+		// variations out of a product's visible children, so the index reads the product's own values for them.
+		update_option( 'woocommerce_attribute_lookup_enabled', 'yes' );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
 		$decks = $this->catalogue->term( 'product_cat', 'Decks', 0, 'decks' );
 		$this->deck( 'Alpha', $decks, array( '7.75' => false, '8.0' => true, '8.25' => true, '9.0' => false ), 'Mellow' );
 		$this->deck( 'Bravo', $decks, array( '8.25' => true, '8.5' => false, '8.75' => true, '9.0' => false ), 'Steep' );
 		$this->deck( 'Charlie', $decks, array( '8.25' => false, '8.75' => true ), 'Flat' );
-		update_option( 'woocommerce_attribute_lookup_enabled', 'yes' );
-		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
 		$lookup = wc_get_container()->get( LookupDataStore::class );
 		foreach ( get_posts( array( 'post_type' => 'product', 'fields' => 'ids', 'numberposts' => -1 ) ) as $product ) {
 			$lookup->create_data_for_product( (int) $product );
@@ -105,8 +107,9 @@ final class UnstockedTest extends IndexTestCase {
 	 * @param int               $decks   The Decks category.
 	 * @param array<string, bool> $widths Width to in stock.
 	 * @param string            $concave Its concave.
+	 * @param string            $status  Its status.
 	 */
-	private function deck( string $name, int $decks, array $widths, string $concave ): int {
+	private function deck( string $name, int $decks, array $widths, string $concave, string $status = 'publish' ): int {
 		$width = new WC_Product_Attribute();
 		$width->set_id( WooCommerceCatalogue::ensureWidthTaxonomy() );
 		$width->set_name( 'pa_width' );
@@ -123,6 +126,7 @@ final class UnstockedTest extends IndexTestCase {
 		$deck->set_name( $name . ' Deck' );
 		$deck->set_category_ids( array( $decks ) );
 		$deck->set_attributes( array( $width, $shape ) );
+		$deck->set_status( $status );
 		$id = $deck->save();
 		foreach ( $widths as $w => $stocked ) {
 			$variation = new WC_Product_Variation();
@@ -205,6 +209,16 @@ final class UnstockedTest extends IndexTestCase {
 	}
 
 	/**
+	 * What the page a query lands on lists, as WooCommerce's own query on that page counts it.
+	 *
+	 * @param string $target The landing.
+	 */
+	private function listedAt( string $target ): int {
+		$this->visit( str_starts_with( $target, '/' ) ? untrailingslashit( home_url() ) . $target : $target );
+		return (int) $GLOBALS['wp_query']->found_posts;
+	}
+
+	/**
 	 * The panel's answer.
 	 *
 	 * @param string $words The query.
@@ -244,6 +258,35 @@ final class UnstockedTest extends IndexTestCase {
 		$closest = $this->service( ResultsView::class )->routedLine();
 		self::assertStringNotContainsString( 'Nothing in', $closest );
 		self::assertStringContainsString( 'Showing Decks with Width 8.75.', $closest );
+	}
+
+	public function test_see_all_counts_the_page_enter_opens(): void {
+		foreach ( array( '9 deck', '7.75 deck', '8.5 deck', '8.25 deck', 'steep 9 deck', 'mellow 8.75 deck', '9 inch deck' ) as $query ) {
+			[ $target ] = $this->send( $query );
+			self::assertSame( $this->listedAt( $target ), $this->panel( $query )['total'], $query );
+		}
+	}
+
+	public function test_a_value_only_a_hidden_product_has_is_no_way_on(): void {
+		// A draft deck in stock in 7.5: the shop lists it nowhere, so 7.5 isn't offered for "7.75".
+		$this->catalogue->term( 'pa_width', '7.5' );
+		$draft = $this->deck( 'Draft', $this->catalogue->term( 'product_cat', 'Decks', 0, 'decks' ), array( '7.5' => true ), 'Flat', 'draft' );
+		wc_get_container()->get( LookupDataStore::class )->create_data_for_product( $draft );
+		$args = self::args( $this->send( '7.75' )[0] );
+		self::assertSame( 'pa_width:7-75', $args[ QueryRouter::NONE_ARG ], 'the shop, without the size' );
+		self::assertSame( 'pa_width:8-0', $args[ QueryRouter::NEAR_ARG ] );
+	}
+
+	public function test_every_value_left_out_keeps_the_way_back_to_the_search(): void {
+		// "9 hoodie"-like searches that do carry a width: the landing is the search for the other words, unfiltered.
+		Settings::set( 'category_redirect', false );
+		[ $target ] = $this->send( '9 alpha' );
+		self::assertArrayNotHasKey( 'filter_width', self::args( $target ) );
+		$this->visit( $target );
+		$line = $this->service( ResultsView::class )->routedLine();
+		self::assertStringContainsString( 'Nothing in Width 9.0 is in stock right now.', $line );
+		self::assertStringContainsString( '<p class="csearch-results-routed"><a href="', $line, 'the way back, with no "Showing" lead' );
+		self::assertStringContainsString( 'Search all products for “9 alpha”.', $line );
 	}
 
 	public function test_the_smallest_size_has_one_closest_value_and_a_middle_one_two(): void {
