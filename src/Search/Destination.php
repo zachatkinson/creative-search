@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace CreativeBranding\Search\Search;
 
+use CreativeBranding\Search\Domain\Fields;
 use CreativeBranding\Search\Index\TermReader;
 use CreativeBranding\Search\Repository\ProductIdRepository;
 use CreativeBranding\Search\Results\CategoryScope;
@@ -27,11 +28,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  * out once for both the redirect ({@see QueryRouter}) and the panel's "See all" (D-145): `8.25 deck` lands on Decks
  * filtered to 8.25, so the panel counts the products that page shows, not every deck.
  *
- * A value filters only when the page's products carry its attribute at all (D-156), and a value that would leave
- * the page listing nothing, where the same page without it lists something, is left out
+ * A value filters only when the page's products carry its attribute at all (D-156), judged by the products found by
+ * more than their description (D-157), and not when its word is part of the name of a product the query finds that
+ * doesn't have the value (D-157). A value that would leave the page listing nothing, where the same page without it
+ * lists something, is left out
  * and named on the page with the closest values in stock (D-154): `9 deck` opens Decks, not an empty Decks in 9.00.
  */
 final class Destination {
+
+	/**
+	 * How many of the query's first strong matches are read for a value's word in their name (D-157).
+	 */
+	public const NAME_SCAN = 10;
 
 	/**
 	 * Constructor.
@@ -120,7 +128,16 @@ final class Destination {
 			}
 			// A value filters only products that carry its attribute (D-156): "9 hoodie" is no width of a hoodie, so the
 			// 9 stays a word, and the query is read again without it as a filter (the rest may name a category then).
-			$missing = array_values( array_filter( array_keys( $route['filters'] ), fn( string $taxonomy ): bool => ! $this->products->carries( $taxonomy, $base['ids'], CategoryScope::ttIds( $base['term'] ) ) ) );
+			// The products that carry it must be found by more than their description, when any are (D-157): three decks
+			// that mention a hoodie don't make "9" a width. And a word that is part of a product's name, on a product
+			// without the value, is that name ("cloud 9"), not the value (D-157).
+			$missing = array_values(
+				array_filter(
+					array_keys( $route['filters'] ),
+					fn( string $taxonomy ): bool => ! $this->products->carries( $taxonomy, $base['strong'], CategoryScope::ttIds( $base['term'] ), $base['hidden'] )
+						|| $this->inName( $words, $lang, $taxonomy, $route['named'][ $taxonomy ] ?? array() )
+				)
+			);
 			$kept    = array_merge( $kept, $missing );
 		} while ( array() !== $missing );
 		return $this->landing( $words, $base, $route['filters'], $panel );
@@ -134,7 +151,9 @@ final class Destination {
 	 * @param string                                                                   $lang  Its language.
 	 * @param array{filters: array<string, string[]>, rest: string, categories: int[]} $route The reading of the query.
 	 * @param WP_Term|null                                                             $scope The category the search is kept to, or null.
-	 * @return array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null}|array{categories: int[]}|null
+	 * @return array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null, strong: int[]|null, hidden: int}|array{categories: int[]}|null
+	 *     `strong`: the other words' products found by more than their description, or all of them when none is
+	 *     (D-157), null for a category or the shop; `hidden`: the visibility term the page leaves out.
 	 */
 	private function base( string $words, string $lang, array $route, ?WP_Term $scope ): ?array {
 		if ( null !== $scope ) {
@@ -147,17 +166,18 @@ final class Destination {
 		if ( null === $term && array() === $route['filters'] ) {
 			return null;
 		}
-		$args = array();
-		$ids  = null;
+		$args   = array();
+		$ids    = null;
+		$strong = null;
 		if ( null !== $term ) {
 			$base = get_term_link( $term );
 		} elseif ( '' !== $route['rest'] ) {
-			$args = array(
+			$args             = array(
 				's'         => rawurlencode( $route['rest'] ),
 				'post_type' => 'product',
 			);
-			$base = home_url( '/' );
-			$ids  = $this->search->rankedIds( $route['rest'], $lang, '' )['ids'];
+			$base             = home_url( '/' );
+			[ $ids, $strong ] = self::strong( $this->search->rankedIds( $route['rest'], $lang, '' ) );
 		} else {
 			$base = wc_get_page_permalink( 'shop' );
 		}
@@ -165,11 +185,77 @@ final class Destination {
 			return null;
 		}
 		return array(
-			'base' => $base,
-			'args' => $args,
-			'term' => $term,
-			'ids'  => $ids,
+			'base'   => $base,
+			'args'   => $args,
+			'term'   => $term,
+			'ids'    => $ids,
+			'strong' => $strong,
+			'hidden' => self::hidden( null === $ids ),
 		);
+	}
+
+	/**
+	 * A search's products, and those of them found by more than their description, or all of them when none is
+	 * (D-157).
+	 *
+	 * @param array{ids: int[], described: int[]} $ranked The search.
+	 * @return array{0: int[], 1: int[]}
+	 */
+	private static function strong( array $ranked ): array {
+		$strong = array_values( array_diff( $ranked['ids'], $ranked['described'] ) );
+		return array( $ranked['ids'], array() === $strong ? $ranked['ids'] : $strong );
+	}
+
+	/**
+	 * The visibility term a page leaves out: hidden from the catalogue on a category or the shop, hidden from search
+	 * on a search (WooCommerce's own listing does the same).
+	 *
+	 * @param bool $catalogue A category or the shop.
+	 */
+	private static function hidden( bool $catalogue ): int {
+		$visibility = wc_get_product_visibility_term_ids();
+		return Cast::int( $visibility[ $catalogue ? 'exclude-from-catalog' : 'exclude-from-search' ] ?? 0 );
+	}
+
+	/**
+	 * Whether a value's word is part of the name of one of the query's first strong matches that doesn't have the
+	 * value, sold out or not (D-157): "cloud 9" names the Cloud 9 deck, not Width 9.00, when that deck has no 9.00. A
+	 * product named with its own value ("Blue 54mm wheels" in 54mm) keeps the filter.
+	 *
+	 * @param string                  $words    The query.
+	 * @param string                  $lang     Its language.
+	 * @param string                  $taxonomy The attribute.
+	 * @param array<string, string[]> $named    Its values' slugs to the words that named them.
+	 */
+	private function inName( string $words, string $lang, string $taxonomy, array $named ): bool {
+		if ( array() === $named ) {
+			return false;
+		}
+		$ranked = $this->search->rankedIds( $words, $lang, '' );
+		$strong = array_slice( self::strong( $ranked )[1], 0, self::NAME_SCAN );
+		$docs   = array();
+		foreach ( $strong as $id ) {
+			if ( isset( $ranked['docs'][ $id ] ) ) {
+				$docs[ $ranked['docs'][ $id ] ] = $id;
+			}
+		}
+		if ( array() === $docs ) {
+			return false;
+		}
+		$fields = $this->search->index()->fieldsOf( array_keys( $docs ), array_values( array_unique( array_merge( ...array_values( $named ) ) ) ), $ranked['from'] );
+		foreach ( $fields as $doc => $field ) {
+			$inName = $field[ Fields::NAME ] ?? array();
+			foreach ( $named as $slug => $said ) {
+				if ( array() === array_intersect( $said, $inName ) ) {
+					continue;
+				}
+				$value = get_term_by( 'slug', $slug, $taxonomy );
+				if ( ! $value instanceof WP_Term || ! in_array( $value->term_id, $this->products->termsOf( $taxonomy, array( $docs[ $doc ] ) ), true ) ) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -179,24 +265,25 @@ final class Destination {
 	 * @param string                                                                   $lang  Its language.
 	 * @param array{filters: array<string, string[]>, rest: string, categories: int[]} $route The reading of the query.
 	 * @param WP_Term                                                                  $scope The category.
-	 * @return array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null}|null
+	 * @return array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null, strong: int[]|null, hidden: int}|null
 	 */
 	private function scoped( string $lang, array $route, WP_Term $scope ): ?array {
 		if ( array() === $route['filters'] ) {
 			return null;
 		}
-		$args = array();
-		$ids  = null;
-		$term = $scope;
+		$args   = array();
+		$ids    = null;
+		$strong = null;
+		$term   = $scope;
 		if ( '' !== $route['rest'] ) {
-			$args = array(
+			$args             = array(
 				's'                => rawurlencode( $route['rest'] ),
 				'post_type'        => 'product',
 				CategoryScope::ARG => $scope->slug,
 			);
-			$base = home_url( '/' );
-			$ids  = $this->search->rankedIds( $route['rest'], $lang, '', false, CategoryScope::ttIds( $scope ) )['ids'];
-			$term = null;
+			$base             = home_url( '/' );
+			[ $ids, $strong ] = self::strong( $this->search->rankedIds( $route['rest'], $lang, '', false, CategoryScope::ttIds( $scope ) ) );
+			$term             = null;
 		} else {
 			$base = get_term_link( $scope );
 		}
@@ -204,10 +291,12 @@ final class Destination {
 			return null;
 		}
 		return array(
-			'base' => $base,
-			'args' => $args,
-			'term' => $term,
-			'ids'  => $ids,
+			'base'   => $base,
+			'args'   => $args,
+			'term'   => $term,
+			'ids'    => $ids,
+			'strong' => $strong,
+			'hidden' => self::hidden( null === $ids ),
 		);
 	}
 
@@ -217,10 +306,10 @@ final class Destination {
 	 * is left still lists nothing. One value left out brings the closest values in stock either side of it, for the
 	 * page's line.
 	 *
-	 * @param string                                                                                $words   The query.
-	 * @param array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null} $base    The page before its filters.
-	 * @param array<string, string[]>                                                               $filters Attribute taxonomy to slugs.
-	 * @param bool                                                                                  $panel   For the panel: no closest values.
+	 * @param string                                                                                                                 $words   The query.
+	 * @param array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null, strong: int[]|null, hidden: int} $base    The page before its filters.
+	 * @param array<string, string[]>                                                                                                $filters Attribute taxonomy to slugs.
+	 * @param bool                                                                                                                   $panel   For the panel: no closest values.
 	 */
 	private function landing( string $words, array $base, array $filters, bool $panel ): Landing {
 		$term      = $base['term'];

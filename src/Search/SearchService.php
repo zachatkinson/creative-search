@@ -291,7 +291,8 @@ final class SearchService {
 	 * @param bool        $exact  The shopper's exact words: no token dropped ("search instead for").
 	 * @param int[]       $scope  Products of these term-taxonomy ids only: a category and its subcategories (D-117).
 	 * @param bool        $strong The strong matches only, when any (D-118): a sort other than Relevance.
-	 * @return array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string}
+	 * @return array{ids: int[], corrected: string|null, dropped: bool, query: string, lang: string, docs: array<int, int>, tokens: array<int, string[]>, key: string, from: string, described: int[]}
+	 *     `described`: the products some word reached only in their description (D-142), never a pinned one.
 	 */
 	public function rankedIds( string $raw, ?string $lang, string $source = 'page', bool $exact = false, array $scope = array(), bool $strong = false ): array {
 		$query = self::clean( $raw );
@@ -307,9 +308,10 @@ final class SearchService {
 				'tokens'    => array(),
 				'key'       => '',
 				'from'      => $lang,
+				'described' => array(),
 			);
 		}
-		$key    = Cache::key( $this->index->generation(), 'ids', array( $query, $lang, $exact, $scope, $strong, $this->settingsKey() ) );
+		$key    = Cache::key( $this->index->generation(), 'ids2', array( $query, $lang, $exact, $scope, $strong, $this->settingsKey() ) );
 		$cached = $this->cache->get( $key );
 		if ( null === $cached ) {
 			$result = $strong ? $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, false, $scope, true ), false ) : null;
@@ -317,9 +319,13 @@ final class SearchService {
 				// Nothing matches every word as typed: the sort keeps every match rather than show nothing (D-118).
 				$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact, $scope ), false );
 			}
-			$docs = array();
+			$docs      = array();
+			$described = array();
 			foreach ( $result->products as $hit ) {
 				$docs[ $hit->document->objectId ] = $hit->document->id;
+				if ( $hit->score->descriptionOnly ) {
+					$described[] = $hit->document->objectId;
+				}
 			}
 			// The owner's pinned products first, in their order (D-110). One hidden from search is left out here: the
 			// ranked query lifts WooCommerce's search exclusion (a hidden product's exact SKU may be ranked), and
@@ -333,6 +339,7 @@ final class SearchService {
 				'tokens'    => $result->tokens,
 				'key'       => $result->key,
 				'from'      => $result->lang,
+				'described' => array_values( array_diff( $described, $pins ) ),
 			);
 			$this->cache->set( $key, $cached );
 		}
@@ -350,6 +357,7 @@ final class SearchService {
 			'tokens'    => array_map( array( Cast::class, 'strings' ), is_array( $cached['tokens'] ?? null ) ? $cached['tokens'] : array() ),
 			'key'       => Cast::str( $cached['key'] ?? null ),
 			'from'      => Cast::str( $cached['from'] ?? null, $lang ),
+			'described' => Cast::ints( $cached['described'] ?? array() ),
 		);
 	}
 

@@ -56,9 +56,10 @@ final class QueryRoutes {
 	 * @param string   $lang  A checked language.
 	 * @param string[] $words Attribute taxonomies whose values stay words: the products the query lands on don't
 	 *                        carry them (D-156).
-	 * @return array{filters: array<string, string[]>, rest: string, categories: int[]} The filters by attribute
-	 *     taxonomy; the rest as a query (an empty string when the filters were all of it); the categories, with
-	 *     products, whose names the rest reads as.
+	 * @return array{filters: array<string, string[]>, rest: string, categories: int[], named: array<string, array<string, string[]>>}
+	 *     The filters by attribute taxonomy; the rest as a query (an empty string when the filters were all of it);
+	 *     the categories, with products, whose names the rest reads as; and the words that named each value applied
+	 *     (attribute taxonomy to slug to the folded words), for D-157's check of product names.
 	 */
 	public function route( string $query, string $lang, array $words = array() ): array {
 		$tokenizer = $this->analyzers->tokenizer();
@@ -91,10 +92,19 @@ final class QueryRoutes {
 		if ( Settings::isOn( 'category_redirect' ) && array() !== $rest && array() === $parsed->excluded && ! $parsed->allStopWords && array() === $parsed->phrases() ) {
 			$categories = self::listing( CategoryMatcher::match( $this->wordStems( $rest, $lang ), $this->categoryStems( $lang ) ) );
 		}
+		$named = array();
+		foreach ( $parsed->tokens as $token ) {
+			foreach ( 0 === $token->phrase ? $values[ $token->text ] ?? array() : array() as $taxonomy => $slug ) {
+				if ( in_array( $slug, $filters[ $taxonomy ] ?? array(), true ) ) {
+					$named[ $taxonomy ][ $slug ][] = $token->text;
+				}
+			}
+		}
 		return array(
 			'filters'    => $filters,
 			'rest'       => array() === $filters ? $query : self::text( $rest, $parsed->excluded ),
 			'categories' => $categories,
+			'named'      => $named,
 		);
 	}
 

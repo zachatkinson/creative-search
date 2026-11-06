@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- A number in a search becomes a size filter only when the products that match by more than their description have that attribute: "9 hoodie" no longer filters by a deck width because a few decks mention a hoodie in their descriptions, and Enter opens the results for the words, with no line in the panel or on the page (D-157).
+- A product hidden from the catalogue or from search no longer makes a number filter a page that can't list it (D-157).
+- A number that is part of the name of a product the search finds, where that product doesn't have that value ("cloud 9" for a Cloud 9 board with no 9.0 width), is searched as a word instead of filtering. Stores whose product names hold sizes the products don't carry as attribute values will see those numbers searched as words (D-157).
+
 ## [1.6.5] - 2026-11-05
 
 From the check of 1.6.4 on the demo (1.6.5 brief).
