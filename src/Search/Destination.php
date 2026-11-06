@@ -129,13 +129,13 @@ final class Destination {
 			// A value filters only products that carry its attribute (D-156): "9 hoodie" is no width of a hoodie, so the
 			// 9 stays a word, and the query is read again without it as a filter (the rest may name a category then).
 			// The products that carry it must be found by more than their description, when any are (D-157): three decks
-			// that mention a hoodie don't make "9" a width. And a word that is part of a product's name, on a product
-			// without the value, is that name ("cloud 9"), not the value (D-157).
+			// that mention a hoodie don't make "9" a width. And a number that would leave the page listing nothing and is
+			// part of the name of a product found without the value is that name ("cloud 9"), not the value (D-157).
 			$missing = array_values(
 				array_filter(
 					array_keys( $route['filters'] ),
 					fn( string $taxonomy ): bool => ! $this->products->carries( $taxonomy, $base['strong'], CategoryScope::ttIds( $base['term'] ), $base['hidden'] )
-						|| $this->inName( $words, $lang, $taxonomy, $route['named'][ $taxonomy ] ?? array() )
+						|| $this->named( $words, $lang, $scope, $base, $taxonomy, $route['filters'][ $taxonomy ], $route['named'][ $taxonomy ] ?? array() )
 				)
 			);
 			$kept    = array_merge( $kept, $missing );
@@ -218,20 +218,41 @@ final class Destination {
 	}
 
 	/**
-	 * Whether a value's word is part of the name of one of the query's first strong matches that doesn't have the
-	 * value, sold out or not (D-157): "cloud 9" names the Cloud 9 deck, not Width 9.00, when that deck has no 9.00. A
-	 * product named with its own value ("Blue 54mm wheels" in 54mm) keeps the filter.
+	 * Whether a number that names a value is the name of a product instead (D-157): only when the value would leave
+	 * the page listing nothing (D-154's case, so a filter that lists products is never dropped for a name), and the
+	 * number is part of the name of one of the query's first strong matches that doesn't have the value, sold out or
+	 * not. "cloud 9" names the Cloud 9 deck, not Width 9.00, when that deck has no 9.00; "9 boards" still opens
+	 * Boards in 9.00 when boards are listed in it, whatever their names. A product named with its own value ("54mm"
+	 * wheels in 54mm) keeps the filter.
+	 *
+	 * @param string                                                                                                                 $words    The query.
+	 * @param string                                                                                                                 $lang     Its language.
+	 * @param WP_Term|null                                                                                                           $scope    The category the search is kept to, or null.
+	 * @param array{base: string, args: array<string, string>, term: WP_Term|null, ids: int[]|null, strong: int[]|null, hidden: int} $base     The page before its filters.
+	 * @param string                                                                                                                 $taxonomy The attribute.
+	 * @param string[]                                                                                                               $slugs    Its values.
+	 * @param array<string, string[]>                                                                                                $named    Its values' slugs to the words that named them.
+	 */
+	private function named( string $words, string $lang, ?WP_Term $scope, array $base, string $taxonomy, array $slugs, array $named ): bool {
+		$named = array_filter( array_map( static fn( array $said ): array => array_values( array_filter( $said, 'is_numeric' ) ), $named ) );
+		if ( array() === $named || $this->count( $base['term'], array( $taxonomy => $slugs ), $base['ids'] ) > 0 ) {
+			return false; // No number, or the value lists something: it filters.
+		}
+		return $this->inName( $words, $lang, CategoryScope::ttIds( $scope ), $taxonomy, $named );
+	}
+
+	/**
+	 * Whether a value's word is part of the name of one of the query's first strong matches (within the category
+	 * the search is kept to) that doesn't have the value.
 	 *
 	 * @param string                  $words    The query.
 	 * @param string                  $lang     Its language.
+	 * @param int[]                   $scope    Term taxonomy ids of the category the search is kept to, or none.
 	 * @param string                  $taxonomy The attribute.
 	 * @param array<string, string[]> $named    Its values' slugs to the words that named them.
 	 */
-	private function inName( string $words, string $lang, string $taxonomy, array $named ): bool {
-		if ( array() === $named ) {
-			return false;
-		}
-		$ranked = $this->search->rankedIds( $words, $lang, '' );
+	private function inName( string $words, string $lang, array $scope, string $taxonomy, array $named ): bool {
+		$ranked = $this->search->rankedIds( $words, $lang, '', false, $scope );
 		$strong = array_slice( self::strong( $ranked )[1], 0, self::NAME_SCAN );
 		$docs   = array();
 		foreach ( $strong as $id ) {
@@ -243,14 +264,11 @@ final class Destination {
 			return false;
 		}
 		$fields = $this->search->index()->fieldsOf( array_keys( $docs ), array_values( array_unique( array_merge( ...array_values( $named ) ) ) ), $ranked['from'] );
-		foreach ( $fields as $doc => $field ) {
-			$inName = $field[ Fields::NAME ] ?? array();
-			foreach ( $named as $slug => $said ) {
-				if ( array() === array_intersect( $said, $inName ) ) {
-					continue;
-				}
-				$value = get_term_by( 'slug', $slug, $taxonomy );
-				if ( ! $value instanceof WP_Term || ! in_array( $value->term_id, $this->products->termsOf( $taxonomy, array( $docs[ $doc ] ) ), true ) ) {
+		foreach ( $named as $slug => $said ) {
+			$value = get_term_by( 'slug', $slug, $taxonomy );
+			foreach ( $fields as $doc => $field ) {
+				// One read of the product's terms per product whose name holds the word, at most NAME_SCAN.
+				if ( array() !== array_intersect( $said, $field[ Fields::NAME ] ?? array() ) && ( ! $value instanceof WP_Term || ! in_array( $value->term_id, $this->products->termsOf( $taxonomy, array( $docs[ $doc ] ) ), true ) ) ) {
 					return true;
 				}
 			}

@@ -87,6 +87,8 @@ final class StrongValueTest extends IndexTestCase {
 	public function test_strong_matches_that_carry_the_value_still_filter(): void {
 		self::assertStringContainsString( 'filter_width=8-0', (string) $this->target( '8 board' ) );
 		self::assertStringContainsString( 'filter_width=9-0', (string) $this->target( 'pro 9' ), 'a product named with a value it has keeps the filter' );
+		// Cloud 9 Board (no 9.0) is among the boards, but Boards lists boards in 9.0: the filter stays (spec review).
+		self::assertStringContainsString( 'filter_width=9-0', (string) $this->target( '9 boards' ), 'a name never drops a filter that lists products' );
 	}
 
 	public function test_a_number_in_a_product_name_is_that_name(): void {
@@ -103,10 +105,16 @@ final class StrongValueTest extends IndexTestCase {
 		// no width of the page (before, it filtered, listed nothing, and said nothing in 9.0 was in stock).
 		$hidden = $this->product( 'Pullover Gift Box', 'Apparel', 'A box.', array( 'pa_width' => array( '9.0' ) ), 'instock', 'search' );
 		$this->reindex();
-		$target = (string) $this->target( '9 apparel' );
-		self::assertStringNotContainsString( 'filter_width', $target );
-		self::assertStringNotContainsString( QueryRouter::NONE_ARG, $target, 'no line' );
+		self::assertNull( $this->target( '9 apparel' ), 'the results for the words: no width filter, no line' );
 		wp_delete_post( $hidden, true );
+	}
+
+	public function test_a_search_kept_to_a_category_judges_by_its_own_strong_matches(): void {
+		// Kept to Boards, "pullover" finds only the Street Board, by its description: it alone decides, so 9 filters.
+		$args = self::args( (string) $this->target( '9 pullover', 'boards' ) );
+		self::assertSame( '9-0', $args['filter_width'] ?? '' );
+		// Kept to Apparel, the pullovers decide: no width, so the 9 stays a word.
+		self::assertNull( $this->target( '9 pullover', 'apparel' ) );
 	}
 
 	public function test_a_value_only_a_sold_out_product_has_is_the_unstocked_line(): void {
@@ -196,16 +204,20 @@ final class StrongValueTest extends IndexTestCase {
 	 * Where a product search is sent, or null for the results for its words (the page is then visited).
 	 *
 	 * @param string $words The query.
+	 * @param string $scope The category the search is kept to, by slug, or none.
 	 */
-	private function target( string $words ): ?string {
+	private function target( string $words, string $scope = '' ): ?string {
 		$this->service( ProductSearch::class )->reset();
 		$this->service( ResultsHooks::class )->reset();
 		( new \ReflectionProperty( \WC_Query::class, 'chosen_attributes' ) )->setValue( null, null );
 		$this->go_to(
 			add_query_arg(
-				array(
-					's'         => rawurlencode( $words ),
-					'post_type' => 'product',
+				array_filter(
+					array(
+						's'          => rawurlencode( $words ),
+						'post_type'  => 'product',
+						'product_cat' => $scope,
+					)
 				),
 				home_url( '/' )
 			)

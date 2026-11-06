@@ -54,6 +54,8 @@ final class I18nTypographyTest extends TestCase {
 			'a plain space after «'         => array( '« kazumi' . self::NBSP . '»' ),
 			'a plain space before »'        => array( '«' . self::NBSP . 'kazumi »' ),
 			'no space inside « »'           => array( 'Résultats pour «%s».' ),
+			'no space before a colon'       => array( 'Le plus proche en stock:' ),
+			'a placeholder then a colon'    => array( 'Correspond à %1$s: %2$s' ),
 		);
 	}
 
@@ -65,7 +67,8 @@ final class I18nTypographyTest extends TestCase {
 	public function test_the_right_spacing_and_other_locales_pass(): void {
 		self::assertSame( array(), csearch_typography( 'fr_CA', 'Résultats pour «' . self::NBSP . '%s' . self::NBSP . '».' ) );
 		self::assertSame( array(), csearch_typography( 'fr_CA', 'Correspond à %1$s' . self::NBSP . ': %2$s' ) );
-		self::assertSame( array(), csearch_typography( 'fr_CA', 'https://example.com' ), 'a colon with no space before it' );
+		self::assertSame( array(), csearch_typography( 'fr_CA', 'https://example.com' ), 'an address' );
+		self::assertSame( array(), csearch_typography( 'fr_CA', 'à 10:30' ), 'a time' );
 		self::assertSame( array(), csearch_typography( 'en_US', 'Closest in stock :' ), 'only the locales with the rule' );
 	}
 

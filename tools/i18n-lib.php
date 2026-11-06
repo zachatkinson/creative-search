@@ -111,6 +111,10 @@ function csearch_typography( string $locale, string $text ): array {
 	if ( 1 === preg_match( '/[ \\x{202F}]:/u', $text ) ) {
 		$problems[] = 'has a plain or narrow space before a colon (fr_CA wants a no-break space, U+00A0)';
 	}
+	// A colon straight after a word, a placeholder or a guillemet; not in an address (https://) or a time (10:30).
+	if ( 1 === preg_match( '/(?<=[\\p{L}\\p{N}»)$])(?<!\\d(?=:\\d)):(?!\\/\\/)/u', $text ) ) {
+		$problems[] = 'has no space before a colon (fr_CA wants a no-break space, U+00A0)';
+	}
 	if ( 1 === preg_match( '/«(?!\\x{00A0})|(?<!\\x{00A0})»/u', $text ) ) {
 		$problems[] = 'has « » without a no-break space inside (fr_CA wants U+00A0 after « and before »)';
 	}
