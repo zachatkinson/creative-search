@@ -27,7 +27,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * out once for both the redirect ({@see QueryRouter}) and the panel's "See all" (D-145): `8.25 deck` lands on Decks
  * filtered to 8.25, so the panel counts the products that page shows, not every deck.
  *
- * A value that would leave the page listing nothing, where the same page without it lists something, is left out
+ * A value filters only when the page's products carry its attribute at all (D-156), and a value that would leave
+ * the page listing nothing, where the same page without it lists something, is left out
  * and named on the page with the closest values in stock (D-154): `9 deck` opens Decks, not an empty Decks in 9.00.
  */
 final class Destination {
@@ -107,14 +108,21 @@ final class Destination {
 		if ( array() !== $this->search->rules()->pins( $words, $lang ) ) {
 			return null; // The owner pinned products to these words (D-110): they are shown, not a category.
 		}
-		$route = $this->routes->route( $words, $lang );
-		if ( $panel && array() === $route['filters'] ) {
-			return null;
-		}
-		$base = $this->base( $words, $lang, $route, $scope );
-		if ( null === $base || isset( $base['categories'] ) ) {
-			return $base;
-		}
+		$kept = array(); // Attributes whose values stay words.
+		do {
+			$route = $this->routes->route( $words, $lang, $kept );
+			if ( $panel && array() === $route['filters'] ) {
+				return null;
+			}
+			$base = $this->base( $words, $lang, $route, $scope );
+			if ( null === $base || isset( $base['categories'] ) ) {
+				return $base;
+			}
+			// A value filters only products that carry its attribute (D-156): "9 hoodie" is no width of a hoodie, so the
+			// 9 stays a word, and the query is read again without it as a filter (the rest may name a category then).
+			$missing = array_values( array_filter( array_keys( $route['filters'] ), fn( string $taxonomy ): bool => ! $this->products->carries( $taxonomy, $base['ids'], CategoryScope::ttIds( $base['term'] ) ) ) );
+			$kept    = array_merge( $kept, $missing );
+		} while ( array() !== $missing );
 		return $this->landing( $words, $base, $route['filters'], $panel );
 	}
 

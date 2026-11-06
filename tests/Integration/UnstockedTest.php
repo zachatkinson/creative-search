@@ -21,7 +21,9 @@ use CreativeBranding\Search\Search\Suggestions;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Tests\Support\IndexTestCase;
 use CreativeBranding\Search\Tests\Support\WooCommerceCatalogue;
+use CreativeBranding\Search\Search\SearchService;
 use WC_Product_Attribute;
+use WC_Product_Simple;
 use WC_Product_Variable;
 use WC_Product_Variation;
 use WP_Query;
@@ -326,5 +328,40 @@ final class UnstockedTest extends IndexTestCase {
 		update_option( 'woocommerce_attribute_lookup_enabled', 'no' );
 		do_action( 'csearch_flush_cache' );
 		self::assertContains( 'Charlie Deck', array_column( $this->panel( '8.25 deck' )['products'], 'name' ) );
+	}
+
+	public function test_a_value_filters_only_products_that_have_the_attribute(): void {
+		// D-156: hoodies have no width, so the 9 in "9 hoodie" stays a word.
+		$hoodie = new WC_Product_Simple();
+		$hoodie->set_name( 'Grey Hoodie' );
+		$hoodie->set_regular_price( '50' );
+		$hoodie->set_description( 'A heavy 9 oz fleece.' );
+		$hoodie->set_category_ids( array( $this->catalogue->term( 'product_cat', 'Hoodies', 0, 'hoodies' ) ) );
+		$hoodie->save();
+		$this->runQueue();
+		do_action( 'csearch_flush_cache' );
+
+		$this->visit(
+			add_query_arg(
+				array(
+					's'         => '9+hoodie',
+					'post_type' => 'product',
+				),
+				home_url( '/' )
+			)
+		);
+		$target = $this->service( QueryRouter::class )->target();
+		self::assertStringNotContainsString( 'filter_width', (string) $target, 'no width filter' );
+		self::assertNull( $target, 'the results for the words typed' );
+		$listed = array_map( static fn( $p ): int => $p instanceof \WP_Post ? $p->ID : (int) $p, $GLOBALS['wp_query']->posts );
+		self::assertContains( $hoodie->get_id(), $listed, 'Enter lands on results that list products' );
+		self::assertSame( '', QueryRouter::from() );
+
+		$answer = $this->panel( '9 hoodie' );
+		self::assertSame( '', $answer['unstocked'], 'the shop never had a 9 hoodie to sell' );
+		self::assertSame( count( $this->service( SearchService::class )->rankedIds( '9 hoodie', 'en', '' )['ids'] ), $answer['total'], 'See all counts the search for the words' );
+
+		// The decks do carry widths: "9 deck" is still read as a width (and left out, D-154).
+		self::assertSame( 'pa_width:9-0', self::args( $this->send( '9 deck' )[0] )[ QueryRouter::NONE_ARG ] );
 	}
 }

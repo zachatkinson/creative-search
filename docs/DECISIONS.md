@@ -1231,3 +1231,12 @@ Two cases found in a review of D-148's release workflow (shared by the sibling p
 4. **What the landing applies, the panel suggests.** When the landing applies a value, the panel's products are those the landing lists, in rank order (`Destination::lists()`, the landing's own query limited to the panel's candidates): a deck whose 8.25″ is sold out isn't suggested for "8.25 deck", and neither is a product of another category. A value left out (D-154) applies nothing, so the panel's products are its search's.
 
 **Why:** "In stock" beside a size the shopper can't buy reads as a promise; the panel should show what the page Enter opens shows, and say what the page says.
+
+### D-156 · A value filters only products that have the attribute · 2026-11-05
+1.6.5 brief, item 3. "9 hoodie" opened `?s=hoodie&post_type=product&filter_width=9-00`, which is empty: `FeatureFilters` read "9" as Width 9.00″ though nothing "hoodie" finds has a width.
+
+`Search\Destination` now checks, for each attribute the query names a value of, whether any product of the page it would land on carries a term of that attribute, sold out or not (`ProductIdRepository::carries()`: the category and its subcategories, the other words' products, or the shop; one `LIMIT 1` read per attribute named, on the term relationships' primary key). An attribute none of them carries goes back to being words: `QueryRoutes::route()` takes the attributes to leave as words (after the `csearch_query_filters` hook, so a hook can't put back a filter no product could match) and the query is read again, since the rest may then name another category or none. "9 hoodie" then names no category ("9" is no word of Hoodies) and Enter opens the results for the words typed, which list the hoodies; D-154's line doesn't appear, since the shop never had a 9″ hoodie to sell, and the panel counts its own search. D-101 already kept a word two attributes share; this keeps a word no landed product could be filtered by.
+
+The check is per attribute, not per value: a value the landing's products don't have while they have the attribute (a 9.00″ deck nobody stocks) is D-154's case.
+
+**Why:** a filter no product of the page can match is an empty page reached through the shopper's own words.

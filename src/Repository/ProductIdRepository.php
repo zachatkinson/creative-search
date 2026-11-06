@@ -134,7 +134,7 @@ final class ProductIdRepository extends Repository {
 	}
 
 	/**
-	 * The terms of an attribute some published products carry (D-154, D-156).
+	 * The terms of an attribute some published products carry (D-154).
 	 *
 	 * @param string     $taxonomy Attribute taxonomy.
 	 * @param int[]|null $ids      Product ids, or null for every product.
@@ -175,5 +175,29 @@ final class ProductIdRepository extends Repository {
 			$out[ (int) $row['product_or_parent_id'] . ':' . (int) $row['term_id'] ] = true;
 		}
 		return $out;
+	}
+
+	/**
+	 * Whether any published product of a set carries some term of an attribute, sold out or not (D-156): a value read
+	 * from a query filters only products that have the attribute at all.
+	 *
+	 * @param string     $taxonomy   Attribute taxonomy.
+	 * @param int[]|null $ids        Product ids, or null for any product.
+	 * @param int[]      $categories Term taxonomy ids of a category and its subcategories the products are in, or
+	 *                               none for any category.
+	 */
+	public function carries( string $taxonomy, ?array $ids, array $categories = array() ): bool {
+		global $wpdb;
+		if ( array() === $ids ) {
+			return false;
+		}
+		$in    = array() === $categories ? '' : ' INNER JOIN %i c ON c.object_id = p.ID AND c.term_taxonomy_id IN (' . self::ints( $categories ) . ')';
+		$among = null === $ids ? '' : ' AND p.ID IN (' . self::ints( $ids ) . ')';
+		$args  = array( $wpdb->posts, $wpdb->term_relationships, $wpdb->term_taxonomy );
+		if ( array() !== $categories ) {
+			$args[] = $wpdb->term_relationships;
+		}
+		array_push( $args, $taxonomy, 'product', 'publish' );
+		return null !== $this->value( $this->prepare( 'SELECT 1 FROM %i p INNER JOIN %i r ON r.object_id = p.ID INNER JOIN %i tt ON tt.term_taxonomy_id = r.term_taxonomy_id' . $in . ' WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = %s' . $among . ' LIMIT 1', ...$args ) );
 	}
 }

@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 - A size or other value in a search that has nothing in stock where the search lands is no longer applied: "9 deck" opens Decks, says "Nothing in Width 9.00″ is in stock right now." with links to the closest widths in stock, "See all" counts Decks, and Analytics still logs the search as finding nothing (D-154).
 - The panel says so too, outside the suggestions and in what screen readers hear; it suggests only products the page Enter opens lists; and "Matches Width: 9.00″" shows only on a product that has 9.00″ in stock (D-155).
+- A number becomes a size filter only when the products the search lands on have that attribute at all: "9 hoodie" opens the hoodies, not an empty page filtered to Width 9.00″ (D-156).
 - Releases: each commit has its own release queue, so a tag's release can no longer be dropped behind another run, and a re-run finishes a release that published its zip but not its `info.json` (D-153).
 
 ## [1.6.4] - 2026-11-05
