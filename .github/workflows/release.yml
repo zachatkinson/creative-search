@@ -124,7 +124,7 @@ jobs:
         run: |
           mkdir -p tmp
           gh release download "creative-search-${VERSION}" --repo "$RELEASES_REPO" --pattern "creative-search-${VERSION}.zip" --dir tmp
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: env.PUBLISHED != 'yes'
         with:
           node-version-file: .nvmrc
