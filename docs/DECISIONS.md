@@ -1261,3 +1261,11 @@ Tested on a generic store (`StrongValueTest`: apparel in sizes, boards in widths
 
 **Why:** the products that only mention a word are the least likely thing the shopper asked for (D-146, D-147); a filter they alone justify, or one that only an unlisted product can match, leads to an empty page; and a number the shopper typed as part of a product's name is that name.
 
+### D-158 · French spacing, checked for every string · 2026-11-06
+1.6.6 brief, item 2. "Closest in stock:" shipped in both plural forms as "Le plus proche en stock :", with a plain space before the colon, where Canadian French puts a no-break space (U+00A0) so the colon never starts a line of its own.
+
+1. **The strings.** The brief named two; the check below found seven more with the same mistake, all fixed: "Correspond à %1$s : %2$s" (the panel's and the results page's "Matches Width: 9.00″"), "Résultats pour « %s »." (shoppers see both), and five admin and REST help texts (three colons, two with « »). Fixed in the PO and compiled again (`composer i18n:mo`; none of them is in the scripts, so the JSON files are unchanged).
+2. **The check.** `tools/i18n-check.php` (CI's `composer i18n:check`) now also checks each translated form for its locale's punctuation spacing, `csearch_typography()` in the new `tools/i18n-lib.php` (with the PO reader, moved there so a unit test can load them without running the check). The locale is the PO's `Language` header, else its file name. For fr_CA it fails on a plain or narrow space before a colon, and on « or » without a no-break space inside. `I18nTypographyTest` runs the same rule on every shipped PO in the unit suite, so it fails without wp-env too, and holds the rule to strings it must refuse and must pass (a colon in a URL, another locale).
+3. **Only fr_CA's rules.** The only translation shipped is fr_CA, whose usage (OQLF) wants no space before ; ! ?. fr_FR wants a narrow no-break space (U+202F) before ; ! ? and other rules again; a locale added later gets its own branch in `csearch_typography()`, and until then none is checked.
+
+**Why:** a check that runs on every string catches the next one; a fix to the two the demo showed would leave the others, and the next.

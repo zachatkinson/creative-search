@@ -1711,7 +1711,7 @@ msgstr "Correspond à %s"
 #, php-format
 msgctxt "an attribute and its value"
 msgid "Matches %1$s: %2$s"
-msgstr "Correspond à %1$s : %2$s"
+msgstr "Correspond à %1$s : %2$s"
 
 #: src/Search/MatchDetails.php:205
 msgid "Matches the description"
@@ -1894,7 +1894,7 @@ msgstr "Recherches suggérées"
 
 #: src/Admin/ToolsTab.php:276
 msgid "Suggest searches other shoppers made, above the products: only searches made three times or more that found products, with every word in your catalogue."
-msgstr "Suggérer, au-dessus des produits, des recherches faites par d’autres clients : seulement celles faites trois fois ou plus, qui ont trouvé des produits et dont chaque mot est dans votre catalogue."
+msgstr "Suggérer, au-dessus des produits, des recherches faites par d’autres clients : seulement celles faites trois fois ou plus, qui ont trouvé des produits et dont chaque mot est dans votre catalogue."
 
 #: src/Admin/ToolsTab.php:277
 msgid "Search within a category"
@@ -1902,7 +1902,7 @@ msgstr "Chercher dans une catégorie"
 
 #: src/Admin/ToolsTab.php:277
 msgid "Offer to search within the categories most of the products are in, such as “kazumi in Decks”."
-msgstr "Proposer de chercher dans les catégories qui contiennent la plupart des produits, comme « kazumi dans Planches »."
+msgstr "Proposer de chercher dans les catégories qui contiennent la plupart des produits, comme « kazumi dans Planches »."
 
 #: src/Admin/ToolsTab.php:278
 msgid "Add to cart"
@@ -1918,13 +1918,13 @@ msgstr "Événements d’analyse"
 
 #: src/Admin/ToolsTab.php:279
 msgid "Tell the page about searches, chosen suggestions, products added to the cart and searches with no suggestions: events on the search form, and on Google Tag Manager’s data layer when the page has one. Nothing is sent anywhere by this plugin."
-msgstr "Informer la page des recherches, des suggestions choisies, des produits ajoutés au panier et des recherches sans suggestion : des événements sur le formulaire de recherche, et dans la couche de données de Google Tag Manager quand la page en a une. Cette extension n’envoie rien nulle part."
+msgstr "Informer la page des recherches, des suggestions choisies, des produits ajoutés au panier et des recherches sans suggestion : des événements sur le formulaire de recherche, et dans la couche de données de Google Tag Manager quand la page en a une. Cette extension n’envoie rien nulle part."
 
 #. translators: %s: the query the results are for, with a typo corrected
 #: src/Admin/ToolsTab.php:160
 #, php-format
 msgid "Showing results for “%s”."
-msgstr "Résultats pour « %s »."
+msgstr "Résultats pour « %s »."
 
 #. translators: %s: the query the results are for, with a typo corrected
 #: src/Cli/SearchCommand.php:79
@@ -1959,7 +1959,7 @@ msgstr "Assombrir la page derrière les suggestions"
 
 #: src/Rest/SuggestRoute.php:68
 msgid "The product category the shopper is in: offered first as “kazumi in Decks” when it holds results (1.5)."
-msgstr "La catégorie de produits où se trouve le client : proposée en premier, « kazumi dans Planches », lorsqu’elle contient des résultats (1.5)."
+msgstr "La catégorie de produits où se trouve le client : proposée en premier, « kazumi dans Planches », lorsqu’elle contient des résultats (1.5)."
 
 #. translators: %s: number of searches
 #: src/Admin/Actions.php:271
@@ -2094,5 +2094,5 @@ msgstr "Aucun produit en %s n’est en stock pour l’instant."
 #: src/Results/ResultsView.php:239
 msgid "Closest in stock:"
 msgid_plural "Closest in stock:"
-msgstr[0] "Le plus proche en stock :"
-msgstr[1] "Les plus proches en stock :"
+msgstr[0] "Le plus proche en stock :"
+msgstr[1] "Les plus proches en stock :"
