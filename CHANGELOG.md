@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- CI's GitHub Actions run on Node 24: checkout v7, cache v6, setup-node v7, upload-artifact v7, composer-install v4 (D-159).
+
 ## [1.6.6] - 2026-11-06
 
 From the check of 1.6.5 on the demo (1.6.6 brief).

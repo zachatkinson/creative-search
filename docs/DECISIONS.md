@@ -1271,3 +1271,8 @@ Tested on a generic store (`StrongValueTest`: apparel in sizes, boards in widths
 3. **Only fr_CA's rules.** The only translation shipped is fr_CA, whose usage (OQLF) wants no space before ; ! ?. fr_FR wants a narrow no-break space (U+202F) before ; ! ? and other rules again; a locale added later gets its own branch in `csearch_typography()`, and until then none is checked.
 
 **Why:** a check that runs on every string catches the next one; a fix to the two the demo showed would leave the others, and the next.
+
+### D-159 · CI's actions on Node 24 · 2026-11-06
+GitHub runs actions built for Node 20 on Node 24 now and warns on every run ("Node.js 20 is deprecated…"); Zach asked to update. `actions/checkout` v4 → v7, `actions/cache` v4 → v6, `actions/setup-node` v4 → v7, `actions/upload-artifact` v4 → v7, and `ramsey/composer-install` v3 → v4 (whose own `actions/cache` moves from v4 to v5); `shivammathur/setup-php` already ran on Node 24. The new majors' breaking changes don't touch these workflows: the runners are GitHub-hosted (the newer runner minimum is met), `setup-node` already sets `cache: npm` and the package has no `packageManager` field (v5's automatic caching), and each artifact's name is used once per run. The caches' keys are unchanged, so the 10,000-product catalogue and the browsers are found again. A workflow-only pull request runs the newest leg (D-152); the other legs, Infection and the budgets first run on the new actions on main's push.
+
+**Why:** the warning on every run hides the ones that matter, and the Node 20 runtime is being removed.
