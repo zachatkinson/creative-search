@@ -101,10 +101,13 @@ if ( array( 'pa_width' ) !== Settings::get( 'filter_attributes' ) ) {
 	Settings::set( 'filter_attributes', array( 'pa_width' ) );
 }
 
-// A width the shop's decks don't come in: "9.5 decks" leaves it out and says so (D-154, D-155).
-if ( taxonomy_exists( 'pa_width' ) && ! term_exists( '9-5', 'pa_width' ) ) {
-	wp_insert_term( '9.5', 'pa_width', array( 'slug' => '9-5' ) );
-}
+// A width the shop's decks don't come in: "9.5 decks" leaves it out and says so (D-154, D-155). Made once the Width
+// attribute exists, which on a fresh site is after the products load.
+$csearch_unstocked_width = static function (): void {
+	if ( taxonomy_exists( 'pa_width' ) && ! term_exists( '9-5', 'pa_width' ) ) {
+		wp_insert_term( '9.5', 'pa_width', array( 'slug' => '9-5' ) );
+	}
+};
 
 // A variable grip in three designs, two with their own photo (D-104: "mumber fur fire" shows the Fire design).
 $csearch_grip_new = false;
@@ -149,6 +152,7 @@ if ( ! wc_get_product_id_by_sku( 'MUM-FUR' ) && is_string( $csearch_file ) && fi
 }
 
 if ( wc_get_product_id_by_sku( 'KAZ-DEA-00001' ) ) {
+	$csearch_unstocked_width();
 	Plugin::container()->get( \CreativeBranding\Search\Index\AttributeTerms::class )->rebuild();
 	if ( $csearch_french_new || $csearch_content_new || $csearch_grip_new ) {
 		Plugin::container()->get( Reindex::class )->runInline();
@@ -164,6 +168,7 @@ foreach ( array( 0, 1, 2, 4, 6, 7, 15, 16, 21, 22 ) as $i ) {
 	$ids[ $i ] = $loader->product( WooCommerceCatalogue::spec( $i ) );
 }
 Settings::set( 'fallback_products', array( $ids[15], $ids[6] ) );
+$csearch_unstocked_width();
 Plugin::container()->get( \CreativeBranding\Search\Index\AttributeTerms::class )->rebuild();
 Plugin::container()->get( Reindex::class )->runInline();
 echo 'loaded ' . count( $ids ) . "\n";
