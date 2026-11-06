@@ -31,6 +31,8 @@ final class MatchDetail {
 	 * @param string                $reason      What matched: one of the constants, or empty for nothing to say.
 	 * @param string                $name        The attribute's name, for an attribute value.
 	 * @param string                $label       The SKU or the value.
+	 * @param string                $attribute   For an attribute value, its variation key (`attribute_pa_width`).
+	 * @param string                $value       For an attribute value, its slug (`9-00`), so a caller can check it is in stock (D-155).
 	 */
 	public function __construct(
 		public readonly int $variationId = 0,
@@ -38,7 +40,9 @@ final class MatchDetail {
 		public readonly array $args = array(),
 		public readonly string $reason = '',
 		public readonly string $name = '',
-		public readonly string $label = ''
+		public readonly string $label = '',
+		public readonly string $attribute = '',
+		public readonly string $value = ''
 	) {
 	}
 
@@ -47,5 +51,12 @@ final class MatchDetail {
 	 */
 	public function isEmpty(): bool {
 		return 0 === $this->variationId && '' === $this->reason;
+	}
+
+	/**
+	 * The same details without the line saying what matched: the value it names is sold out on this product (D-155).
+	 */
+	public function withoutReason(): self {
+		return new self( $this->variationId, $this->imageId, $this->args );
 	}
 }

@@ -81,7 +81,7 @@ final class MatchDecorations {
 					$docs[ $answer['docs'][ $id ] ] = $id;
 				}
 			}
-			$found = $this->matches->of( array_keys( $docs ), $answer['tokens'], $answer['key'], $answer['from'] );
+			$found = $this->matches->of( $docs, $answer['tokens'], $answer['key'], $answer['from'] );
 			foreach ( $docs as $doc => $id ) {
 				$this->details[ $id ] = $found[ $doc ] ?? null;
 			}

@@ -108,6 +108,8 @@ final class SearchForm {
 		$html .= '<p class="csearch-status" hidden data-wp-bind--hidden="!context.searching">' . esc_html__( 'Searching…', 'creative-search' ) . '</p>';
 		$html .= '<p class="csearch-status" hidden data-wp-bind--hidden="!context.empty">' . esc_html__( 'No suggestions', 'creative-search' ) . '</p>';
 		$html .= '<p class="csearch-status csearch-corrected" hidden data-wp-bind--hidden="!context.corrected" data-wp-text="context.corrected"></p>';
+		// A value asked for left out, nothing in it being in stock (D-155): outside the listbox, since it is not an option.
+		$html .= '<p class="csearch-status csearch-unstocked" hidden data-wp-bind--hidden="!context.unstocked" data-wp-text="context.unstocked"></p>';
 		$html .= '<ul id="' . esc_attr( $listbox ) . '" class="csearch-list" role="listbox" aria-label="' . esc_attr__( 'Suggestions', 'creative-search' ) . '">';
 		$html .= $this->rowTemplate();
 		$html .= '</ul>';
@@ -291,6 +293,7 @@ final class SearchForm {
 			'query'      => $current,
 			'typed'      => $current,
 			'corrected'  => '',
+			'unstocked'  => '',
 			'open'       => false,
 			'panel'      => false,
 			'activeId'   => null,

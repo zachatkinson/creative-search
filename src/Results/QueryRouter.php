@@ -38,11 +38,13 @@ final class QueryRouter {
 	public const ALL_ARG  = 'csearch_all';
 	public const FROM_ARG = 'csearch_from';
 	public const SIG_ARG  = 'csearch_sig';
+	public const NONE_ARG = 'csearch_none';
+	public const NEAR_ARG = 'csearch_near';
 
 	/**
 	 * Arguments that mean the shopper is refining a search they already have.
 	 */
-	private const REFINING = array( self::ALL_ARG, self::FROM_ARG, self::SIG_ARG, ProductSearch::EXACT_ARG, 'orderby', 'min_price', 'max_price', 'rating_filter' );
+	private const REFINING = array( self::ALL_ARG, self::FROM_ARG, self::SIG_ARG, self::NONE_ARG, self::NEAR_ARG, ProductSearch::EXACT_ARG, 'orderby', 'min_price', 'max_price', 'rating_filter' );
 
 	/**
 	 * The page to send the shopper to, once worked out.
@@ -86,16 +88,16 @@ final class QueryRouter {
 		if ( null === $landing ) {
 			return;
 		}
-		if ( isset( $landing['categories'] ) ) {
+		if ( is_array( $landing ) ) {
 			// Two categories of one name: the shopper chooses, on the results page for every word they typed.
 			$this->categories = $landing['categories'];
 			return;
 		}
 		// The target is kept for `template_redirect`; the query the shopper typed is logged once with what the page
-		// they land on lists (that page does not log it again); and the page is left: no ranking, no search clause,
-		// nothing fetched.
-		$this->target = $landing['url'];
-		$this->log->record( $words, $lang, $landing['count'], 'page' );
+		// they land on lists (that page does not log it again), or as finding nothing when the value asked for was
+		// left out (D-154); and the page is left: no ranking, no search clause, nothing fetched.
+		$this->target = $landing->url;
+		$this->log->record( $words, $lang, $landing->logged(), 'page' );
 		$query->set( 'csearch_routed', true );
 		$query->set( 'post__in', array( 0 ) );
 	}
@@ -110,17 +112,29 @@ final class QueryRouter {
 	}
 
 	/**
-	 * The arguments that tell the page landed on which query sent the shopper there: the query, and a signature so
-	 * a link made elsewhere cannot put words on the shop's pages.
+	 * The arguments that tell the page landed on which query sent the shopper there: the query, the values it named
+	 * that were left out for having nothing in stock there and the closest values in stock (D-154), and a signature
+	 * of them all, so a link made elsewhere cannot put words on the shop's pages.
 	 *
-	 * @param string $words The query.
+	 * @param string                  $words     The query.
+	 * @param array<string, string[]> $unstocked Attribute taxonomy to the slugs left out.
+	 * @param array<string, string[]> $closest   Attribute taxonomy to the closest slugs in stock.
 	 * @return array<string, string>
 	 */
-	public static function fromArgs( string $words ): array {
-		return array(
+	public static function fromArgs( string $words, array $unstocked = array(), array $closest = array() ): array {
+		$none = self::values( $unstocked );
+		$near = self::values( $closest );
+		$args = array(
 			self::FROM_ARG => rawurlencode( $words ),
-			self::SIG_ARG  => self::signature( $words ),
+			self::SIG_ARG  => self::signature( $words, $none, $near ),
 		);
+		if ( '' !== $none ) {
+			$args[ self::NONE_ARG ] = rawurlencode( $none );
+		}
+		if ( '' !== $near ) {
+			$args[ self::NEAR_ARG ] = rawurlencode( $near );
+		}
+		return $args;
 	}
 
 	/**
@@ -128,18 +142,84 @@ final class QueryRouter {
 	 * other page.
 	 */
 	public static function from(): string {
-		$from = isset( $_GET[ self::FROM_ARG ] ) && is_string( $_GET[ self::FROM_ARG ] ) ? SearchService::clean( wp_unslash( $_GET[ self::FROM_ARG ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a public, read-only parameter, cleaned by SearchService::clean().
-		$sig  = isset( $_GET[ self::SIG_ARG ] ) && is_string( $_GET[ self::SIG_ARG ] ) ? sanitize_key( wp_unslash( $_GET[ self::SIG_ARG ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- a public, read-only parameter, checked against its signature.
-		return '' !== $from && hash_equals( self::signature( $from ), $sig ) ? $from : '';
+		$from = self::arg( self::FROM_ARG );
+		$from = '' === $from ? '' : SearchService::clean( $from );
+		$sig  = sanitize_key( self::arg( self::SIG_ARG ) );
+		return '' !== $from && hash_equals( self::signature( $from, self::arg( self::NONE_ARG ), self::arg( self::NEAR_ARG ) ), $sig ) ? $from : '';
 	}
 
 	/**
-	 * A query's signature: the site's hash of it, cut short. The same for every visitor, so the page can be cached.
+	 * The values the query named that were left out of this page, nothing in them being in stock (D-154), when the
+	 * signature holds: attribute taxonomy to slugs.
+	 *
+	 * @return array<string, string[]>
+	 */
+	public static function unstocked(): array {
+		return '' === self::from() ? array() : self::parse( self::arg( self::NONE_ARG ) );
+	}
+
+	/**
+	 * The closest values in stock to the one left out (D-154), when the signature holds: attribute taxonomy to slugs.
+	 *
+	 * @return array<string, string[]>
+	 */
+	public static function closest(): array {
+		return '' === self::from() ? array() : self::parse( self::arg( self::NEAR_ARG ) );
+	}
+
+	/**
+	 * A public, read-only argument of this request, unslashed, or an empty string.
+	 *
+	 * @param string $name The argument.
+	 */
+	private static function arg( string $name ): string {
+		return isset( $_GET[ $name ] ) && is_string( $_GET[ $name ] ) ? wp_unslash( $_GET[ $name ] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- public and read-only; checked against its signature before use, and every reader cleans it.
+	}
+
+	/**
+	 * Values as one argument: `pa_width:9-00,pa_width:9-5`.
+	 *
+	 * @param array<string, string[]> $values Attribute taxonomy to slugs.
+	 */
+	private static function values( array $values ): string {
+		$out = array();
+		foreach ( $values as $taxonomy => $slugs ) {
+			foreach ( $slugs as $slug ) {
+				$out[] = $taxonomy . ':' . $slug;
+			}
+		}
+		return implode( ',', $out );
+	}
+
+	/**
+	 * Values back from an argument: attribute taxonomies that exist, each with its slugs.
+	 *
+	 * @param string $arg The argument.
+	 * @return array<string, string[]>
+	 */
+	private static function parse( string $arg ): array {
+		$out = array();
+		foreach ( '' === $arg ? array() : explode( ',', $arg ) as $value ) {
+			$parts = explode( ':', $value, 2 );
+			$slug  = sanitize_title( $parts[1] ?? '' );
+			if ( '' !== $slug && str_starts_with( $parts[0], 'pa_' ) && taxonomy_exists( $parts[0] ) ) {
+				$out[ $parts[0] ][] = $slug;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * A query's signature: the site's hash of it and of the values left out, cut short. The same for every visitor,
+	 * so the page can be cached; a query alone signs as it did before 1.6.5.
 	 *
 	 * @param string $words The query.
+	 * @param string $none  The values left out, as one argument.
+	 * @param string $near  The closest values, as one argument.
 	 */
-	private static function signature( string $words ): string {
-		return substr( wp_hash( 'csearch_from|' . $words ), 0, 12 );
+	private static function signature( string $words, string $none = '', string $near = '' ): string {
+		$signed = '' === $none && '' === $near ? $words : $words . "\n" . $none . "\n" . $near;
+		return substr( wp_hash( 'csearch_from|' . $signed ), 0, 12 );
 	}
 
 	/**

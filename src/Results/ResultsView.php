@@ -13,6 +13,7 @@ use CreativeBranding\Search\Domain\Document;
 use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Search\Cache;
 use CreativeBranding\Search\Search\SearchService;
+use CreativeBranding\Search\Search\ValueText;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use WC_Query;
@@ -171,6 +172,7 @@ final class ResultsView {
 		if ( '' === $from ) {
 			return '';
 		}
+		$html     = $this->unstockedLine( $from );
 		$filters  = self::chosenFilters();
 		$category = is_tax( 'product_cat' ) ? get_queried_object() : null;
 		if ( $category instanceof WP_Term ) {
@@ -182,8 +184,10 @@ final class ResultsView {
 		} elseif ( '' !== $filters ) {
 			/* translators: %s: the filters applied, such as "Width 8.25" */
 			$showing = sprintf( __( 'Showing products with %s.', 'creative-search' ), $filters );
-		} else {
+		} elseif ( '' === $html ) {
 			return '';
+		} else {
+			$showing = ''; // Every value was left out, and no category: the line above says why, the link is the way back.
 		}
 		$all = add_query_arg(
 			array(
@@ -193,7 +197,7 @@ final class ResultsView {
 			),
 			home_url( '/' )
 		);
-		return '<p class="csearch-results-routed">' . esc_html( $showing ) . ' <a href="' . esc_url( $all ) . '">' . esc_html(
+		return $html . '<p class="csearch-results-routed">' . ( '' === $showing ? '' : esc_html( $showing ) . ' ' ) . '<a href="' . esc_url( $all ) . '">' . esc_html(
 			sprintf(
 				/* translators: %s: the query the shopper typed */
 				__( 'Search all products for “%s”.', 'creative-search' ),
@@ -203,22 +207,51 @@ final class ResultsView {
 	}
 
 	/**
+	 * On a page a query was sent to without a value it named, nothing in it being in stock there (D-154): "Nothing
+	 * in Width 9.00″ is in stock right now.", then "Closest in stock:" and the closest values in stock, each a link to
+	 * this page with it applied ("Width 8.75″"). Empty on any other page.
+	 *
+	 * @param string $from The query that sent the shopper here.
+	 */
+	private function unstockedLine( string $from ): string {
+		$none = QueryRouter::unstocked();
+		if ( array() === $none ) {
+			return '';
+		}
+		$html = '<p class="csearch-results-unstocked">' . esc_html( ValueText::unstocked( $none ) ) . '</p>';
+		// This page's first page: a link from page 2 would keep `/page/2/`, which a shorter listing doesn't have.
+		$here  = remove_query_arg( array( QueryRouter::FROM_ARG, QueryRouter::SIG_ARG, QueryRouter::NONE_ARG, QueryRouter::NEAR_ARG, 'paged', 'product-page' ), get_pagenum_link( 1, false ) );
+		$links = array();
+		foreach ( QueryRouter::closest() as $taxonomy => $slugs ) {
+			foreach ( $slugs as $slug ) {
+				$value = array( $taxonomy => array( $slug ) );
+				// The link's text names the attribute too, so it reads alone (WCAG 2.4.4).
+				$links[] = '<a href="' . esc_url( add_query_arg( QueryRouter::filterArgs( $value ) + QueryRouter::fromArgs( $from ), $here ) ) . '">' . esc_html( ValueText::values( $value ) ) . '</a>';
+			}
+		}
+		if ( array() === $links ) {
+			return $html;
+		}
+		// A lead line and a list, as the no-results page offers its words: a link alone in a list item reads as a link
+		// in any theme, underlined or not.
+		return $html . '<p class="csearch-results-closest">' . esc_html(
+			/* translators: leads a list of one or two values in stock, such as Width 8.75″ */
+			_n( 'Closest in stock:', 'Closest in stock:', count( $links ), 'creative-search' )
+		) . '</p><ul class="csearch-results-closest-list"><li>' . implode( '</li><li>', $links ) . '</li></ul>';
+	}
+
+	/**
 	 * The attribute filters on the page, as WooCommerce reads them: "Width 8.25 and Wheel size 54mm".
 	 */
 	private static function chosenFilters(): string {
-		$parts = array();
+		$values = array();
 		foreach ( class_exists( WC_Query::class ) ? WC_Query::get_layered_nav_chosen_attributes() : array() as $taxonomy => $chosen ) {
-			$names = array();
-			foreach ( Cast::strings( $chosen['terms'] ?? array() ) as $slug ) {
-				$term    = get_term_by( 'slug', $slug, (string) $taxonomy );
-				$names[] = $term instanceof WP_Term ? $term->name : $slug;
-			}
-			if ( array() !== $names ) {
-				/* translators: 1: an attribute, such as Width, 2: its values, such as 8.25 */
-				$parts[] = sprintf( _x( '%1$s %2$s', 'an attribute and its values, such as Width 8.25', 'creative-search' ), wc_attribute_label( (string) $taxonomy ), wp_sprintf( '%l', $names ) );
+			$slugs = Cast::strings( $chosen['terms'] ?? array() );
+			if ( array() !== $slugs ) {
+				$values[ (string) $taxonomy ] = $slugs;
 			}
 		}
-		return wp_sprintf( '%l', $parts );
+		return ValueText::values( $values );
 	}
 
 	/**

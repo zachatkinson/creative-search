@@ -13,6 +13,9 @@
 | A search kept to a category (D-117): the ranking statement joined to the category's term-taxonomy ids | `wp_term_relationships` by `term_taxonomy_id` (or its PRIMARY `(object_id, term_taxonomy_id)`), an index-only lookup per ranked document |
 | Why a product matched (D-104, D-105): the query's terms each shown product carries, field by field, then its SKUs and attribute values | `csearch_postings` PRIMARY (the terms' range); `csearch_facts` PRIMARY `(document_id, position)` |
 | Suggested searches (D-112): earlier searches that start with what is typed | `csearch_log.created_at` or `csearch_log.normalised` (the optimiser picks the narrower range) |
+| A value with nothing in stock where a search lands (D-154): the attribute's values in stock among the landing's products | WooCommerce's `wc_product_attributes_lookup` key `(taxonomy, term_id, in_stock, product_or_parent_id)`; without the lookup table, `wp_term_relationships` PRIMARY by `object_id` |
+| Whether the products a search lands on carry an attribute at all (D-156), `LIMIT 1` | `wp_term_relationships` PRIMARY `(object_id, term_taxonomy_id)` joined to `wp_term_taxonomy` by `term_taxonomy_id`, and the category's own relationships by `term_taxonomy_id` |
+| "Matches Width: 9.00″" only in stock (D-155): the shown products' in-stock lookup rows for the values they match | WooCommerce's `wc_product_attributes_lookup` PRIMARY `(product_or_parent_id, term_id, …)` |
 | Whether schema 3's rebuild is still owed (D-107), read once a request where matches are explained | `wp_options.option_name` (unique) |
 | Cleanup of an old generation in batches | `csearch_postings.generation`, `csearch_documents.object` (generation first); the term counts by `generation` once its documents are gone |
 

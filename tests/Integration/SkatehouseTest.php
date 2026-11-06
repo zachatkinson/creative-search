@@ -186,6 +186,31 @@ final class SkatehouseTest extends IndexTestCase {
 		self::assertStringContainsString( 'Sorted by price: low to high', self::resultCount() );
 		unset( $_GET['orderby'] );
 		update_option( 'woocommerce_default_catalog_orderby', 'menu_order' );
+
+		// 1.6.5: the demo hides sold-out sizes through WooCommerce's lookup table (Creative Shop answers its filter).
+		update_option( 'woocommerce_attribute_lookup_enabled', 'yes' );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
+		$lookup = wc_get_container()->get( \Automattic\WooCommerce\Internal\ProductAttributesLookup\LookupDataStore::class );
+		foreach ( get_posts( array( 'post_type' => 'product', 'fields' => 'ids', 'numberposts' => -1 ) ) as $product ) {
+			$lookup->create_data_for_product( (int) $product );
+		}
+		do_action( 'csearch_flush_cache' );
+		foreach ( array( '9 deck', '9 inch deck', '7.75 deck' ) as $query ) {
+			$landed = (string) $this->target( $query );
+			self::assertStringStartsWith( self::category( 'Decks' ), $landed, $query . ' opens Decks (D-154)' );
+			self::assertDoesNotMatchRegularExpression( '/[?&]filter_/', $landed, $query . ': without the size nothing is in stock in' );
+			self::assertStringContainsString( QueryRouter::NONE_ARG . '=', $landed );
+			self::assertSame( 0, $this->logged( $query ), $query . ' is logged as finding nothing' );
+		}
+		self::assertStringContainsString( QueryRouter::NEAR_ARG . '=pa_width%3A8-00', (string) $this->target( '7.75 deck' ), '7.75 offers 8.00 alone' );
+		self::assertNull( $this->target( '9 hoodie' ), 'hoodies have no width: the results for the words (D-156)' );
+		self::assertNotEmpty( $GLOBALS['wp_query']->posts, 'and they list products' );
+		self::assertMatchesRegularExpression( '/[?&]filter_[a-z0-9_-]+=8-25(&|$)/', (string) $this->target( '8.25 deck' ), '8.25 deck as in 1.6.4' );
+		self::assertSame( 88, $this->logged( '8.25 deck' ) );
+		self::assertStringContainsString( '8-5', (string) $this->target( 'philly 8.5' ), 'philly 8.5 as in 1.6.4' );
+		self::assertGreaterThan( 0, $this->logged( 'philly 8.5' ), 'and lists Philly\'s decks in 8.50' );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
+		update_option( 'woocommerce_attribute_lookup_enabled', 'no' );
 	}
 
 	/**

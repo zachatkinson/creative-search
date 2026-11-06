@@ -67,6 +67,7 @@ function context( overrides = {} ) {
 		query: '',
 		typed: '',
 		corrected: '',
+		unstocked: '',
 		open: false,
 		panel: false,
 		activeId: null,
@@ -530,6 +531,35 @@ test( 'a corrected answer says so in the panel and the live region', async () =>
 	assert.equal( ctx.live, '3 suggestions. Showing results for kazumi' );
 	actions.clear();
 	assert.equal( ctx.corrected, '' );
+} );
+
+test( 'a value left out for having nothing in stock is said outside the rows and with the count (D-155)', async () => {
+	const line = 'Nothing in Width 9.00″ is in stock right now.';
+	dom.fetch = () =>
+		respond( { ...ANSWER, query: '9 deck', unstocked: line, total: 122 } );
+	type( '9 deck' );
+	await settle();
+	const ctx = scope.ctx;
+	assert.equal( ctx.unstocked, line );
+	assert.equal( ctx.live, `3 suggestions. ${ line }` );
+	assert.ok(
+		ctx.rows.every( ( r ) => r.name !== line ),
+		'not a row of the listbox'
+	);
+	assert.equal(
+		ctx.rows[ ctx.rows.length - 1 ].name,
+		'See all 122 results for 9 deck'
+	);
+	actions.clear();
+	assert.equal( ctx.unstocked, '' );
+	dom.fetch = () => respond( ANSWER );
+	type( 'kazumi' );
+	await settle();
+	assert.equal(
+		scope.ctx.unstocked,
+		'',
+		'an answer without the line clears it'
+	);
 } );
 
 test( 'the panel stops at its cap: eight rows on a desktop, five on a phone, See all aside (D-136)', async () => {

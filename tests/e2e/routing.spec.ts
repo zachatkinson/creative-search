@@ -74,6 +74,44 @@ for ( const theme of [ 'twentytwentyfive', 'storefront' ] ) {
 			);
 		} );
 
+		test( 'a size with nothing in stock is left out, and the page says so (D-154)', async ( {
+			page,
+		} ) => {
+			await page.goto( '/?s=9.5+decks&post_type=product' );
+			await expect( page ).toHaveURL(
+				/product-category\/skateboards\/decks\/\?/
+			);
+			await expect( page ).not.toHaveURL( /filter_width/ );
+			await expect( page ).toHaveURL( /csearch_none=pa_width%3A9-5/ );
+			const nothing = page.locator( '.csearch-results-unstocked' );
+			await expect( nothing ).toHaveText(
+				'Nothing in Width 9.5 is in stock right now.'
+			);
+			await expect( nothing ).toHaveCount( 1 );
+			await expect(
+				page.locator( '.csearch-results-routed' )
+			).toContainText( 'Showing Decks.' );
+			const closest = page
+				.locator( '.csearch-results-closest-list' )
+				.getByRole( 'link' );
+			// Each closest value's link names the attribute, so it reads alone (WCAG 2.4.4).
+			await expect( closest.first() ).toHaveAccessibleName( /^Width \d/ );
+			await axe(
+				page,
+				`${ theme } nothing in stock`,
+				'main, #main, #primary'
+			);
+			const name = ( await closest.first().textContent() ) || '';
+			await closest.first().click();
+			await expect( page ).toHaveURL( /filter_width=/ );
+			await expect(
+				page.locator( '.csearch-results-routed' )
+			).toContainText( `Showing Decks with ${ name }.` );
+			await expect(
+				page.locator( '.csearch-results-unstocked' )
+			).toHaveCount( 0 );
+		} );
+
 		test( 'a category and a size together', async ( { page } ) => {
 			await page.goto( '/?s=8.75+decks&post_type=product' );
 			await expect( page ).toHaveURL(

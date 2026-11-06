@@ -96,6 +96,10 @@ final class Schemas {
 				'query'     => array( 'type' => 'string' ),
 				'corrected' => array( 'type' => array( 'string', 'null' ) ),
 				'lang'      => array( 'type' => 'string' ),
+				'unstocked' => array(
+					'type'        => 'string',
+					'description' => 'Says that a value the query named was left out, nothing in it being in stock where the search lands; empty otherwise (1.6.5).',
+				),
 			),
 		);
 	}

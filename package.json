@@ -1,6 +1,6 @@
 {
 	"name": "creative-search",
-	"version": "1.6.4",
+	"version": "1.6.5",
 	"private": true,
 	"description": "Search for WooCommerce: live suggestions, typo tolerance, an index of its own, analytics, an accessible search bar.",
 	"author": "Zach Atkinson",

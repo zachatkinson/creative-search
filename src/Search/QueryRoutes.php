@@ -52,13 +52,15 @@ final class QueryRoutes {
 	/**
 	 * The filters a query names, the query without them, and the categories the rest names.
 	 *
-	 * @param string $query A clean query.
-	 * @param string $lang  A checked language.
+	 * @param string   $query A clean query.
+	 * @param string   $lang  A checked language.
+	 * @param string[] $words Attribute taxonomies whose values stay words: the products the query lands on don't
+	 *                        carry them (D-156).
 	 * @return array{filters: array<string, string[]>, rest: string, categories: int[]} The filters by attribute
 	 *     taxonomy; the rest as a query (an empty string when the filters were all of it); the categories, with
 	 *     products, whose names the rest reads as.
 	 */
-	public function route( string $query, string $lang ): array {
+	public function route( string $query, string $lang, array $words = array() ): array {
 		$tokenizer = $this->analyzers->tokenizer();
 		$parsed    = ( new QueryParser( $tokenizer, $this->search->synonymsFor( array( $lang ) ) ) )->parse( $query, $lang );
 		$values    = $this->attributes->values();
@@ -73,6 +75,7 @@ final class QueryRoutes {
 		 * @param string                  $query   The query.
 		 */
 		$filters = self::filters( apply_filters( 'csearch_query_filters', $split['filters'], $query ) );
+		$filters = array_diff_key( $filters, array_flip( $words ) );
 		// A word stays a word unless the filter it named is still applied.
 		$rest       = array_values(
 			array_filter(

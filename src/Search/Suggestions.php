@@ -56,7 +56,7 @@ final class Suggestions {
 	 * @param WP_Term|null $within Products of this category and its subcategories only (the API's `cat`, D-117).
 	 * @param WP_Term|null $here   The category the shopper is in, offered first among the scopes (D-130).
 	 * @return array<mixed> `queries` (1.3), `products`, `scopes` (1.3), `terms`, `content` (posts and pages, 1.1),
-	 *                      `total`, `query`, `corrected`, `lang`.
+	 *                      `total`, `query`, `corrected`, `lang`, `unstocked` (1.6.5).
 	 */
 	public function answer( string $raw, ?string $lang, int $limit, ?WP_Term $within = null, ?WP_Term $here = null ): array {
 		$scope = CategoryScope::ttIds( $within );
@@ -73,16 +73,18 @@ final class Suggestions {
 			'query'     => $query,
 			'corrected' => null,
 			'lang'      => $lang,
+			'unstocked' => '',
 		);
 		if ( '' === $query ) {
 			return $empty;
 		}
 		$terms  = Settings::isOn( 'show_terms' ) ? Settings::clamp( Settings::int( 'suggest_terms' ), 0, Settings::TERMS_MAX ) : 0;
 		$panel  = array( Settings::get( 'suggest_queries' ), Settings::get( 'suggest_scopes' ), Settings::get( 'suggest_cart' ) );
-		$key    = Cache::key( $this->search->index()->generation(), 'suggest', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale() ) );
+		$key    = Cache::key( $this->search->index()->generation(), 'suggest2', array( $query, $lang, $limit, $terms, $scope, null === $here ? 0 : $here->term_id, $this->search->settingsKey(), $panel, Settings::get( 'category_redirect' ), Settings::get( 'filter_attributes' ), get_locale(), get_option( 'woocommerce_hide_out_of_stock_items' ), get_option( 'woocommerce_attribute_lookup_enabled' ) ) );
 		$answer = $this->cache->get( $key );
 		if ( null === $answer ) {
-			$result = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
+			$landing = $this->lands->filtered( $query, $lang, $within );
+			$result  = $this->search->run( $query, $lang, SearchService::MAX_IDS, $terms, true, false, $scope );
 			// A panel limited to a category leaves out the pins: one may sit outside it (D-110, D-117).
 			$pinned   = array() === $scope ? $this->search->pinnedDocuments( $query, $lang, $result->lang ) : array();
 			$products = $this->pinnedFirst( $result->products, $pinned );
@@ -97,6 +99,11 @@ final class Suggestions {
 			// A page the shopper asked for by name (D-143): a product some word reaches only in its description is a
 			// weaker answer than the page, and stays out of the panel (D-146). The results page still lists it.
 			$listed = array() === $content ? $products : array_values( array_filter( $products, static fn( Document $d ): bool => ! isset( $described[ $d->id ] ) ) );
+			if ( null !== $landing && array() !== $landing->filters ) {
+				// The page Enter opens applies a value: the panel suggests only what that page lists (D-155).
+				$keep   = array_flip( $this->lands->lists( $landing, array_map( static fn( Document $d ): int => $d->objectId, $listed ) ) );
+				$listed = array_values( array_filter( $listed, static fn( Document $d ): bool => isset( $keep[ $d->objectId ] ) ) );
+			}
 			$answer = array(
 				'queries'   => $this->queries->for( $query, $lang ),
 				'products'  => $this->products( array_slice( $listed, 0, $limit ), $result, $described ),
@@ -105,29 +112,22 @@ final class Suggestions {
 				'scopes'    => array() === $scope ? $this->scopes->for( $query, $result->productIds(), $shown, $here, self::objectIds( $result, $described ) ) : array(),
 				'terms'     => $this->terms( $result->terms ),
 				'content'   => $content,
-				'total'     => $this->total( $query, $lang, count( $products ), $within ),
+				// "See all" counts what the page it opens lists (D-145): a size or other value the shop filters by becomes
+				// that filter on the way there, or is left out when nothing in it is in stock (D-154).
+				'total'     => null === $landing ? count( $products ) : $landing->count,
 				'query'     => $query,
 				'corrected' => $result->corrected,
 				'lang'      => $lang,
+				// A value asked for left out, nothing in it being in stock there: the line the page says too (D-155).
+				'unstocked' => null === $landing ? '' : ValueText::unstocked( $landing->unstocked ),
+				// The value asked for was left out: the search is logged as finding nothing, as the page logs it (D-154).
+				'logged'    => null === $landing ? count( $products ) : $landing->logged(),
 			);
 			$this->cache->set( $key, $answer );
 		}
-		$this->search->log()->record( $query, $lang, Cast::int( $answer['total'] ?? 0 ), 'suggest' );
+		$this->search->log()->record( $query, $lang, Cast::int( $answer['logged'] ?? 0 ), 'suggest' );
+		unset( $answer['logged'] );
 		return $answer;
-	}
-
-	/**
-	 * The number "See all" shows: what the page it opens lists. A size or other value the shop filters by becomes
-	 * that filter on the way to the page (D-101, D-102), so the page lists fewer than the panel's search found and
-	 * the count is the page's (D-145); any other query lists what the panel found.
-	 *
-	 * @param string       $query  Clean query.
-	 * @param string       $lang   Checked language.
-	 * @param int          $found  The products the panel's search found.
-	 * @param WP_Term|null $within The category the search is kept to, or null.
-	 */
-	private function total( string $query, string $lang, int $found, ?WP_Term $within ): int {
-		return $this->lands->filteredCount( $query, $lang, $within ) ?? $found;
 	}
 
 	/**
@@ -194,7 +194,7 @@ final class Suggestions {
 	private function products( array $documents, SearchResult $result, array $only ): array {
 		$ids     = array_map( static fn( Document $d ): int => $d->id, $documents );
 		$rows    = $this->search->index()->rows( $ids );
-		$details = $this->matches->of( $ids, $result->tokens, $result->key, $result->lang );
+		$details = $this->matches->of( array_combine( $ids, array_map( static fn( Document $d ): int => $d->objectId, $documents ) ), $result->tokens, $result->key, $result->lang );
 		$cart    = Settings::isOn( 'suggest_cart' );
 		$out     = array();
 		foreach ( $documents as $document ) {

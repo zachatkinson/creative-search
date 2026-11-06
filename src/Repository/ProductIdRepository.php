@@ -114,4 +114,90 @@ final class ProductIdRepository extends Repository {
 		);
 		return array_map( static fn( array $row ): int => (int) $row['product_or_parent_id'], $rows );
 	}
+
+	/**
+	 * The terms of an attribute some products have in stock, as WooCommerce's attributes lookup table keeps them
+	 * (D-154): the values its filtered listing would list one of them in.
+	 *
+	 * @param string     $taxonomy Attribute taxonomy.
+	 * @param int[]|null $ids      Product ids, or null for every product.
+	 * @return int[] Term ids.
+	 */
+	public function termsInStock( string $taxonomy, ?array $ids ): array {
+		global $wpdb;
+		if ( array() === $ids ) {
+			return array();
+		}
+		$among = null === $ids ? '' : ' AND product_or_parent_id IN (' . self::ints( $ids ) . ')';
+		$rows  = $this->rows( $this->prepare( 'SELECT DISTINCT term_id FROM %i WHERE taxonomy = %s AND in_stock = %d' . $among, $wpdb->prefix . 'wc_product_attributes_lookup', $taxonomy, 1 ) );
+		return array_map( static fn( array $row ): int => (int) $row['term_id'], $rows );
+	}
+
+	/**
+	 * The terms of an attribute some published products carry (D-154).
+	 *
+	 * @param string     $taxonomy Attribute taxonomy.
+	 * @param int[]|null $ids      Product ids, or null for every product.
+	 * @return int[] Term ids.
+	 */
+	public function termsOf( string $taxonomy, ?array $ids ): array {
+		global $wpdb;
+		if ( array() === $ids ) {
+			return array();
+		}
+		$among = null === $ids ? '' : ' AND p.ID IN (' . self::ints( $ids ) . ')';
+		$rows  = $this->rows( $this->prepare( 'SELECT DISTINCT tt.term_id FROM %i p INNER JOIN %i r ON r.object_id = p.ID INNER JOIN %i tt ON tt.term_taxonomy_id = r.term_taxonomy_id WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = %s' . $among, $wpdb->posts, $wpdb->term_relationships, $wpdb->term_taxonomy, $taxonomy, 'product', 'publish' ) );
+		return array_map( static fn( array $row ): int => (int) $row['term_id'], $rows );
+	}
+
+	/**
+	 * Which of some products have which of some attribute terms in stock, as WooCommerce's attributes lookup table
+	 * keeps them (D-155): a product, or a variation of it, with an in-stock row for the term.
+	 *
+	 * @param int[] $productIds Product ids.
+	 * @param int[] $termIds    Attribute term ids.
+	 * @return array<string, true> `product:term` for each pair in stock.
+	 */
+	public function inStockPairs( array $productIds, array $termIds ): array {
+		global $wpdb;
+		if ( array() === $productIds || array() === $termIds ) {
+			return array();
+		}
+		$rows = $this->rows(
+			$this->prepare(
+				'SELECT DISTINCT product_or_parent_id, term_id FROM %i WHERE product_or_parent_id IN (' . self::ints( $productIds ) . ') AND term_id IN (' . self::ints( $termIds ) . ') AND in_stock = %d',
+				$wpdb->prefix . 'wc_product_attributes_lookup',
+				1
+			)
+		);
+		$out  = array();
+		foreach ( $rows as $row ) {
+			$out[ (int) $row['product_or_parent_id'] . ':' . (int) $row['term_id'] ] = true;
+		}
+		return $out;
+	}
+
+	/**
+	 * Whether any published product of a set carries some term of an attribute, sold out or not (D-156): a value read
+	 * from a query filters only products that have the attribute at all.
+	 *
+	 * @param string     $taxonomy   Attribute taxonomy.
+	 * @param int[]|null $ids        Product ids, or null for any product.
+	 * @param int[]      $categories Term taxonomy ids of a category and its subcategories the products are in, or
+	 *                               none for any category.
+	 */
+	public function carries( string $taxonomy, ?array $ids, array $categories = array() ): bool {
+		global $wpdb;
+		if ( array() === $ids ) {
+			return false;
+		}
+		$in    = array() === $categories ? '' : ' INNER JOIN %i c ON c.object_id = p.ID AND c.term_taxonomy_id IN (' . self::ints( $categories ) . ')';
+		$among = null === $ids ? '' : ' AND p.ID IN (' . self::ints( $ids ) . ')';
+		$args  = array( $wpdb->posts, $wpdb->term_relationships, $wpdb->term_taxonomy );
+		if ( array() !== $categories ) {
+			$args[] = $wpdb->term_relationships;
+		}
+		array_push( $args, $taxonomy, 'product', 'publish' );
+		return null !== $this->value( $this->prepare( 'SELECT 1 FROM %i p INNER JOIN %i r ON r.object_id = p.ID INNER JOIN %i tt ON tt.term_taxonomy_id = r.term_taxonomy_id' . $in . ' WHERE tt.taxonomy = %s AND p.post_type = %s AND p.post_status = %s' . $among . ' LIMIT 1', ...$args ) );
+	}
 }

@@ -71,7 +71,13 @@ final class MatchExplainerTest extends TestCase {
 		self::assertSame( MatchDetail::ATTRIBUTE, $d->reason, 'fire is not in the name' );
 		self::assertSame( 'Design', $d->name );
 		self::assertSame( 'Fire', $d->label );
+		self::assertSame( 'attribute_pa_design', $d->attribute, 'the value\'s key, for the stock check (D-155)' );
+		self::assertSame( 'fire', $d->value );
 		self::assertFalse( $d->isEmpty() );
+		$bare = $d->withoutReason();
+		self::assertSame( array( 101, 501, array( 'attribute_pa_design' => 'fire' ) ), array( $bare->variationId, $bare->imageId, $bare->args ), 'the variation stays' );
+		self::assertSame( array( '', '', '', '', '' ), array( $bare->reason, $bare->name, $bare->label, $bare->attribute, $bare->value ) );
+		self::assertFalse( $bare->isEmpty() );
 	}
 
 	public function test_the_second_variation_is_named_with_its_own_photo(): void {
@@ -94,6 +100,7 @@ final class MatchExplainerTest extends TestCase {
 		self::assertSame( array( 'attribute_pa_design' => 'ice' ), $d->args, 'its attributes, not the SKU' );
 		self::assertSame( MatchDetail::SKU, $d->reason );
 		self::assertSame( 'MUM-FUR-ICE', $d->label, 'the SKU typed' );
+		self::assertSame( array( '', '' ), array( $d->attribute, $d->value ), 'a SKU names no value' );
 	}
 
 	public function test_a_variation_sku_names_it_when_no_attribute_word_was_typed(): void {
