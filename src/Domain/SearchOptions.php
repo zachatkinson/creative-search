@@ -35,6 +35,8 @@ final class SearchOptions {
 	 * @param int[]              $scope        Products of these term-taxonomy ids only (a category and its subcategories,
 	 *                                         D-117); none limits nothing.
 	 * @param bool               $inStockFirst What can be bought before what is sold out, each in score order (D-138), among products that match alike (D-142).
+	 * @param int[]              $products     These products only, by id, a variation's folded into its parent's (D-162);
+	 *                                         none limits nothing (the caller answers an empty list itself).
 	 */
 	public function __construct(
 		public readonly array $weights = array(),
@@ -47,7 +49,8 @@ final class SearchOptions {
 		public readonly int $kind = Kind::PRODUCT,
 		public readonly bool $strict = false,
 		public readonly array $scope = array(),
-		public readonly bool $inStockFirst = false
+		public readonly bool $inStockFirst = false,
+		public readonly array $products = array()
 	) {
 	}
 

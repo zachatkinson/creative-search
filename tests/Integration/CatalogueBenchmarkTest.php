@@ -231,6 +231,46 @@ final class CatalogueBenchmarkTest extends IndexTestCase {
 				$failures[] = sprintf( "%s [%s, %s]: %s\n    got %s | terms %s | corrected %s", $q['q'], $q['kind'], $q['lang'], implode( '; ', $wrong ), implode( ', ', $shown ), implode( ', ', $terms ), var_export( $data['corrected'], true ) );
 			}
 		}
+		// 1.7.0 (D-162): another plugin's ranking kept to 500 products spread over the catalogue, through
+		// `csearch_ranked_ids`, for the golden set's one- and three-word queries, cold, the fastest of three each.
+		$scoped   = array();
+		$step     = max( 1, intdiv( count( $products ), 500 ) );
+		$spread   = array_slice( array_values( array_filter( $products, static fn( int $k ): bool => 0 === $k % $step, ARRAY_FILTER_USE_KEY ) ), 0, 500 );
+		$byWords  = array(
+			1 => array(),
+			3 => array(),
+		);
+		$scopedAt = hrtime( true );
+		foreach ( GoldenQueries::queries() as $q ) {
+			$words = count( preg_split( '/\s+/', trim( (string) $q['q'] ) ) ?: array() );
+			if ( ! isset( $byWords[ $words ] ) ) {
+				continue;
+			}
+			$times = array();
+			for ( $i = 0; $i < self::TIMINGS; $i++ ) {
+				wp_cache_flush();
+				$start   = hrtime( true );
+				$scoped  = apply_filters( 'csearch_ranked_ids', null, $q['q'], array( 'lang' => $q['lang'], 'product_ids' => $spread ) );
+				$times[] = ( hrtime( true ) - $start ) / 1e6;
+			}
+			self::assertIsArray( $scoped );
+			self::assertSame( array(), array_diff( $scoped['ids'], $spread ), 'only the products asked for' );
+			$byWords[ $words ][] = min( $times );
+		}
+		$this->phase(
+			sprintf(
+				'csearch_ranked_ids kept to %d products: %d one-word queries p95 %.1f ms, %d three-word queries p95 %.1f ms (budget 100)',
+				count( $spread ),
+				count( $byWords[1] ),
+				self::p95( $byWords[1] ),
+				count( $byWords[3] ),
+				self::p95( $byWords[3] )
+			),
+			$scopedAt
+		);
+		self::assertLessThan( 100.0, self::p95( $byWords[1] ) );
+		self::assertLessThan( 100.0, self::p95( $byWords[3] ) );
+
 		remove_filter( 'csearch_languages', array( WooCommerceCatalogue::class, 'bilingual' ) );
 		Settings::update(
 			array(

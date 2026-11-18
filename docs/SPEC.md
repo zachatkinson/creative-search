@@ -258,7 +258,7 @@ One menu entry, WooCommerce → Search, with four tabs, built with WordPress's o
 
 The log answers the owner's questions (what people want, what they cannot find, what they click) and holds nothing about who asked: no IP address, no user id, no session id, no user agent, no page URL, and the query itself trimmed, lower-cased and capped at 200 characters.
 
-- **Kept:** the query as typed and as normalised, the language, the result count, the source (suggestions or results page), the clicked suggestion's type and id, and the time to the minute.
+- **Kept:** the query as typed and as normalised, the language, the result count, the source (suggestions, results page, or, from 1.7.0, another plugin that asks for a ranking from PHP and names a source: `builder`, a source it registered, or `other`; such searches are logged as the shop's are, with nothing more about who asked, and stay out of the shop's own counts and suggested searches, D-163), the clicked suggestion's type and id, and the time to the minute.
 - **Never kept:** anything that identifies the shopper or the device. A query that looks like an email address, a phone number, a card number or a postal code (patterns in `Domain\Scrub`, tested) is logged as `[redacted]` so a shopper typing their own details into the wrong box leaves no trace.
 - **Retention:** 90 days by default (a setting, 7 to 365), purged nightly by `csearch_purge_log` in batches of 1,000; aggregates for the Analytics charts are rolled up daily into `csearch_settings['stats']` (counts only) so the charts survive the purge.
 - **Rate-limit counters** live in the object cache for 10 seconds, keyed by a hash of the IP, never written to the database.

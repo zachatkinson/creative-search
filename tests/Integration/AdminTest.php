@@ -263,8 +263,10 @@ final class AdminTest extends IndexTestCase {
 				'searches' => 5,
 				'zero'     => 2,
 				'clicks'   => 1,
-				'suggest'  => 3,
-				'page'     => 2,
+				'sources'  => array(
+					'suggest' => 3,
+					'page'    => 2,
+				),
 			),
 			$analytics->totals( 7 )
 		);

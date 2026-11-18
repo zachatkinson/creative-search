@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Creative Search 1.6.5\n"
+"Project-Id-Version: Creative Search 1.6.6\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/creative-search\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-06T00:27:08+00:00\n"
+"POT-Creation-Date: 2026-11-18T19:42:31+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: creative-search\n"
@@ -206,143 +206,143 @@ msgstr ""
 msgid "Search settings"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:43
+#: src/Admin/AnalyticsTab.php:44
 msgid "Period"
 msgstr ""
 
 #. translators: %d: number of days
-#: src/Admin/AnalyticsTab.php:46
+#: src/Admin/AnalyticsTab.php:47
 #, php-format
 msgid "Last %d day"
 msgid_plural "Last %d days"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Admin/AnalyticsTab.php:48
-msgid "Show"
+#: src/Admin/AnalyticsTab.php:49
+msgid "Searches from"
 msgstr ""
 
 #: src/Admin/AnalyticsTab.php:50
-msgid "Summary"
+msgid "The shop: suggestions and results page"
 msgstr ""
 
 #: src/Admin/AnalyticsTab.php:54
-#: src/Admin/AnalyticsTab.php:68
-#: src/Admin/AnalyticsTab.php:138
-#: src/Admin/AnalyticsTab.php:194
-msgid "Searches"
-msgstr ""
-
-#: src/Admin/AnalyticsTab.php:55
-msgid "Searches with no results"
+msgid "Show"
 msgstr ""
 
 #: src/Admin/AnalyticsTab.php:56
-msgid "Suggestions clicked"
-msgstr ""
-
-#: src/Admin/AnalyticsTab.php:57
-#: src/Admin/AnalyticsTab.php:138
-msgid "Click-through"
-msgstr ""
-
-#: src/Admin/AnalyticsTab.php:58
-msgid "From the suggestions"
+msgid "Summary"
 msgstr ""
 
 #: src/Admin/AnalyticsTab.php:59
-msgid "From the results page"
+#: src/Admin/AnalyticsTab.php:75
+#: src/Admin/AnalyticsTab.php:145
+#: src/Admin/AnalyticsTab.php:201
+msgid "Searches"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:66
+#: src/Admin/AnalyticsTab.php:60
+msgid "Searches with no results"
+msgstr ""
+
+#: src/Admin/AnalyticsTab.php:61
+msgid "Suggestions clicked"
+msgstr ""
+
+#: src/Admin/AnalyticsTab.php:62
+#: src/Admin/AnalyticsTab.php:145
+msgid "Click-through"
+msgstr ""
+
+#: src/Admin/AnalyticsTab.php:73
 msgid "Searches a day"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:68
+#: src/Admin/AnalyticsTab.php:75
 msgid "The numbers by day"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:68
+#: src/Admin/AnalyticsTab.php:75
 msgid "Day"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:68
+#: src/Admin/AnalyticsTab.php:75
 msgid "No results"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:68
-#: src/Admin/AnalyticsTab.php:85
+#: src/Admin/AnalyticsTab.php:75
+#: src/Admin/AnalyticsTab.php:92
 msgid "Clicks"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:74
+#: src/Admin/AnalyticsTab.php:81
 msgid "Top queries"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:75
+#: src/Admin/AnalyticsTab.php:82
 msgid "No searches in this period."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:76
+#: src/Admin/AnalyticsTab.php:83
 msgid "Top queries with no results"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:77
+#: src/Admin/AnalyticsTab.php:84
 msgid "What shoppers wanted and could not find: a buying list, or a synonym to add."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:78
+#: src/Admin/AnalyticsTab.php:85
 msgid "Every search in this period found something."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:80
+#: src/Admin/AnalyticsTab.php:87
 msgid "Most clicked suggestions"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:83
+#: src/Admin/AnalyticsTab.php:90
 msgid "No suggestion was clicked in this period."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:85
+#: src/Admin/AnalyticsTab.php:92
 msgid "Suggestion"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:85
+#: src/Admin/AnalyticsTab.php:92
 msgid "Type"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:93
+#: src/Admin/AnalyticsTab.php:100
 msgid "Export"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:94
+#: src/Admin/AnalyticsTab.php:101
 msgid "Every search of the period, one row each, the same columns as the log. Nothing in it identifies a shopper."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:95
+#: src/Admin/AnalyticsTab.php:102
 #: src/Admin/SynonymsTab.php:131
 msgid "Export CSV"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:106
-#: src/Admin/AnalyticsTab.php:123
+#: src/Admin/AnalyticsTab.php:113
+#: src/Admin/AnalyticsTab.php:130
 msgid "Clear analytics"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:109
+#: src/Admin/AnalyticsTab.php:116
 msgid "Start the numbers again from nothing, such as on launch day, after testing."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:117
 msgid "Clear analytics…"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:114
+#: src/Admin/AnalyticsTab.php:121
 msgid "This deletes, for good:"
 msgstr ""
 
 #. translators: %s: number of searches
-#: src/Admin/AnalyticsTab.php:116
+#: src/Admin/AnalyticsTab.php:123
 #, php-format
 msgid "%s logged search, with what was clicked after it"
 msgid_plural "all %s logged searches, with what was clicked after each"
@@ -350,32 +350,32 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: number of days
-#: src/Admin/AnalyticsTab.php:118
+#: src/Admin/AnalyticsTab.php:125
 #, php-format
 msgid "%s day of daily counts behind the charts"
 msgid_plural "%s days of daily counts behind the charts"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Admin/AnalyticsTab.php:119
+#: src/Admin/AnalyticsTab.php:126
 msgid "the suggested searches, which are built from the log, until shoppers search again"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:120
+#: src/Admin/AnalyticsTab.php:127
 msgid "Synonyms, redirects, pins and the index are not touched. Export a CSV first to keep a copy."
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:124
+#: src/Admin/AnalyticsTab.php:131
 #: src/Admin/SynonymsTab.php:105
 msgid "Cancel"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 #: src/Admin/ToolsTab.php:139
 msgid "Query"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 #: src/Admin/RulesTab.php:43
 #: src/Admin/RulesTab.php:68
 #: src/Admin/RulesTab.php:126
@@ -386,27 +386,27 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 msgid "Results"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 msgid "Actions"
 msgstr ""
 
 #. translators: %s: a search query
-#: src/Admin/AnalyticsTab.php:149
+#: src/Admin/AnalyticsTab.php:156
 #, php-format
 msgid "Explain “%s”"
 msgstr ""
 
 #. translators: %s: a search query
-#: src/Admin/AnalyticsTab.php:149
+#: src/Admin/AnalyticsTab.php:156
 msgid "Explain"
 msgstr ""
 
 #. translators: 1: number of searches, 2: number of days, 3: the busiest day's searches
-#: src/Admin/AnalyticsTab.php:168
+#: src/Admin/AnalyticsTab.php:175
 #, php-format
 msgid "%1$s search over %2$s days; the busiest day had %3$s."
 msgid_plural "%1$s searches over %2$s days; the busiest day had %3$s."
@@ -414,38 +414,60 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: 1: a day, 2: searches, 3: searches with no results
-#: src/Admin/AnalyticsTab.php:183
+#: src/Admin/AnalyticsTab.php:190
 #, php-format
 msgid "%1$s: %2$s search, %3$s with no results"
 msgid_plural "%1$s: %2$s searches, %3$s with no results"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Admin/AnalyticsTab.php:194
+#: src/Admin/AnalyticsTab.php:201
 msgid "With no results"
 msgstr ""
 
+#: src/Admin/AnalyticsTab.php:212
+msgid "From the suggestions"
+msgstr ""
+
+#: src/Admin/AnalyticsTab.php:213
+msgid "From the results page"
+msgstr ""
+
+#: src/Admin/AnalyticsTab.php:214
+msgid "From a product builder"
+msgstr ""
+
+#: src/Admin/AnalyticsTab.php:215
+msgid "From other plugins"
+msgstr ""
+
+#. translators: %s: the short name another plugin logs its searches under, such as kiosk
+#: src/Admin/AnalyticsTab.php:218
+#, php-format
+msgid "From “%s”"
+msgstr ""
+
 #. translators: %s: a percentage number
-#: src/Admin/AnalyticsTab.php:205
+#: src/Admin/AnalyticsTab.php:228
 #, php-format
 msgid "%s%%"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:215
+#: src/Admin/AnalyticsTab.php:238
 msgid "Product"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:216
+#: src/Admin/AnalyticsTab.php:239
 #: src/Admin/BoostsTab.php:160
 msgid "Category"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:217
+#: src/Admin/AnalyticsTab.php:240
 #: src/Admin/BoostsTab.php:161
 msgid "Tag"
 msgstr ""
 
-#: src/Admin/AnalyticsTab.php:218
+#: src/Admin/AnalyticsTab.php:241
 #: src/Admin/BoostsTab.php:162
 msgid "Brand"
 msgstr ""

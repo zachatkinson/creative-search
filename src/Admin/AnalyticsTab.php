@@ -35,8 +35,9 @@ final class AnalyticsTab {
 	 */
 	public function render(): void {
 		$days   = Analytics::period( isset( $_GET['days'] ) && is_string( $_GET['days'] ) ? sanitize_text_field( wp_unslash( $_GET['days'] ) ) : 30 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- choosing a period changes nothing.
-		$totals = $this->analytics->totals( $days );
-		$daily  = $this->analytics->daily( $days );
+		$source = Analytics::source( isset( $_GET['source'] ) && is_string( $_GET['source'] ) ? sanitize_key( wp_unslash( $_GET['source'] ) ) : '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- choosing a source changes nothing.
+		$totals = $this->analytics->totals( $days, $source );
+		$daily  = $this->analytics->daily( $days, $source );
 
 		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="csearch-period">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( AdminPage::SLUG ) . '"><input type="hidden" name="tab" value="analytics">';
@@ -45,20 +46,26 @@ final class AnalyticsTab {
 			/* translators: %d: number of days */
 			echo '<option value="' . esc_attr( (string) $period ) . '"' . selected( $period, $days, false ) . '>' . esc_html( sprintf( _n( 'Last %d day', 'Last %d days', $period, 'creative-search' ), $period ) ) . '</option>';
 		}
+		echo '</select> <label for="csearch-source">' . esc_html__( 'Searches from', 'creative-search' ) . '</label> <select id="csearch-source" name="source">';
+		echo '<option value=""' . selected( '', $source, false ) . '>' . esc_html__( 'The shop: suggestions and results page', 'creative-search' ) . '</option>';
+		foreach ( Analytics::sources() as $choice ) {
+			echo '<option value="' . esc_attr( $choice ) . '"' . selected( $choice, $source, false ) . '>' . esc_html( self::source( $choice ) ) . '</option>';
+		}
 		echo '</select> ' . get_submit_button( __( 'Show', 'creative-search' ), 'secondary', 'submit', false, array( 'id' => 'csearch-show-period' ) ) . '</form>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- WordPress builds the button escaped.
 
 		echo '<h2>' . esc_html__( 'Summary', 'creative-search' ) . '</h2><ul class="csearch-totals">';
-		$ctr = $totals['searches'] > 0 ? $totals['clicks'] / $totals['searches'] : 0.0;
-		foreach (
-			array(
-				array( __( 'Searches', 'creative-search' ), number_format_i18n( $totals['searches'] ) ),
-				array( __( 'Searches with no results', 'creative-search' ), number_format_i18n( $totals['zero'] ) ),
-				array( __( 'Suggestions clicked', 'creative-search' ), number_format_i18n( $totals['clicks'] ) ),
-				array( __( 'Click-through', 'creative-search' ), self::percent( $ctr ) ),
-				array( __( 'From the suggestions', 'creative-search' ), number_format_i18n( $totals['suggest'] ) ),
-				array( __( 'From the results page', 'creative-search' ), number_format_i18n( $totals['page'] ) ),
-			) as $total
-		) {
+		$ctr  = $totals['searches'] > 0 ? $totals['clicks'] / $totals['searches'] : 0.0;
+		$rows = array(
+			array( __( 'Searches', 'creative-search' ), number_format_i18n( $totals['searches'] ) ),
+			array( __( 'Searches with no results', 'creative-search' ), number_format_i18n( $totals['zero'] ) ),
+			array( __( 'Suggestions clicked', 'creative-search' ), number_format_i18n( $totals['clicks'] ) ),
+			array( __( 'Click-through', 'creative-search' ), self::percent( $ctr ) ),
+		);
+		// Every source's searches, the shop's two always (D-163).
+		foreach ( $totals['sources'] as $from => $count ) {
+			$rows[] = array( self::source( $from ), number_format_i18n( $count ) );
+		}
+		foreach ( $rows as $total ) {
 			echo '<li><span class="csearch-total-value">' . esc_html( $total[1] ) . '</span> <span class="csearch-total-label">' . esc_html( $total[0] ) . '</span></li>';
 		}
 		echo '</ul>';
@@ -72,10 +79,10 @@ final class AnalyticsTab {
 		echo '</tbody></table></details>';
 
 		echo '<h2>' . esc_html__( 'Top queries', 'creative-search' ) . '</h2>';
-		$this->queries( $this->analytics->topQueries( $days, false ), __( 'No searches in this period.', 'creative-search' ) );
+		$this->queries( $this->analytics->topQueries( $days, false, Analytics::TOP, 0, $source ), __( 'No searches in this period.', 'creative-search' ) );
 		echo '<h2>' . esc_html__( 'Top queries with no results', 'creative-search' ) . '</h2>';
 		echo '<p class="description">' . esc_html__( 'What shoppers wanted and could not find: a buying list, or a synonym to add.', 'creative-search' ) . '</p>';
-		$this->queries( $this->analytics->topQueries( $days, true ), __( 'Every search in this period found something.', 'creative-search' ) );
+		$this->queries( $this->analytics->topQueries( $days, true, Analytics::TOP, 0, $source ), __( 'Every search in this period found something.', 'creative-search' ) );
 
 		echo '<h2>' . esc_html__( 'Most clicked suggestions', 'creative-search' ) . '</h2>';
 		$clicked = $this->analytics->topClicked( $days );
@@ -193,6 +200,22 @@ final class AnalyticsTab {
 		$svg .= '<line class="csearch-axis" x1="0" y1="' . ( $height + 1 ) . '" x2="' . $width . '" y2="' . ( $height + 1 ) . '"></line></svg>';
 		$svg .= '<p class="csearch-chart-key"><span class="csearch-key csearch-key-all"></span> ' . esc_html__( 'Searches', 'creative-search' ) . ' <span class="csearch-key csearch-key-zero"></span> ' . esc_html__( 'With no results', 'creative-search' ) . '</p>';
 		return $svg;
+	}
+
+	/**
+	 * Where searches came from, as the screen names it (D-163).
+	 *
+	 * @param string $source A log source.
+	 */
+	public static function source( string $source ): string {
+		$names = array(
+			'suggest' => __( 'From the suggestions', 'creative-search' ),
+			'page'    => __( 'From the results page', 'creative-search' ),
+			'builder' => __( 'From a product builder', 'creative-search' ),
+			'other'   => __( 'From other plugins', 'creative-search' ),
+		);
+		/* translators: %s: the short name another plugin logs its searches under, such as kiosk */
+		return $names[ $source ] ?? sprintf( __( 'From “%s”', 'creative-search' ), $source );
 	}
 
 	/**

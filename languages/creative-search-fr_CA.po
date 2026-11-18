@@ -178,130 +178,130 @@ msgstr "Masquer"
 msgid "Search settings"
 msgstr "Réglages de la recherche"
 
-#: src/Admin/AnalyticsTab.php:43
+#: src/Admin/AnalyticsTab.php:44
 msgid "Period"
 msgstr "Période"
 
 #. translators: %d: number of days
-#: src/Admin/AnalyticsTab.php:46
+#: src/Admin/AnalyticsTab.php:47
 #, php-format
 msgid "Last %d day"
 msgid_plural "Last %d days"
 msgstr[0] "Dernier %d jour"
 msgstr[1] "%d derniers jours"
 
-#: src/Admin/AnalyticsTab.php:48
+#: src/Admin/AnalyticsTab.php:54
 msgid "Show"
 msgstr "Afficher"
 
-#: src/Admin/AnalyticsTab.php:50
+#: src/Admin/AnalyticsTab.php:56
 msgid "Summary"
 msgstr "Résumé"
 
-#: src/Admin/AnalyticsTab.php:54
-#: src/Admin/AnalyticsTab.php:68
-#: src/Admin/AnalyticsTab.php:138
-#: src/Admin/AnalyticsTab.php:194
+#: src/Admin/AnalyticsTab.php:59
+#: src/Admin/AnalyticsTab.php:75
+#: src/Admin/AnalyticsTab.php:145
+#: src/Admin/AnalyticsTab.php:201
 msgid "Searches"
 msgstr "Recherches"
 
-#: src/Admin/AnalyticsTab.php:55
+#: src/Admin/AnalyticsTab.php:60
 msgid "Searches with no results"
 msgstr "Recherches sans résultat"
 
-#: src/Admin/AnalyticsTab.php:56
+#: src/Admin/AnalyticsTab.php:61
 msgid "Suggestions clicked"
 msgstr "Suggestions cliquées"
 
-#: src/Admin/AnalyticsTab.php:57
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:62
+#: src/Admin/AnalyticsTab.php:145
 msgid "Click-through"
 msgstr "Taux de clics"
 
-#: src/Admin/AnalyticsTab.php:58
+#: src/Admin/AnalyticsTab.php:212
 msgid "From the suggestions"
 msgstr "Depuis les suggestions"
 
-#: src/Admin/AnalyticsTab.php:59
+#: src/Admin/AnalyticsTab.php:213
 msgid "From the results page"
 msgstr "Depuis la page de résultats"
 
-#: src/Admin/AnalyticsTab.php:66
+#: src/Admin/AnalyticsTab.php:73
 msgid "Searches a day"
 msgstr "Recherches par jour"
 
-#: src/Admin/AnalyticsTab.php:68
+#: src/Admin/AnalyticsTab.php:75
 msgid "The numbers by day"
 msgstr "Les chiffres par jour"
 
-#: src/Admin/AnalyticsTab.php:68
+#: src/Admin/AnalyticsTab.php:75
 msgid "Day"
 msgstr "Jour"
 
-#: src/Admin/AnalyticsTab.php:68
+#: src/Admin/AnalyticsTab.php:75
 msgid "No results"
 msgstr "Aucun résultat"
 
-#: src/Admin/AnalyticsTab.php:68
-#: src/Admin/AnalyticsTab.php:85
+#: src/Admin/AnalyticsTab.php:75
+#: src/Admin/AnalyticsTab.php:92
 msgid "Clicks"
 msgstr "Clics"
 
-#: src/Admin/AnalyticsTab.php:74
+#: src/Admin/AnalyticsTab.php:81
 msgid "Top queries"
 msgstr "Recherches les plus fréquentes"
 
-#: src/Admin/AnalyticsTab.php:75
+#: src/Admin/AnalyticsTab.php:82
 msgid "No searches in this period."
 msgstr "Aucune recherche pendant cette période."
 
-#: src/Admin/AnalyticsTab.php:76
+#: src/Admin/AnalyticsTab.php:83
 msgid "Top queries with no results"
 msgstr "Recherches fréquentes sans résultat"
 
-#: src/Admin/AnalyticsTab.php:77
+#: src/Admin/AnalyticsTab.php:84
 msgid "What shoppers wanted and could not find: a buying list, or a synonym to add."
 msgstr "Ce que les clients voulaient sans le trouver : une liste d’achats, ou un synonyme à ajouter."
 
-#: src/Admin/AnalyticsTab.php:78
+#: src/Admin/AnalyticsTab.php:85
 msgid "Every search in this period found something."
 msgstr "Chaque recherche de cette période a trouvé quelque chose."
 
-#: src/Admin/AnalyticsTab.php:80
+#: src/Admin/AnalyticsTab.php:87
 msgid "Most clicked suggestions"
 msgstr "Suggestions les plus cliquées"
 
-#: src/Admin/AnalyticsTab.php:83
+#: src/Admin/AnalyticsTab.php:90
 msgid "No suggestion was clicked in this period."
 msgstr "Aucune suggestion n’a été cliquée pendant cette période."
 
-#: src/Admin/AnalyticsTab.php:85
+#: src/Admin/AnalyticsTab.php:92
 msgid "Suggestion"
 msgstr "Suggestion"
 
-#: src/Admin/AnalyticsTab.php:85
+#: src/Admin/AnalyticsTab.php:92
 msgid "Type"
 msgstr "Type"
 
-#: src/Admin/AnalyticsTab.php:93
+#: src/Admin/AnalyticsTab.php:100
 msgid "Export"
 msgstr "Exporter"
 
-#: src/Admin/AnalyticsTab.php:94
+#: src/Admin/AnalyticsTab.php:101
 msgid "Every search of the period, one row each, the same columns as the log. Nothing in it identifies a shopper."
 msgstr "Toutes les recherches de la période, une ligne chacune, avec les mêmes colonnes que le journal. Rien n’y identifie un client."
 
-#: src/Admin/AnalyticsTab.php:95
+#: src/Admin/AnalyticsTab.php:102
 #: src/Admin/SynonymsTab.php:131
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 #: src/Admin/ToolsTab.php:139
 msgid "Query"
 msgstr "Requête"
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 #: src/Admin/RulesTab.php:43
 #: src/Admin/RulesTab.php:68
 #: src/Admin/RulesTab.php:126
@@ -312,27 +312,27 @@ msgstr "Requête"
 msgid "Language"
 msgstr "Langue"
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 msgid "Results"
 msgstr "Résultats"
 
-#: src/Admin/AnalyticsTab.php:138
+#: src/Admin/AnalyticsTab.php:145
 msgid "Actions"
 msgstr "Actions"
 
 #. translators: %s: a search query
-#: src/Admin/AnalyticsTab.php:149
+#: src/Admin/AnalyticsTab.php:156
 #, php-format
 msgid "Explain “%s”"
 msgstr "Expliquer « %s »"
 
 #. translators: %s: a search query
-#: src/Admin/AnalyticsTab.php:149
+#: src/Admin/AnalyticsTab.php:156
 msgid "Explain"
 msgstr "Expliquer"
 
 #. translators: 1: number of searches, 2: number of days, 3: the busiest day's searches
-#: src/Admin/AnalyticsTab.php:168
+#: src/Admin/AnalyticsTab.php:175
 #, php-format
 msgid "%1$s search over %2$s days; the busiest day had %3$s."
 msgid_plural "%1$s searches over %2$s days; the busiest day had %3$s."
@@ -340,38 +340,38 @@ msgstr[0] "%1$s recherche en %2$s jours; le jour le plus achalandé en a compté
 msgstr[1] "%1$s recherches en %2$s jours; le jour le plus achalandé en a compté %3$s."
 
 #. translators: 1: a day, 2: searches, 3: searches with no results
-#: src/Admin/AnalyticsTab.php:183
+#: src/Admin/AnalyticsTab.php:190
 #, php-format
 msgid "%1$s: %2$s search, %3$s with no results"
 msgid_plural "%1$s: %2$s searches, %3$s with no results"
 msgstr[0] "%1$s : %2$s recherche, %3$s sans résultat"
 msgstr[1] "%1$s : %2$s recherches, %3$s sans résultat"
 
-#: src/Admin/AnalyticsTab.php:194
+#: src/Admin/AnalyticsTab.php:201
 msgid "With no results"
 msgstr "Sans résultat"
 
 #. translators: %s: a percentage number
-#: src/Admin/AnalyticsTab.php:205
+#: src/Admin/AnalyticsTab.php:228
 #, php-format
 msgid "%s%%"
 msgstr "%s %%"
 
-#: src/Admin/AnalyticsTab.php:215
+#: src/Admin/AnalyticsTab.php:238
 msgid "Product"
 msgstr "Produit"
 
-#: src/Admin/AnalyticsTab.php:216
+#: src/Admin/AnalyticsTab.php:239
 #: src/Admin/BoostsTab.php:160
 msgid "Category"
 msgstr "Catégorie"
 
-#: src/Admin/AnalyticsTab.php:217
+#: src/Admin/AnalyticsTab.php:240
 #: src/Admin/BoostsTab.php:161
 msgid "Tag"
 msgstr "Étiquette"
 
-#: src/Admin/AnalyticsTab.php:218
+#: src/Admin/AnalyticsTab.php:241
 #: src/Admin/BoostsTab.php:162
 msgid "Brand"
 msgstr "Marque"
@@ -621,7 +621,7 @@ msgstr "Ajouter le synonyme"
 msgid "Save synonym"
 msgstr "Enregistrer le synonyme"
 
-#: src/Admin/AnalyticsTab.php:124
+#: src/Admin/AnalyticsTab.php:131
 #: src/Admin/SynonymsTab.php:105
 msgid "Cancel"
 msgstr "Annuler"
@@ -1969,25 +1969,25 @@ msgid_plural "Analytics cleared: %s searches deleted, with the daily counts. New
 msgstr[0] "Statistiques effacées : %s recherche supprimée, avec les comptes quotidiens. Les nouvelles recherches sont comptées à partir de maintenant."
 msgstr[1] "Statistiques effacées : %s recherches supprimées, avec les comptes quotidiens. Les nouvelles recherches sont comptées à partir de maintenant."
 
-#: src/Admin/AnalyticsTab.php:106
-#: src/Admin/AnalyticsTab.php:123
+#: src/Admin/AnalyticsTab.php:113
+#: src/Admin/AnalyticsTab.php:130
 msgid "Clear analytics"
 msgstr "Effacer les statistiques"
 
-#: src/Admin/AnalyticsTab.php:109
+#: src/Admin/AnalyticsTab.php:116
 msgid "Start the numbers again from nothing, such as on launch day, after testing."
 msgstr "Repartir de zéro, par exemple le jour du lancement, après les essais."
 
-#: src/Admin/AnalyticsTab.php:110
+#: src/Admin/AnalyticsTab.php:117
 msgid "Clear analytics…"
 msgstr "Effacer les statistiques…"
 
-#: src/Admin/AnalyticsTab.php:114
+#: src/Admin/AnalyticsTab.php:121
 msgid "This deletes, for good:"
 msgstr "Ceci supprime définitivement :"
 
 #. translators: %s: number of searches
-#: src/Admin/AnalyticsTab.php:116
+#: src/Admin/AnalyticsTab.php:123
 #, php-format
 msgid "%s logged search, with what was clicked after it"
 msgid_plural "all %s logged searches, with what was clicked after each"
@@ -1995,18 +1995,18 @@ msgstr[0] "%s recherche journalisée, avec ce qui a été cliqué ensuite"
 msgstr[1] "les %s recherches journalisées, avec ce qui a été cliqué après chacune"
 
 #. translators: %s: number of days
-#: src/Admin/AnalyticsTab.php:118
+#: src/Admin/AnalyticsTab.php:125
 #, php-format
 msgid "%s day of daily counts behind the charts"
 msgid_plural "%s days of daily counts behind the charts"
 msgstr[0] "%s jour de comptes quotidiens derrière les graphiques"
 msgstr[1] "%s jours de comptes quotidiens derrière les graphiques"
 
-#: src/Admin/AnalyticsTab.php:119
+#: src/Admin/AnalyticsTab.php:126
 msgid "the suggested searches, which are built from the log, until shoppers search again"
 msgstr "les recherches suggérées, tirées du journal, jusqu’à ce que la clientèle cherche de nouveau"
 
-#: src/Admin/AnalyticsTab.php:120
+#: src/Admin/AnalyticsTab.php:127
 msgid "Synonyms, redirects, pins and the index are not touched. Export a CSV first to keep a copy."
 msgstr "Les synonymes, les redirections, les épinglages et l’index ne sont pas touchés. Exportez d’abord en CSV pour en garder une copie."
 
@@ -2096,3 +2096,25 @@ msgid "Closest in stock:"
 msgid_plural "Closest in stock:"
 msgstr[0] "Le plus proche en stock :"
 msgstr[1] "Les plus proches en stock :"
+
+#: src/Admin/AnalyticsTab.php:49
+msgid "Searches from"
+msgstr "Recherches provenant de"
+
+#: src/Admin/AnalyticsTab.php:50
+msgid "The shop: suggestions and results page"
+msgstr "La boutique : suggestions et page de résultats"
+
+#: src/Admin/AnalyticsTab.php:214
+msgid "From a product builder"
+msgstr "D’un configurateur de produits"
+
+#: src/Admin/AnalyticsTab.php:215
+msgid "From other plugins"
+msgstr "D’autres extensions"
+
+#. translators: %s: the short name another plugin logs its searches under, such as kiosk
+#: src/Admin/AnalyticsTab.php:218
+#, php-format
+msgid "From “%s”"
+msgstr "De « %s »"

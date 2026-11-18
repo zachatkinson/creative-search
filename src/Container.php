@@ -49,6 +49,7 @@ final class Container {
 			Hooks\LogHooks::class,
 			Hooks\ResultsHooks::class,
 			Hooks\MatchHooks::class,
+			Hooks\ApiHooks::class,
 			Block\SearchBlock::class,
 			Block\Shortcode::class,
 			Block\WidgetRegistrar::class,

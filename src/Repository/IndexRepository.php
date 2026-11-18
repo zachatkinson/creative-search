@@ -93,9 +93,14 @@ final class IndexRepository implements IndexStore {
 	 *
 	 * @param array<int, Document> $documents Documents by id.
 	 * @param int[]                $scope     Term-taxonomy ids; none keeps every document.
+	 * @param int[]                $products  Product ids a caller keeps the ranking to (D-162); none keeps every one.
 	 * @return array<int, Document>
 	 */
-	private function inScope( array $documents, array $scope ): array {
+	private function inScope( array $documents, array $scope, array $products = array() ): array {
+		if ( array() !== $products ) {
+			$kept      = array_flip( $products );
+			$documents = array_filter( $documents, static fn( Document $d ): bool => isset( $kept[ $d->objectId ] ) );
+		}
 		if ( array() === $scope || array() === $documents ) {
 			return $documents;
 		}
@@ -238,7 +243,7 @@ final class IndexRepository implements IndexStore {
 			return ( new Ranker() )->rank(
 				$plan,
 				$this->postings( array_merge( $plan->terms(), $plan->excluded ), $plan->lang, $plan->kind ),
-				fn( array $ids, string $key ): array => $this->inScope( $this->documents( $ids, $key ), $plan->scope )
+				fn( array $ids, string $key ): array => $this->inScope( $this->documents( $ids, $key ), $plan->scope, $plan->products )
 			);
 		}
 		$hits = array();

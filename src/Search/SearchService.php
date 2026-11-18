@@ -25,6 +25,7 @@ use CreativeBranding\Search\Index\ContentReader;
 use CreativeBranding\Search\Index\Languages;
 use CreativeBranding\Search\Index\TermReader;
 use CreativeBranding\Search\Repository\IndexRepository;
+use CreativeBranding\Search\Repository\ProductIdRepository;
 use CreativeBranding\Search\Repository\SynonymRepository;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
@@ -46,6 +47,11 @@ final class SearchService {
 	public const MAX_TERMS = 10;
 
 	/**
+	 * The products a caller may keep a ranking to (D-162).
+	 */
+	public const MAX_PRODUCTS = 2000;
+
+	/**
 	 * Posts and pages at most: in the panel, and on the results page (D-093).
 	 */
 	public const CONTENT_PANEL   = 2;
@@ -60,13 +66,14 @@ final class SearchService {
 	/**
 	 * Constructor.
 	 *
-	 * @param IndexRepository   $index     The index.
-	 * @param AnalyzerFactory   $analyzers The analyzer.
-	 * @param SynonymRepository $synonyms  The owner's synonyms.
-	 * @param Languages         $languages The indexed languages.
-	 * @param Cache             $cache     Answers.
-	 * @param SearchLog         $log       The log writer.
-	 * @param OwnerRules        $rules     The owner's pinned products (D-110).
+	 * @param IndexRepository     $index     The index.
+	 * @param AnalyzerFactory     $analyzers The analyzer.
+	 * @param SynonymRepository   $synonyms  The owner's synonyms.
+	 * @param Languages           $languages The indexed languages.
+	 * @param Cache               $cache     Answers.
+	 * @param SearchLog           $log       The log writer.
+	 * @param OwnerRules          $rules     The owner's pinned products (D-110).
+	 * @param ProductIdRepository $products Variations' parents, for a ranking kept to some products (D-162).
 	 */
 	public function __construct(
 		private IndexRepository $index,
@@ -75,7 +82,8 @@ final class SearchService {
 		private Languages $languages,
 		private Cache $cache,
 		private SearchLog $log,
-		private OwnerRules $rules
+		private OwnerRules $rules,
+		private ProductIdRepository $products
 	) {
 	}
 
@@ -110,9 +118,10 @@ final class SearchService {
 	 * @param bool   $retry     Retry without the least-matched token when nothing matches.
 	 * @param bool   $explain   Rank in PHP, with every part of each score (D-086): the same order, more memory.
 	 * @param int[]  $scope     Products of these term-taxonomy ids only (D-117).
+	 * @param int[]  $products  These products only, by id, variations folded into their parents (D-162); none limits nothing.
 	 */
-	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false, array $scope = array() ): SearchResult {
-		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry, $scope ), $explain );
+	public function run( string $query, string $lang, int $limit = self::MAX_IDS, int $termLimit = 0, bool $retry = true, bool $explain = false, array $scope = array(), array $products = array() ): SearchResult {
+		return $this->searchWith( $query, $lang, $this->options( $limit, $termLimit, $retry, $scope, false, $this->products->foldVariations( $products ) ), $explain );
 	}
 
 	/**
@@ -362,6 +371,66 @@ final class SearchService {
 	}
 
 	/**
+	 * The ranked product ids another plugin asks for (`csearch_ranked_ids`, D-161): the results page's ranking (the
+	 * same parser, typo tolerance, synonyms, weights and cache) without the owner's pinned products, which are the
+	 * shop's own results. Null while the index holds no product in the language searched. Kept to some products by
+	 * id when asked (D-162): a variation counts as its parent, and an empty list finds nothing.
+	 *
+	 * @param string      $raw    Query as received.
+	 * @param string|null $lang   Language asked for; null for the site's.
+	 * @param int         $limit  Products at most, 1 to 500.
+	 * @param string      $source The log's source; empty logs nothing.
+	 * @param bool        $exact    The words as given: no word dropped when nothing matches them all.
+	 * @param int[]|null  $products Product or variation ids to keep the ranking to, positive; null for every product.
+	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}|null
+	 */
+	public function forCaller( string $raw, ?string $lang, int $limit = self::MAX_IDS, string $source = '', bool $exact = false, ?array $products = null ): ?array {
+		$lang = $this->language( $lang );
+		if ( 0 === $this->index->documentCount( $lang ) ) {
+			return null;
+		}
+		$query = self::clean( $raw );
+		if ( null !== $products ) {
+			$products = array_values( array_unique( $products ) );
+			sort( $products );
+		}
+		if ( '' === $query || array() === $products ) {
+			return array(
+				'ids'       => array(),
+				'corrected' => null,
+				'query'     => '',
+				'lang'      => $lang,
+			);
+		}
+		// The list in the key, hashed: two callers with different lists never share an answer.
+		$soldOut = 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' );
+		$key     = Cache::key( $this->index->generation(), 'caller', array( $query, $lang, $exact, $this->settingsKey(), null === $products ? null : md5( implode( ',', $products ) ), $soldOut ) );
+		$cached  = $this->cache->get( $key );
+		if ( null === $cached ) {
+			$kept   = null === $products ? array() : $this->products->foldVariations( $products );
+			$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact, array(), false, $kept ), false );
+			// A sold-out product stays out when the shop hides them, as WooCommerce's query leaves it off the results page.
+			$hits   = $soldOut ? array_filter( $result->products, static fn( Hit $hit ): bool => $hit->document->inStock ) : $result->products;
+			$cached = array(
+				'ids'       => array_values( array_unique( array_map( static fn( Hit $hit ): int => $hit->document->objectId, $hits ) ) ),
+				'corrected' => $result->corrected,
+			);
+			$this->cache->set( $key, $cached );
+		}
+		$ids = Cast::ints( $cached['ids'] ?? array() );
+		if ( '' !== $source ) {
+			// A caller's searches never count as the shop's own (D-163).
+			$this->log->record( $query, $lang, count( $ids ), in_array( $source, SearchLog::SHOP, true ) ? SearchLog::OTHER : $source );
+		}
+		return array(
+			'ids'       => array_slice( $ids, 0, max( 1, min( self::MAX_IDS, $limit ) ) ),
+			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
+			'query'     => $query,
+			'lang'      => $lang,
+		);
+	}
+
+	/**
 	 * Product id to document id, from a cached answer (an answer cached before 1.3 has none).
 	 *
 	 * @param mixed $docs The cached map.
@@ -383,8 +452,9 @@ final class SearchService {
 	 * @param bool  $retry     Retry without the least-matched token.
 	 * @param int[] $scope     Products of these term-taxonomy ids only (D-117).
 	 * @param bool  $strict    Strong matches only (D-118).
+	 * @param int[] $products  These products only, by id (D-162).
 	 */
-	public function options( int $limit, int $termLimit, bool $retry = true, array $scope = array(), bool $strict = false ): SearchOptions {
+	public function options( int $limit, int $termLimit, bool $retry = true, array $scope = array(), bool $strict = false, array $products = array() ): SearchOptions {
 		$weights = Settings::fieldWeights();
 		/**
 		 * The field weights the score uses, by field name (name, sku, short, long, category, tag, brand, attribute).
@@ -409,7 +479,8 @@ final class SearchService {
 			Kind::PRODUCT,
 			$strict,
 			array_values( array_unique( array_map( 'intval', $scope ) ) ),
-			Settings::isOn( 'in_stock_first' )
+			Settings::isOn( 'in_stock_first' ),
+			$products
 		);
 	}
 

@@ -131,7 +131,7 @@ SELECT p.document_id, t.term FROM `wp_csearch_postings` p INNER JOIN `wp_csearch
 | t | eq_ref | PRIMARY,term | PRIMARY | 1 | Using where |
 
 ```sql
-SELECT normalised, COUNT(*) AS searches FROM `wp_csearch_log` WHERE normalised LIKE 'kazumi%' AND lang = 'en' AND created_at >= '2026-07-25 02:45:41' AND results > 0 AND (source = 'page' OR clicked_type IS NOT NULL) GROUP BY normalised HAVING COUNT(*) >= 3 ORDER BY searches DESC, normalised ASC LIMIT 12
+SELECT normalised, COUNT(*) AS searches FROM `wp_csearch_log` WHERE normalised LIKE 'kazumi%' AND lang = 'en' AND created_at >= '2026-07-25 02:45:41' AND results > 0 AND (source = 'page' OR (clicked_type IS NOT NULL AND source = 'suggest')) GROUP BY normalised HAVING COUNT(*) >= 3 ORDER BY searches DESC, normalised ASC LIMIT 12
 ```
 
 | table | type | possible keys | key | rows | Extra |
