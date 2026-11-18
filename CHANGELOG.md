@@ -2,10 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html). One entry per milestone; `v1.0.0` closes milestone 8.
 
-## [Unreleased]
+## [1.7.0] - 2026-11-18
+
+A search other plugins can ask from PHP (1.7.0 brief), for the agency's product configurator first and any plugin after it. No schema change, no REST change, no setting added; no index rebuild is owed.
 
 ### Added
-- `csearch_ranked_ids`: another plugin can ask for Creative Search's ranking of a query from PHP, ranked as the results page ranks but without the owner's pinned products; it returns `null` while the index isn't built, so the caller can fall back to its own search (D-161).
+- `csearch_ranked_ids`: another plugin can ask for Creative Search's ranking of a query from PHP, ranked as the results page ranks (hidden products, and sold-out ones while the shop hides them, stay out) but without the owner's pinned products; it returns `null` while the index isn't built, so the caller can fall back to its own search (D-161).
 - `csearch_ranked_ids` takes `product_ids`: up to 2,000 product or variation ids to keep the ranking to, applied in the ranking's SQL so the 500-result cap counts only those products (D-162).
 - A log source of its own for other plugins' searches: `builder` joins `suggest` and `page`, `csearch_log_sources` registers others, and a source no one registered is logged as `other` instead of `suggest`. The Analytics tab lists every source in its totals and gets a "Searches from" menu to show one source on its own (D-163).
 

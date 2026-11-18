@@ -291,3 +291,18 @@ Short source keys used in the last column (all opened 2026-10-21):
 ## v1.4.0
 
 From 1.4.0 the cold `/suggest` and the `/search` timings keep the fastest of three per query (D-129); the budgets are unchanged. On this Mac, 300 products: cold `/suggest` p95 12.2 ms, warm 0.6 ms, `/search` 8.7 ms, memory 0.51 MB, with the log seeded and 200 redirects and 200 pins loaded (measured before D-129, single timings). 1.4.0 changed no server code on the search path.
+
+## v1.7.0
+
+`csearch_ranked_ids` kept to 500 products (D-162): every twentieth product of the 10,000-product catalogue, in English and French with the synonyms, pages and posts, the search log seeded and 200 redirects and 200 pins, as for the other budgets. The golden set's one-word and three-word queries, each cold (the cache flushed), the fastest of three timings kept (D-129), measured around `apply_filters()`. On this Mac, 18 November 2026:
+
+| What (10,000 products) | Result | Budget |
+| --- | --- | --- |
+| `csearch_ranked_ids`, 500-id scope, one-word query, p95 (21 queries) | 35.7 ms | 100 ms (the `/search` budget) |
+| `csearch_ranked_ids`, 500-id scope, three-word query, p95 (5 queries) | 40.6 ms | 100 ms |
+| Full reindex | 110.4 s, 11.0 ms a product | 300 s |
+| `/suggest` p95, cold / warm | 55.5 ms / 0.7 ms | 100 ms / 60 ms |
+| `/search` p95 | 31.8 ms | 100 ms |
+| Memory, p95 of a cold suggest | 1.70 MB | 4 MB |
+
+At 300 products the same scoped queries take 4.3 ms and 4.1 ms.

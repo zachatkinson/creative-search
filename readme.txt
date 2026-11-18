@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.6.6
+Stable tag: 1.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.7.0 =
+Other plugins can ask for Creative Search's ranking from PHP, kept to their own products, and their searches are logged under their own source, apart from the shop's numbers. No index rebuild is needed.
+
 = 1.6.6 =
 A number becomes a size only when the products that really match the search have sizes, not products that only mention its words in their descriptions; French spacing fixed before colons and inside « ». No index rebuild is needed.
 
@@ -109,6 +112,10 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.7.0 =
+* For developers: `csearch_ranked_ids` gives another plugin the ranked product ids for a query on the server, as the results page ranks them but without your pinned products, kept to a list of products when it passes one.
+* Searches another plugin asks for are logged under their own source (a product builder, a source it registers, or other plugins). Analytics lists every source in its totals and can show one on its own; the daily chart, top queries and suggested searches count only your shop's own searches.
 
 = 1.6.6 =
 * A number becomes a size filter only when the products that match by more than their description have that attribute: "9 hoodie" opens the results for the words, not hoodies filtered by a deck width because a few decks mention a hoodie.
