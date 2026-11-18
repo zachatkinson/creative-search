@@ -33,7 +33,7 @@ final class SearchLog {
 	/**
 	 * The shop's own sources: the daily chart, top queries and suggested searches count only these (D-163).
 	 */
-	public const SHOP = array( 'suggest', 'page' );
+	public const SHOP = LogRepository::SHOP;
 
 	/**
 	 * What a source no one registered is logged as (D-163).

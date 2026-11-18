@@ -95,7 +95,7 @@ final class Analytics {
 	 * @return string[]
 	 */
 	public static function sources(): array {
-		return array_merge( array_values( array_diff( SearchLog::sources(), LogRepository::SHOP ) ), array( SearchLog::OTHER ) );
+		return array_values( array_unique( array_merge( array_diff( SearchLog::sources(), LogRepository::SHOP ), array( SearchLog::OTHER ) ) ) );
 	}
 
 	/**

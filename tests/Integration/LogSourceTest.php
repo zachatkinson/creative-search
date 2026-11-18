@@ -57,6 +57,14 @@ final class LogSourceTest extends IndexTestCase {
 		self::assertSame( array( 'suggest', 'page', 'builder', 'kiosk' ), SearchLog::sources() );
 	}
 
+	public function test_a_caller_cannot_log_as_the_shop(): void {
+		apply_filters( 'csearch_ranked_ids', null, 'skillet', array( 'source' => 'page' ) );
+		apply_filters( 'csearch_ranked_ids', null, 'skillet', array( 'source' => 'suggest' ) );
+		add_filter( 'csearch_log_sources', static fn( array $sources ): array => array_merge( $sources, array( 'other' ) ) );
+		self::assertSame( array( 'other', 'other' ), array_column( $this->service( SearchLog::class )->pending(), 'source' ), 'the shop’s own sources are the shop’s' );
+		self::assertSame( array( 'builder', 'other' ), \CreativeBranding\Search\Admin\Analytics::sources(), 'other once' );
+	}
+
 	public function test_the_log_filter_receives_the_source_and_can_keep_one_out(): void {
 		$seen = array();
 		add_filter(

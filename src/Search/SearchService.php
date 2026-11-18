@@ -403,20 +403,24 @@ final class SearchService {
 			);
 		}
 		// The list in the key, hashed: two callers with different lists never share an answer.
-		$key    = Cache::key( $this->index->generation(), 'caller', array( $query, $lang, $exact, $this->settingsKey(), null === $products ? null : md5( implode( ',', $products ) ) ) );
-		$cached = $this->cache->get( $key );
+		$soldOut = 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' );
+		$key     = Cache::key( $this->index->generation(), 'caller', array( $query, $lang, $exact, $this->settingsKey(), null === $products ? null : md5( implode( ',', $products ) ), $soldOut ) );
+		$cached  = $this->cache->get( $key );
 		if ( null === $cached ) {
 			$kept   = null === $products ? array() : $this->products->foldVariations( $products );
 			$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact, array(), false, $kept ), false );
+			// A sold-out product stays out when the shop hides them, as WooCommerce's query leaves it off the results page.
+			$hits   = $soldOut ? array_filter( $result->products, static fn( Hit $hit ): bool => $hit->document->inStock ) : $result->products;
 			$cached = array(
-				'ids'       => $result->productIds(),
+				'ids'       => array_values( array_unique( array_map( static fn( Hit $hit ): int => $hit->document->objectId, $hits ) ) ),
 				'corrected' => $result->corrected,
 			);
 			$this->cache->set( $key, $cached );
 		}
 		$ids = Cast::ints( $cached['ids'] ?? array() );
 		if ( '' !== $source ) {
-			$this->log->record( $query, $lang, count( $ids ), $source );
+			// A caller's searches never count as the shop's own (D-163).
+			$this->log->record( $query, $lang, count( $ids ), in_array( $source, SearchLog::SHOP, true ) ? SearchLog::OTHER : $source );
 		}
 		return array(
 			'ids'       => array_slice( $ids, 0, max( 1, min( self::MAX_IDS, $limit ) ) ),

@@ -145,6 +145,17 @@ final class RankedIdsFilterTest extends IndexTestCase {
 		self::assertSame( array(), $this->service( SearchLog::class )->pending(), 'no source, no row' );
 	}
 
+	public function test_sold_out_products_stay_out_when_the_shop_hides_them(): void {
+		$product = wc_get_product( $this->ids['Steel Skillet'] );
+		$product->set_stock_status( 'outofstock' );
+		$product->save();
+		$this->reindex();
+		update_option( 'woocommerce_hide_out_of_stock_items', 'yes' );
+		self::assertNotContains( $this->ids['Steel Skillet'], apply_filters( 'csearch_ranked_ids', null, 'skillet', array() )['ids'], 'as the results page leaves it out' );
+		update_option( 'woocommerce_hide_out_of_stock_items', 'no' );
+		self::assertContains( $this->ids['Steel Skillet'], apply_filters( 'csearch_ranked_ids', null, 'skillet', array() )['ids'], 'and lists it when the shop shows sold-out products' );
+	}
+
 	/**
 	 * A simple product.
 	 *
