@@ -472,8 +472,8 @@ add_filter( 'csearch_suggested_searches', static fn( array $picked ): array => a
 
 - **Since:** 1.6.0
 - **Signature:** `apply_filters( 'csearch_log_search', bool $log, string $query, string $lang, int $results, string $source ): bool`
-- **What it does:** whether a search goes into the search log (D-139). Return `false` to leave it out of the log, the Analytics tab, the daily counts and the suggested searches, as a test suite or an uptime check might. `$query` is the query as typed, already redacted (`Domain\Scrub`); `$source` is `suggest` or `page`. It runs after the plugin's own checks, so it never sees a search already left out: one from a signed-in user who can edit products while `log_staff_searches` is off, or a request with the header `X-Creative-Test: 1`. That header needs no secret, since it only hides the sender's own searches; it also keeps that request's suggestion clicks from being recorded.
-- **Where it runs:** `Search\SearchLog::record()`, for the panel (`csearch/v1/suggest`), `csearch/v1/search` and the results page.
+- **What it does:** whether a search goes into the search log (D-139). Return `false` to leave it out of the log, the Analytics tab, the daily counts and the suggested searches, as a test suite or an uptime check might. `$query` is the query as typed, already redacted (`Domain\Scrub`); `$source` is the source as it will be logged: `suggest`, `page`, from 1.7.0 also `builder`, a source registered with `csearch_log_sources`, or `other` (D-163), so a site can keep any source out of the log. It runs after the plugin's own checks, so it never sees a search already left out: one from a signed-in user who can edit products while `log_staff_searches` is off, or a request with the header `X-Creative-Test: 1`. That header needs no secret, since it only hides the sender's own searches; it also keeps that request's suggestion clicks from being recorded.
+- **Where it runs:** `Search\SearchLog::record()`, for the panel (`csearch/v1/suggest`), `csearch/v1/search`, the results page and, from 1.7.0, `csearch_ranked_ids` when the caller names a source.
 - **Example:**
 
 ```php
@@ -568,7 +568,7 @@ Or in wp-config.php: `define( 'CSEARCH_DISABLE_UPDATES', true );`
 - **Since:** 1.7.0
 - **Signature:** `apply_filters( 'csearch_ranked_ids', null, string $query, array $args ): ?array`
 - **What it does:** the product ids Creative Search ranks for a query, best first, for another plugin to use on the server without a REST round trip (D-161). It ranks as the results page does: the same parser, typo tolerance, synonyms, field weights, boosts and cache, and hidden products stay out as they do there. The owner's pinned products don't apply, since pins are for the shop's own results.
-  - `$args` takes `lang` (a locale or language code; the site's by default), `limit` (1 to 500, 500 by default), `exact` (true keeps every word: no word is dropped when nothing matches them all) and `product_ids` (an array of up to 2,000 product or variation ids, integers: the ranking is kept to those products, a variation counting as its parent, so the answer gives parent ids; the 500 cap counts only products in the list; an empty list finds nothing, not the whole catalogue; D-162). Unknown keys are ignored, and so is a value of the wrong type.
+  - `$args` takes `lang` (a locale or language code; the site's by default), `limit` (1 to 500, 500 by default), `exact` (true keeps every word: no word is dropped when nothing matches them all), `source` (the search log's source: `builder`, a source registered with `csearch_log_sources`, any other string logged as `other`; empty, the default, logs nothing; D-163) and `product_ids` (an array of up to 2,000 product or variation ids, integers: the ranking is kept to those products, a variation counting as its parent, so the answer gives parent ids; the 500 cap counts only products in the list; an empty list finds nothing, not the whole catalogue; D-162). Unknown keys are ignored, and so is a value of the wrong type.
   - The answer is an array: `ids` (product ids, best first), `corrected` (the corrected query, or `null`), `query` (the query as cleaned) and `lang` (the language searched).
   - Creative Search answers at priority 10. When the first argument is not `null`, another plugin has answered and the answer is passed on untouched. With Creative Search inactive, or while its index holds no product in the language searched (before the first build), the filter returns `null`, and the caller does its own search.
   - It needs no capability, since it reads only what the results page shows any visitor. Call it after `plugins_loaded`. Nothing about it is on the REST routes.
@@ -578,4 +578,17 @@ Or in wp-config.php: `define( 'CSEARCH_DISABLE_UPDATES', true );`
 ```php
 $answer = apply_filters( 'csearch_ranked_ids', null, $words, array( 'product_ids' => $my_list_of_ids, 'limit' => 50 ) );
 $ids    = is_array( $answer ) ? $answer['ids'] : my_plugin_own_search( $words );
+```
+
+### `csearch_log_sources` (filter)
+
+- **Since:** 1.7.0
+- **Signature:** `apply_filters( 'csearch_log_sources', string[] $sources ): string[]`
+- **What it does:** registers the sources another plugin's searches are logged under (D-163). `$sources` is `suggest`, `page` and `builder`. Add a short name of 1 to 8 letters, a to z (the log's `source` column holds 8 characters); a name that isn't is ignored, and the plugin's own three can't be removed. A search passed to `csearch_ranked_ids` with a source no one registered is logged as `other`. The Analytics tab's totals list every source, and its "Searches from" menu shows each registered source on its own; the daily chart, top queries and suggested searches count only `suggest` and `page` unless the menu picks another source.
+- **Where it runs:** `Search\SearchLog::sources()`, when a search is logged and when the Analytics tab is shown.
+- **Example:**
+
+```php
+add_filter( 'csearch_log_sources', static fn( array $sources ): array => array_merge( $sources, array( 'kiosk' ) ) );
+$answer = apply_filters( 'csearch_ranked_ids', null, $words, array( 'source' => 'kiosk' ) );
 ```

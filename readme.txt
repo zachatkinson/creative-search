@@ -32,7 +32,7 @@ Nothing about the shop or its shoppers. The index, the suggestions and the analy
 
 = What does it keep about shoppers? =
 
-Nothing. The search log holds the words typed, the result count, the language and the time, for 90 days by default. No IP address, user id, session or page URL; queries that look like personal details are redacted.
+Nothing. The search log holds the words typed, the result count, the language, where the search came from and the time, for 90 days by default. Searches another plugin asks Creative Search to rank (such as a product builder) are logged the same way, under that plugin's source, when it names one. No IP address, user id, session or page URL; queries that look like personal details are redacted.
 
 = Which languages does it speak? =
 

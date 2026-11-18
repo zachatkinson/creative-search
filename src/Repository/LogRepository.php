@@ -21,6 +21,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class LogRepository extends Repository {
 
 	/**
+	 * The shop's own sources, its panel and its results page: the daily chart, the roll-ups, top queries, suggested
+	 * searches and clicks count only these (D-163).
+	 */
+	public const SHOP = array( 'suggest', 'page' );
+
+	/**
 	 * Write rows.
 	 *
 	 * @param array<int, array{query: string, normalised: string, lang: string, results: int, source: string, created_at: string}> $rows Rows.
@@ -41,7 +47,8 @@ final class LogRepository extends Repository {
 	}
 
 	/**
-	 * Record a click on the latest unclicked row for a query, written since a time.
+	 * Record a click on the latest unclicked row of the shop's own for a query, written since a time: a suggestion is
+	 * clicked after the shop's search, never another plugin's (D-163).
 	 *
 	 * @param string $normalised The normalised query.
 	 * @param string $lang       Language code.
@@ -53,13 +60,14 @@ final class LogRepository extends Repository {
 	public function click( string $normalised, string $lang, string $since, string $type, int $id ): bool {
 		return 1 === $this->run(
 			$this->prepare(
-				'UPDATE %i SET clicked_type = %s, clicked_id = %d WHERE normalised = %s AND lang = %s AND created_at >= %s AND clicked_type IS NULL ORDER BY id DESC LIMIT 1',
+				'UPDATE %i SET clicked_type = %s, clicked_id = %d WHERE normalised = %s AND lang = %s AND created_at >= %s AND clicked_type IS NULL AND source IN (' . self::strings( count( self::SHOP ) ) . ') ORDER BY id DESC LIMIT 1',
 				Tables::log(),
 				$type,
 				$id,
 				$normalised,
 				$lang,
-				$since
+				$since,
+				...self::SHOP
 			)
 		);
 	}
@@ -85,7 +93,8 @@ final class LogRepository extends Repository {
 	}
 
 	/**
-	 * Counts for one UTC day: searches, searches that found nothing, searches followed by a click.
+	 * Counts for one UTC day of the shop's own searches (D-163): searches, searches that found nothing, searches
+	 * followed by a click.
 	 *
 	 * @param string $day `Y-m-d`.
 	 * @return array{searches: int, zero: int, clicks: int}
@@ -93,10 +102,11 @@ final class LogRepository extends Repository {
 	public function dayCounts( string $day ): array {
 		$rows = $this->rows(
 			$this->prepare(
-				'SELECT COUNT(*) AS searches, COALESCE(SUM(results = 0), 0) AS zero, COALESCE(SUM(clicked_type IS NOT NULL), 0) AS clicks FROM %i WHERE created_at >= %s AND created_at < %s',
+				'SELECT COUNT(*) AS searches, COALESCE(SUM(results = 0), 0) AS zero, COALESCE(SUM(clicked_type IS NOT NULL), 0) AS clicks FROM %i WHERE created_at >= %s AND created_at < %s AND source IN (' . self::strings( count( self::SHOP ) ) . ')',
 				Tables::log(),
 				$day . ' 00:00:00',
-				gmdate( 'Y-m-d', (int) strtotime( $day . ' 00:00:00 UTC +1 day' ) ) . ' 00:00:00'
+				gmdate( 'Y-m-d', (int) strtotime( $day . ' 00:00:00 UTC +1 day' ) ) . ' 00:00:00',
+				...self::SHOP
 			)
 		);
 		return array(
@@ -125,13 +135,14 @@ final class LogRepository extends Repository {
 	}
 
 	/**
-	 * Searches per UTC day since a time.
+	 * Searches per UTC day since a time, from some sources.
 	 *
-	 * @param string $since UTC `Y-m-d H:i:s`.
+	 * @param string   $since   UTC `Y-m-d H:i:s`.
+	 * @param string[] $sources The sources counted (D-163).
 	 * @return array<string, array{searches: int, zero: int, clicks: int}> Day to counts.
 	 */
-	public function daily( string $since ): array {
-		$rows = $this->rows( $this->prepare( 'SELECT DATE(created_at) AS day, COUNT(*) AS searches, SUM(results = 0) AS zero, SUM(clicked_type IS NOT NULL) AS clicks FROM %i WHERE created_at >= %s GROUP BY DATE(created_at) ORDER BY day', Tables::log(), $since ) );
+	public function daily( string $since, array $sources = self::SHOP ): array {
+		$rows = $this->rows( $this->prepare( 'SELECT DATE(created_at) AS day, COUNT(*) AS searches, SUM(results = 0) AS zero, SUM(clicked_type IS NOT NULL) AS clicks FROM %i WHERE created_at >= %s AND source IN (' . self::strings( count( $sources ) ) . ') GROUP BY DATE(created_at) ORDER BY day', Tables::log(), $since, ...$sources ) );
 		$out  = array();
 		foreach ( $rows as $row ) {
 			$out[ (string) $row['day'] ] = array(
@@ -146,20 +157,20 @@ final class LogRepository extends Repository {
 	/**
 	 * The most searched queries since a time: searches, average results, clicks.
 	 *
-	 * @param string $since    UTC `Y-m-d H:i:s`.
-	 * @param bool   $zeroOnly Only searches that found nothing.
-	 * @param int    $limit    At most.
-	 * @param int    $offset   Skip.
+	 * @param string   $since    UTC `Y-m-d H:i:s`.
+	 * @param bool     $zeroOnly Only searches that found nothing.
+	 * @param int      $limit    At most.
+	 * @param int      $offset   Skip.
+	 * @param string[] $sources  The sources counted (D-163).
 	 * @return array<int, array{query: string, lang: string, searches: int, results: int, clicks: int}>
 	 */
-	public function topQueries( string $since, bool $zeroOnly, int $limit, int $offset = 0 ): array {
+	public function topQueries( string $since, bool $zeroOnly, int $limit, int $offset = 0, array $sources = self::SHOP ): array {
 		$rows = $this->rows(
 			$this->prepare(
-				'SELECT normalised, lang, COUNT(*) AS searches, ROUND(AVG(results)) AS results, SUM(clicked_type IS NOT NULL) AS clicks FROM %i WHERE created_at >= %s' . ( $zeroOnly ? ' AND results = 0' : '' ) . ' GROUP BY normalised, lang ORDER BY searches DESC, normalised ASC LIMIT %d OFFSET %d',
+				'SELECT normalised, lang, COUNT(*) AS searches, ROUND(AVG(results)) AS results, SUM(clicked_type IS NOT NULL) AS clicks FROM %i WHERE created_at >= %s AND source IN (' . self::strings( count( $sources ) ) . ')' . ( $zeroOnly ? ' AND results = 0' : '' ) . ' GROUP BY normalised, lang ORDER BY searches DESC, normalised ASC LIMIT %d OFFSET %d',
 				Tables::log(),
 				$since,
-				$limit,
-				$offset
+				...array_merge( $sources, array( $limit, $offset ) )
 			)
 		);
 		return array_map(
@@ -177,7 +188,8 @@ final class LogRepository extends Repository {
 	/**
 	 * Past searches that start with some text and found something, the most searched first (suggested searches,
 	 * D-112): from the results page, or from the panel when the shopper chose a suggestion, so the words typed on
-	 * the way to a search are never counted. A prefix range on the `normalised` key.
+	 * the way to a search are never counted, and neither are another plugin's searches (D-163). A prefix range on
+	 * the `normalised` key.
 	 *
 	 * @param string $prefix  The normalised text typed.
 	 * @param string $lang    Language code.
@@ -190,12 +202,13 @@ final class LogRepository extends Repository {
 		global $wpdb;
 		$rows = $this->rows(
 			$this->prepare(
-				'SELECT normalised, COUNT(*) AS searches FROM %i WHERE normalised LIKE %s AND lang = %s AND created_at >= %s AND results > 0 AND (source = %s OR clicked_type IS NOT NULL) GROUP BY normalised HAVING COUNT(*) >= %d ORDER BY searches DESC, normalised ASC LIMIT %d',
+				'SELECT normalised, COUNT(*) AS searches FROM %i WHERE normalised LIKE %s AND lang = %s AND created_at >= %s AND results > 0 AND (source = %s OR (clicked_type IS NOT NULL AND source = %s)) GROUP BY normalised HAVING COUNT(*) >= %d ORDER BY searches DESC, normalised ASC LIMIT %d',
 				Tables::log(),
 				$wpdb->esc_like( $prefix ) . '%',
 				$lang,
 				$since,
 				'page',
+				'suggest',
 				$minimum,
 				$limit
 			)
@@ -233,7 +246,7 @@ final class LogRepository extends Repository {
 	}
 
 	/**
-	 * Searches by source since a time.
+	 * Searches by source since a time: the shop's two first, then every other source logged, the most searches first.
 	 *
 	 * @param string $since UTC `Y-m-d H:i:s`.
 	 * @return array<string, int> Source to searches.
@@ -243,7 +256,7 @@ final class LogRepository extends Repository {
 			'suggest' => 0,
 			'page'    => 0,
 		);
-		foreach ( $this->rows( $this->prepare( 'SELECT source, COUNT(*) AS n FROM %i WHERE created_at >= %s GROUP BY source', Tables::log(), $since ) ) as $row ) {
+		foreach ( $this->rows( $this->prepare( 'SELECT source, COUNT(*) AS n FROM %i WHERE created_at >= %s GROUP BY source ORDER BY n DESC, source ASC', Tables::log(), $since ) ) as $row ) {
 			$out[ (string) $row['source'] ] = (int) $row['n'];
 		}
 		return $out;

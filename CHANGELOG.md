@@ -7,8 +7,10 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 - `csearch_ranked_ids`: another plugin can ask for Creative Search's ranking of a query from PHP, ranked as the results page ranks but without the owner's pinned products; it returns `null` while the index isn't built, so the caller can fall back to its own search (D-161).
 - `csearch_ranked_ids` takes `product_ids`: up to 2,000 product or variation ids to keep the ranking to, applied in the ranking's SQL so the 500-result cap counts only those products (D-162).
+- A log source of its own for other plugins' searches: `builder` joins `suggest` and `page`, `csearch_log_sources` registers others, and a source no one registered is logged as `other` instead of `suggest`. The Analytics tab lists every source in its totals and gets a "Searches from" menu to show one source on its own (D-163).
 
 ### Changed
+- The Analytics tab's daily chart, top queries, the nightly roll-ups and the suggested searches count only the shop's own searches (the suggestions and the results page), so another plugin's searches never become the shop's suggestions or top queries; a suggestion click is recorded only on the shop's own searches (D-163).
 - CI's GitHub Actions run on Node 24: checkout v7, cache v6, setup-node v7, upload-artifact v7, composer-install v4 (D-159).
 - CI's actions are pinned to commit SHAs, which the repository now requires, and Dependabot keeps them current (D-160).
 

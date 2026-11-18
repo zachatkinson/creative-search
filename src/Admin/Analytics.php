@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace CreativeBranding\Search\Admin;
 
 use CreativeBranding\Search\Repository\LogRepository;
+use CreativeBranding\Search\Search\SearchLog;
 use CreativeBranding\Search\Settings\Settings;
 use CreativeBranding\Search\Support\Cast;
 use CreativeBranding\Search\Support\Clock;
@@ -78,6 +79,36 @@ final class Analytics {
 	}
 
 	/**
+	 * A source the screen shows on its own (D-163), from a request value: a registered source other than the shop's
+	 * two, or `other`; anything else is the shop's own searches, an empty string.
+	 *
+	 * @param mixed $value Source asked for.
+	 */
+	public static function source( mixed $value ): string {
+		$source = is_string( $value ) ? $value : '';
+		return in_array( $source, self::sources(), true ) ? $source : '';
+	}
+
+	/**
+	 * The sources the screen can show on their own: every registered source but the shop's two, then `other`.
+	 *
+	 * @return string[]
+	 */
+	public static function sources(): array {
+		return array_merge( array_values( array_diff( SearchLog::sources(), LogRepository::SHOP ) ), array( SearchLog::OTHER ) );
+	}
+
+	/**
+	 * The log sources a view counts: one source, or the shop's own (an empty string).
+	 *
+	 * @param string $source A source from {@see Analytics::source()}.
+	 * @return string[]
+	 */
+	private static function counted( string $source ): array {
+		return '' === $source ? LogRepository::SHOP : array( $source );
+	}
+
+	/**
 	 * The first moment of a period: midnight UTC, `$days - 1` days ago.
 	 *
 	 * @param int $days Days.
@@ -87,14 +118,17 @@ final class Analytics {
 	}
 
 	/**
-	 * Searches, searches with no results and clicks per day, every day of the period present (0 when quiet).
+	 * Searches, searches with no results and clicks per day, every day of the period present (0 when quiet): the
+	 * shop's own (D-163), or one source's. The days already purged come from the roll-ups, which hold the shop's own
+	 * only, so one source's view counts them as 0.
 	 *
-	 * @param int $days Days.
+	 * @param int    $days   Days.
+	 * @param string $source A source from {@see Analytics::source()}; empty for the shop's own.
 	 * @return array<string, array{searches: int, zero: int, clicks: int}>
 	 */
-	public function daily( int $days ): array {
-		$live  = $this->log->daily( self::since( $days ) );
-		$stats = Settings::get( 'stats' );
+	public function daily( int $days, string $source = '' ): array {
+		$live  = $this->log->daily( self::since( $days ), self::counted( $source ) );
+		$stats = '' === $source ? Settings::get( 'stats' ) : array();
 		$stats = is_array( $stats ) ? $stats : array();
 		$out   = array();
 		for ( $back = $days - 1; $back >= 0; $back-- ) {
@@ -114,42 +148,40 @@ final class Analytics {
 	}
 
 	/**
-	 * The totals of a period.
+	 * The totals of a period, the shop's own or one source's (D-163), with every source's searches.
 	 *
-	 * @param int $days Days.
-	 * @return array{searches: int, zero: int, clicks: int, suggest: int, page: int}
+	 * @param int    $days   Days.
+	 * @param string $source A source from {@see Analytics::source()}; empty for the shop's own.
+	 * @return array{searches: int, zero: int, clicks: int, sources: array<string, int>}
 	 */
-	public function totals( int $days ): array {
+	public function totals( int $days, string $source = '' ): array {
 		$out = array(
 			'searches' => 0,
 			'zero'     => 0,
 			'clicks'   => 0,
 		);
-		foreach ( $this->daily( $days ) as $counts ) {
+		foreach ( $this->daily( $days, $source ) as $counts ) {
 			$out['searches'] += $counts['searches'];
 			$out['zero']     += $counts['zero'];
 			$out['clicks']   += $counts['clicks'];
 		}
-		$sources = $this->log->sources( self::since( $days ) );
-		return $out + array(
-			'suggest' => $sources['suggest'] ?? 0,
-			'page'    => $sources['page'] ?? 0,
-		);
+		return $out + array( 'sources' => $this->log->sources( self::since( $days ) ) );
 	}
 
 	/**
 	 * The top queries of a period, with click-through (clicks over searches, a share).
 	 *
-	 * @param int  $days     Days.
-	 * @param bool $zeroOnly Only those that found nothing.
-	 * @param int  $limit    At most.
-	 * @param int  $offset   Skip.
+	 * @param int    $days     Days.
+	 * @param bool   $zeroOnly Only those that found nothing.
+	 * @param int    $limit    At most.
+	 * @param int    $offset   Skip.
+	 * @param string $source   A source from {@see Analytics::source()}; empty for the shop's own (D-163).
 	 * @return array<int, array{query: string, lang: string, searches: int, results: int, clicks: int, ctr: float}>
 	 */
-	public function topQueries( int $days, bool $zeroOnly, int $limit = self::TOP, int $offset = 0 ): array {
+	public function topQueries( int $days, bool $zeroOnly, int $limit = self::TOP, int $offset = 0, string $source = '' ): array {
 		return array_map(
 			static fn( array $row ): array => $row + array( 'ctr' => $row['searches'] > 0 ? $row['clicks'] / $row['searches'] : 0.0 ),
-			$this->log->topQueries( self::since( $days ), $zeroOnly, $limit, $offset )
+			$this->log->topQueries( self::since( $days ), $zeroOnly, $limit, $offset, self::counted( $source ) )
 		);
 	}
 

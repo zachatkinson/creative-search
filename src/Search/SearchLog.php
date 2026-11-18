@@ -25,7 +25,20 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class SearchLog {
 
-	public const SOURCES = array( 'suggest', 'page' );
+	/**
+	 * The sources the plugin knows: its panel, its results page, and a product builder that asks from PHP (D-163).
+	 */
+	public const SOURCES = array( 'suggest', 'page', 'builder' );
+
+	/**
+	 * The shop's own sources: the daily chart, top queries and suggested searches count only these (D-163).
+	 */
+	public const SHOP = array( 'suggest', 'page' );
+
+	/**
+	 * What a source no one registered is logged as (D-163).
+	 */
+	public const OTHER = 'other';
 
 	/**
 	 * The request header an agency's test suite sends so its searches stay out of the log (D-139).
@@ -60,13 +73,14 @@ final class SearchLog {
 	 * @param string $query   The query as typed (already trimmed and capped).
 	 * @param string $lang    Language code.
 	 * @param int    $results Products found.
-	 * @param string $source  suggest or page.
+	 * @param string $source  A registered source ({@see SearchLog::sources()}); any other is logged as `other`.
 	 */
 	public function record( string $query, string $lang, int $results, string $source ): void {
 		$query = Scrub::redact( $query );
 		if ( '' === trim( $query ) || $this->ignored() ) {
 			return;
 		}
+		$source = in_array( $source, self::sources(), true ) ? $source : self::OTHER;
 		/**
 		 * Whether to log a search. Return false to leave it out of the log and every count built from it, as a
 		 * test suite or a monitoring check might (D-139). Runs after the staff and test-header checks.
@@ -77,7 +91,8 @@ final class SearchLog {
 		 * @param string $query   The query as typed, already redacted (`Domain\Scrub`).
 		 * @param string $lang    Its language.
 		 * @param int    $results Products found.
-		 * @param string $source  `suggest` or `page`.
+		 * @param string $source  As it will be logged: `suggest`, `page`, `builder`, a source a plugin registered
+		 *                        (`csearch_log_sources`, since 1.7.0) or `other`.
 		 */
 		if ( false === apply_filters( 'csearch_log_search', true, $query, $lang, $results, $source ) ) {
 			return;
@@ -87,13 +102,39 @@ final class SearchLog {
 			'normalised' => self::normalise( $query ),
 			'lang'       => $lang,
 			'results'    => $results,
-			'source'     => in_array( $source, self::SOURCES, true ) ? $source : 'suggest',
+			'source'     => $source,
 			'created_at' => substr( Clock::now(), 0, 16 ) . ':00',
 		);
 		if ( ! $this->attached ) {
 			$this->attached = true;
 			add_action( 'shutdown', array( $this, 'flush' ), 20 );
 		}
+	}
+
+	/**
+	 * The sources a search may be logged under (D-163): the plugin's own and those a plugin registers, each 1 to 8
+	 * lower-case letters (the log's `source` column is `varchar(8)`). Anything else stays `other`.
+	 *
+	 * @return string[]
+	 */
+	public static function sources(): array {
+		/**
+		 * The log sources other plugins register, so their searches are logged and filtered under their own name
+		 * rather than as `other`.
+		 *
+		 * @since 1.7.0
+		 *
+		 * @param string[] $sources `suggest`, `page` and `builder`. Add a source of 1 to 8 letters, a to z; one
+		 *                          that isn't is ignored, and the plugin's own can't be removed.
+		 */
+		$filtered = apply_filters( 'csearch_log_sources', self::SOURCES );
+		$out      = self::SOURCES;
+		foreach ( is_array( $filtered ) ? $filtered : array() as $source ) {
+			if ( is_string( $source ) && 1 === preg_match( '/^[a-z]{1,8}$/', $source ) && ! in_array( $source, $out, true ) ) {
+				$out[] = $source;
+			}
+		}
+		return $out;
 	}
 
 	/**
