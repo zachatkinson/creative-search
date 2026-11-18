@@ -4,7 +4,7 @@ Tags: woocommerce, search, ajax search, product search, autocomplete
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.5
-Stable tag: 1.7.0
+Stable tag: 1.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ WooCommerce → Search → Tools → Test search, or `wp csearch explain "kazumi
 
 == Upgrade Notice ==
 
+= 1.7.1 =
+For developers: `csearch_ranked_ids` accepts product ids and its limit as numeric strings, as `$wpdb->get_col()` returns them. No index rebuild is needed.
+
 = 1.7.0 =
 Other plugins can ask for Creative Search's ranking from PHP, kept to their own products, and their searches are logged under their own source, apart from the shop's numbers. No index rebuild is needed.
 
@@ -112,6 +115,9 @@ Sizes are now read one way however they are written, so the index is rebuilt onc
 Updates the search index's tables in the background. Searches keep working during the update; the index is then rebuilt once. Large shops: allow a few minutes.
 
 == Changelog ==
+
+= 1.7.1 =
+* For developers: `csearch_ranked_ids` reads product ids and the limit given as numeric strings ("42") as the integers they spell, so ids passed straight from a database read no longer give an empty answer. Signs, decimals, spaces and other values are still ignored.
 
 = 1.7.0 =
 * For developers: `csearch_ranked_ids` gives another plugin the ranked product ids for a query on the server, as the results page ranks them but without your pinned products, kept to a list of products when it passes one.

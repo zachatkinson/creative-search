@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html). One entry per milestone; `v1.0.0` closes milestone 8.
 
+## [1.7.1] - 2026-11-18
+
+A bug fix in 1.7.0's `csearch_ranked_ids`, found in the check of the release. No schema change, no REST change, no setting added; no index rebuild is owed.
+
+### Fixed
+- `csearch_ranked_ids` keeps a product id, and reads the limit, given as a string of digits, as `$wpdb->get_col()` returns ids: a caller passing such ids got an empty answer with no warning, and a string limit was ignored. A string with a sign, a decimal point, an exponent or a space, and any other type, is still ignored; the 2,000-id and 1-to-500 bounds are unchanged, and "42" and 42 count as one id (D-164).
+
 ## [1.7.0] - 2026-11-18
 
 A search other plugins can ask from PHP (1.7.0 brief), for the agency's product configurator first and any plugin after it. No schema change, no REST change, no setting added; no index rebuild is owed.
