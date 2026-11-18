@@ -23,8 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * postings of the plan's terms, scored per field as the Domain's `Scorer` does (w · m · (1 + ln(1 + tf)) · idf,
  * the idf worked out in PHP), the best field per token, AND across tokens, the phrase bonus and the quoted
  * phrases from first positions, the exactness bonuses from the name key and the SKU key, the stock penalty, the
- * owner's boost and rules, the minus words, hidden-by-SKU, the category a search is kept to (D-117), and the order
- * and limit. Only the page of results comes back to PHP, so memory no longer grows with the number of matching
+ * owner's boost and rules, the minus words, hidden-by-SKU, the category a search is kept to (D-117), the products a
+ * caller keeps it to (D-162), and the order and limit. Only the page of results comes back to PHP, so memory no longer grows with the number of matching
  * products.
  *
  * The term ids are read first (a unique-key lookup), so the statement joins integers and never compares a
@@ -134,6 +134,10 @@ final class RankRepository extends Repository {
 		if ( array() !== $plan->scope ) {
 			// A search kept to a category (D-117): its products and its subcategories', through the relationships' primary key.
 			$sql[] = $this->prepare( 'AND EXISTS (SELECT 1 FROM %i tr WHERE tr.object_id = d.object_id AND tr.term_taxonomy_id IN (' . self::ints( $plan->scope ) . '))', $wpdb->term_relationships );
+		}
+		if ( array() !== $plan->products ) {
+			// A ranking kept to some products by id (D-162), before the limit, so the cap counts only those.
+			$sql[] = $this->prepare( 'AND d.object_id IN (' . implode( ',', array_fill( 0, count( $plan->products ), '%d' ) ) . ')', ...$plan->products );
 		}
 		if ( array() !== $plan->excluded ) {
 			$sql[] = $this->prepare(

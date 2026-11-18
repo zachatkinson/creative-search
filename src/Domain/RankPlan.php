@@ -42,6 +42,8 @@ final class RankPlan {
 	 *                                                          none limits nothing.
 	 * @param bool                                 $inStockFirst What can be bought first, each part in score
 	 *                                                          order (D-138), among products that match alike (D-142).
+	 * @param int[]                                $products    These products only, by id (D-162); none limits
+	 *                                                          nothing.
 	 */
 	public function __construct(
 		public readonly string $lang,
@@ -58,7 +60,8 @@ final class RankPlan {
 		public readonly int $kind = Kind::PRODUCT,
 		public readonly array $names = array(),
 		public readonly array $scope = array(),
-		public readonly bool $inStockFirst = false
+		public readonly bool $inStockFirst = false,
+		public readonly array $products = array()
 	) {
 	}
 
@@ -88,7 +91,7 @@ final class RankPlan {
 			$texts[ $i ]  = $query->tokens[ $i ]->text;
 			$tokens[ $i ] = $widening->matches;
 		}
-		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ), $options->scope, $options->inStockFirst );
+		return new self( $lang, $texts, $tokens, $options->weightsById(), $n, $excluded, $query->phrases(), $query->key(), $options->hiddenBySku, $options->boostRules, $options->limit, $options->kind, self::names( $query, $tokens ), $options->scope, $options->inStockFirst, $options->products );
 	}
 
 	/**

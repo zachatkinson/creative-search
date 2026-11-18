@@ -36,6 +36,25 @@ final class ProductIdRepository extends Repository {
 	}
 
 	/**
+	 * Some ids with each variation's replaced by its parent's, as the index folds a variation into its product
+	 * (D-162). One read of the posts' primary key; an id that isn't a variation is kept as it is.
+	 *
+	 * @param int[] $ids Product or variation ids, positive.
+	 * @return int[] Unique, in the order first seen.
+	 */
+	public function foldVariations( array $ids ): array {
+		if ( array() === $ids ) {
+			return array();
+		}
+		global $wpdb;
+		$parents = array();
+		foreach ( $this->rows( $this->prepare( 'SELECT ID, post_parent FROM %i WHERE ID IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ') AND post_type = %s AND post_parent > 0', $wpdb->posts, ...array_merge( $ids, array( 'product_variation' ) ) ) ) as $row ) {
+			$parents[ (int) $row['ID'] ] = (int) $row['post_parent'];
+		}
+		return array_values( array_unique( array_map( static fn( int $id ): int => $parents[ $id ] ?? $id, $ids ) ) );
+	}
+
+	/**
 	 * How many published products there are.
 	 */
 	public function publishedCount(): int {

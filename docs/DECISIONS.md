@@ -1292,3 +1292,14 @@ Zach made the repository public on 18 November 2026 (standard runners are free o
 5. **No capability check.** It returns only ids the results page already shows any visitor, on the server, so it runs for any visitor as the page does.
 
 **Why:** a hook is the WordPress way for one plugin to ask another, it degrades to the caller's own search when Creative Search is missing, and keeping the ranking in `SearchService` means one engine for the panel, the page, WP-CLI and other plugins.
+
+### D-162 · A ranking kept to some products by id · 2026-11-18
+1.7.0 brief, item 2. A caller ranks a list of its own (up to 2,000 products and variations, usually far fewer) and wants only those back, with the 500-result cap counted inside the list.
+
+1. **In the ranking's SQL.** `SearchOptions` and `Domain\RankPlan` carry `products`; `RankRepository::rank()` adds `AND d.object_id IN (%d, …)`, one placeholder per id, prepared with the ids, beside the category scope (D-117) and before `ORDER BY … LIMIT`, so the limit is filled from the list. The ranking in PHP (Explain, and the schema-1 window) keeps the same documents in `IndexRepository::inScope()`. A category scope and a product list narrow each other.
+2. **Variations.** The index folds a variation into its parent, so `ProductIdRepository::foldVariations()` replaces each variation's id by its parent's (one read of `wp_posts` by primary key, only when the answer isn't cached), and the answer gives parent ids. An id that is neither a product nor a variation finds nothing, since no document has it.
+3. **The argument.** `product_ids` must be an array; anything else is ignored (no scope). Its members are kept when they are positive integers, duplicates dropped, the first 2,000 different ones kept and the rest ignored (`SearchService::MAX_PRODUCTS`); numeric strings are dropped, as the brief's type is `int[]`. An empty list, or one with no id left, is an empty answer with nothing searched and nothing logged, never the whole catalogue.
+4. **The cache.** The key (kind `caller`) holds the md5 of the sorted, de-duplicated list, so two callers with different lists never share an answer, and the same list in another order does.
+5. **The benchmark.** `CatalogueBenchmarkTest` times `csearch_ranked_ids` kept to 500 products spread over the catalogue for the golden set's one- and three-word queries, cold, the fastest of three each (D-129), and asserts each p95 under the `/search` budget, 100 ms (docs/BENCHMARK.md, 1.7.0).
+
+**Why:** filtering in SQL is the only way the cap counts the caller's products (a filter after the 500 would lose matches beyond them), and it reads no more postings than an unscoped search.

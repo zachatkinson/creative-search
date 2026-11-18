@@ -568,7 +568,7 @@ Or in wp-config.php: `define( 'CSEARCH_DISABLE_UPDATES', true );`
 - **Since:** 1.7.0
 - **Signature:** `apply_filters( 'csearch_ranked_ids', null, string $query, array $args ): ?array`
 - **What it does:** the product ids Creative Search ranks for a query, best first, for another plugin to use on the server without a REST round trip (D-161). It ranks as the results page does: the same parser, typo tolerance, synonyms, field weights, boosts and cache, and hidden products stay out as they do there. The owner's pinned products don't apply, since pins are for the shop's own results.
-  - `$args` takes `lang` (a locale or language code; the site's by default), `limit` (1 to 500, 500 by default) and `exact` (true keeps every word: no word is dropped when nothing matches them all). Unknown keys are ignored, and so is a value of the wrong type.
+  - `$args` takes `lang` (a locale or language code; the site's by default), `limit` (1 to 500, 500 by default), `exact` (true keeps every word: no word is dropped when nothing matches them all) and `product_ids` (an array of up to 2,000 product or variation ids, integers: the ranking is kept to those products, a variation counting as its parent, so the answer gives parent ids; the 500 cap counts only products in the list; an empty list finds nothing, not the whole catalogue; D-162). Unknown keys are ignored, and so is a value of the wrong type.
   - The answer is an array: `ids` (product ids, best first), `corrected` (the corrected query, or `null`), `query` (the query as cleaned) and `lang` (the language searched).
   - Creative Search answers at priority 10. When the first argument is not `null`, another plugin has answered and the answer is passed on untouched. With Creative Search inactive, or while its index holds no product in the language searched (before the first build), the filter returns `null`, and the caller does its own search.
   - It needs no capability, since it reads only what the results page shows any visitor. Call it after `plugins_loaded`. Nothing about it is on the REST routes.
@@ -576,6 +576,6 @@ Or in wp-config.php: `define( 'CSEARCH_DISABLE_UPDATES', true );`
 - **Example:**
 
 ```php
-$answer = apply_filters( 'csearch_ranked_ids', null, $words, array( 'limit' => 50 ) );
+$answer = apply_filters( 'csearch_ranked_ids', null, $words, array( 'product_ids' => $my_list_of_ids, 'limit' => 50 ) );
 $ids    = is_array( $answer ) ? $answer['ids'] : my_plugin_own_search( $words );
 ```
