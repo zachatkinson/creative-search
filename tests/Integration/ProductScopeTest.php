@@ -95,6 +95,37 @@ final class ProductScopeTest extends IndexTestCase {
 		self::assertCount( 3, $this->ask( 'skillet', 'not a list' )['ids'], 'a value of the wrong type is ignored' );
 	}
 
+	public function test_ids_given_as_strings_are_the_same_ids(): void {
+		// $wpdb->get_col() returns strings: a caller passing its ids straight on gets the answer integers get (D-164).
+		$ints    = array( $this->ids['Steel Skillet'], $this->ids['Skillet Lid'], $this->ids['Glass Teapot'] );
+		$strings = array_map( 'strval', $ints );
+		self::assertSame( $this->ask( 'skillet', $ints ), $this->ask( 'skillet', $strings ), 'numeric strings count as their ids' );
+		self::assertEqualsCanonicalizing( array( $this->ids['Steel Skillet'], $this->ids['Skillet Lid'] ), $this->ask( 'skillet', $strings )['ids'] );
+		self::assertSame( array( $this->ids['Loose Leaf Tea'] ), $this->ask( 'tea', array( (string) $this->variations[0] ) )['ids'], 'a variation’s id as a string counts as its parent' );
+	}
+
+	public function test_strings_that_are_not_positive_whole_numbers_are_ignored(): void {
+		$id   = $this->ids['Cast Iron Skillet'];
+		$junk = array( 'abc', '0', '-3', '1.5', '', ' ', '-' . $id, $id . '.0', '+' . $id, ' ' . $id, $id . ' ', $id . 'e0', '0x1A', array( $id ), array( (string) $id ), 1.0 * $id, true, null, 0, -3 );
+		self::assertSame( $this->ask( 'skillet', array() ), $this->ask( 'skillet', $junk ), 'no id in the list: the empty list’s answer, nothing searched' );
+		self::assertSame( '', $this->ask( 'skillet', array( '0', 0, '-3', -3 ) )['query'], 'zero and below are no ids, not ids that match nothing' );
+		self::assertSame( array( $this->ids['Steel Skillet'] ), $this->ask( 'skillet', array_merge( $junk, array( (string) $this->ids['Steel Skillet'] ) ) )['ids'], 'the one id among the junk' );
+	}
+
+	public function test_strings_and_integers_share_the_two_thousand_cap(): void {
+		// 1,998 ids no product has, then two real ones (one given twice, as a string and as an integer), then a third.
+		$filler = array_map( 'strval', range( 900001, 901998 ) );
+		$given  = array_merge(
+			$filler,
+			array( (string) $this->ids['Cast Iron Skillet'], $this->ids['Cast Iron Skillet'], (string) $this->ids['Steel Skillet'], (string) $this->ids['Skillet Lid'] )
+		);
+		self::assertEqualsCanonicalizing(
+			array( $this->ids['Cast Iron Skillet'], $this->ids['Steel Skillet'] ),
+			$this->ask( 'skillet', $given )['ids'],
+			'"5" and 5 are one id, and the 2,001st different id is left out'
+		);
+	}
+
 	public function test_the_cache_is_kept_apart_per_list(): void {
 		$first  = $this->ask( 'skillet', array( $this->ids['Cast Iron Skillet'] ) )['ids'];
 		$second = $this->ask( 'skillet', array( $this->ids['Steel Skillet'] ) )['ids'];

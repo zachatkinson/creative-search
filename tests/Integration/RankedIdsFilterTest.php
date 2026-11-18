@@ -107,6 +107,19 @@ final class RankedIdsFilterTest extends IndexTestCase {
 		self::assertNotSame( array(), apply_filters( 'csearch_ranked_ids', null, 'teapot kettle', array() )['ids'], 'not exact: the word nothing has is dropped' );
 	}
 
+	public function test_a_limit_given_as_a_string(): void {
+		$this->reindex();
+		$all = apply_filters( 'csearch_ranked_ids', null, 'teapot', array() )['ids'];
+		self::assertCount( 3, $all );
+		self::assertSame( array_slice( $all, 0, 2 ), apply_filters( 'csearch_ranked_ids', null, 'teapot', array( 'limit' => '2' ) )['ids'], 'a numeric string is the limit it spells (D-164)' );
+		self::assertCount( 1, apply_filters( 'csearch_ranked_ids', null, 'teapot', array( 'limit' => '1' ) )['ids'] );
+		self::assertCount( 1, apply_filters( 'csearch_ranked_ids', null, 'teapot', array( 'limit' => '0' ) )['ids'], '"0" is 0: at least 1' );
+		self::assertSame( $all, apply_filters( 'csearch_ranked_ids', null, 'teapot', array( 'limit' => '900' ) )['ids'], 'at most 500' );
+		foreach ( array( 'abc', '-3', '1.5', '2.0', ' 2', '2 ', '+2', '2e0', '', array( 2 ), array( '2' ), 2.0, true ) as $junk ) {
+			self::assertSame( $all, apply_filters( 'csearch_ranked_ids', null, 'teapot', array( 'limit' => $junk ) )['ids'], 'ignored: ' . wp_json_encode( $junk ) );
+		}
+	}
+
 	public function test_null_while_the_index_is_not_ready(): void {
 		// The products are saved but never indexed: the live generation holds nothing.
 		self::assertNull( apply_filters( 'csearch_ranked_ids', null, 'skillet', array() ) );
