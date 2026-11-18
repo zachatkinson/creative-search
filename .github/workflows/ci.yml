@@ -26,7 +26,7 @@ jobs:
       full: ${{ steps.scope.outputs.full }}
       legs: ${{ steps.scope.outputs.legs }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
       - id: scope
@@ -56,13 +56,13 @@ jobs:
       matrix:
         php: ['8.5']
     steps:
-      - uses: actions/checkout@v7
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           coverage: pcov
           tools: composer:v2
-      - uses: ramsey/composer-install@v4
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
       - run: composer lint
       - run: composer analyse
       - run: composer gates
@@ -74,8 +74,8 @@ jobs:
     name: JavaScript and CSS standards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -88,17 +88,17 @@ jobs:
     if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # A pull request mutates the lines it changes, against its base branch (D-148). Quoted: a bare 0 is falsy in
           # an expression, so `&& 0 || 1` was always 1 and the base branch never fetched.
           fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           coverage: pcov
           tools: composer:v2
-      - uses: ramsey/composer-install@v4
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
       # The same two configurations and floors either way (90 % outside the Domain, 100 % inside it); a pull request
       # applies them to its changed lines, and passes when it changed none they mutate. Main runs everything.
       - name: Infection (a pull request's changed lines; everything on main)
@@ -112,7 +112,7 @@ jobs:
           else
             composer infection
           fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: infection-logs
@@ -124,12 +124,12 @@ jobs:
     if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           tools: composer:v2
-      - uses: ramsey/composer-install@v4
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
       - run: composer test:benchmark
 
   integration:
@@ -144,13 +144,13 @@ jobs:
         # Newest alone for a pull request that touches only the browser tests or the workflows (D-152).
         leg: ${{ fromJSON(needs.scope.outputs.legs) }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           tools: composer:v2
-      - uses: ramsey/composer-install@v4
-      - uses: actions/setup-node@v7
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -195,7 +195,7 @@ jobs:
             echo "projects=--project=chromium-desktop --project=webkit-phone" >> "$GITHUB_OUTPUT"
           fi
           echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: playwright-cache
         if: matrix.leg == 'newest' || matrix.leg == 'oldest'
         with:
@@ -207,7 +207,7 @@ jobs:
         if: (matrix.leg == 'newest' || matrix.leg == 'oldest') && steps.playwright-cache.outputs.cache-hit == 'true'
       - run: npm run test:e2e -- ${{ steps.browsers.outputs.projects }}
         if: matrix.leg == 'newest' || matrix.leg == 'oldest'
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure()
         with:
           name: playwright-${{ matrix.leg }}
@@ -220,13 +220,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           tools: composer:v2
-      - uses: ramsey/composer-install@v4
-      - uses: actions/setup-node@v7
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -236,7 +236,7 @@ jobs:
       - run: composer install --working-dir=tools/integration --no-interaction
       # The catalogue as loaded, kept between runs while the catalogue, its loader, and the WordPress and WooCommerce
       # versions stay the same (D-148): a hit skips the load, never the reindex or the budgets.
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: tmp/catalogue-10000.json.gz
           key: catalogue-10000-${{ hashFiles('tests/Fixtures/Catalogue.php', 'tests/Support/WooCommerceCatalogue.php', 'tests/Support/CatalogueSnapshot.php', '.wp-env.json') }}

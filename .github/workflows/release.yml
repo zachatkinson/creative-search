@@ -89,7 +89,7 @@ jobs:
           test -n "$GH_TOKEN" || { echo "The RELEASES_TOKEN secret is missing."; exit 1; }
           push="$(gh api "repos/${RELEASES_REPO}" --jq .permissions.push)" || { echo "RELEASES_TOKEN can't read ${RELEASES_REPO} (expired, or not given that repo)."; exit 1; }
           test "$push" = "true" || { echo "RELEASES_TOKEN can't write to ${RELEASES_REPO}: give it Contents read and write."; exit 1; }
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.ci.outputs.sha }}
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
@@ -124,7 +124,7 @@ jobs:
         run: |
           mkdir -p tmp
           gh release download "creative-search-${VERSION}" --repo "$RELEASES_REPO" --pattern "creative-search-${VERSION}.zip" --dir tmp
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: env.PUBLISHED != 'yes'
         with:
           node-version-file: .nvmrc

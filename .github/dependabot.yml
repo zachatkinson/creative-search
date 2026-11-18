@@ -1,0 +1,15 @@
+# Dependabot keeps the pinned actions current (D-160). Each action is pinned to a commit SHA; Dependabot updates the
+# SHA and the version comment beside it. Monthly, one pull request, and nothing younger than a week, as Creative
+# Skateboard Builder does (its D-040). Security updates are a repository setting of their own and arrive as soon as
+# an advisory does.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']

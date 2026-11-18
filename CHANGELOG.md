@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 - CI's GitHub Actions run on Node 24: checkout v7, cache v6, setup-node v7, upload-artifact v7, composer-install v4 (D-159).
+- CI's actions are pinned to commit SHAs, which the repository now requires, and Dependabot keeps them current (D-160).
 
 ## [1.6.6] - 2026-11-06
 
