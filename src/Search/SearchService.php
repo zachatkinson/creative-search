@@ -362,6 +362,54 @@ final class SearchService {
 	}
 
 	/**
+	 * The ranked product ids another plugin asks for (`csearch_ranked_ids`, D-161): the results page's ranking (the
+	 * same parser, typo tolerance, synonyms, weights and cache) without the owner's pinned products, which are the
+	 * shop's own results. Null while the index holds no product in the language searched.
+	 *
+	 * @param string      $raw    Query as received.
+	 * @param string|null $lang   Language asked for; null for the site's.
+	 * @param int         $limit  Products at most, 1 to 500.
+	 * @param string      $source The log's source; empty logs nothing.
+	 * @param bool        $exact  The words as given: no word dropped when nothing matches them all.
+	 * @return array{ids: int[], corrected: string|null, query: string, lang: string}|null
+	 */
+	public function forCaller( string $raw, ?string $lang, int $limit = self::MAX_IDS, string $source = '', bool $exact = false ): ?array {
+		$lang = $this->language( $lang );
+		if ( 0 === $this->index->documentCount( $lang ) ) {
+			return null;
+		}
+		$query = self::clean( $raw );
+		if ( '' === $query ) {
+			return array(
+				'ids'       => array(),
+				'corrected' => null,
+				'query'     => '',
+				'lang'      => $lang,
+			);
+		}
+		$key    = Cache::key( $this->index->generation(), 'caller', array( $query, $lang, $exact, $this->settingsKey() ) );
+		$cached = $this->cache->get( $key );
+		if ( null === $cached ) {
+			$result = $this->searchWith( $query, $lang, $this->options( self::MAX_IDS, 0, ! $exact ), false );
+			$cached = array(
+				'ids'       => $result->productIds(),
+				'corrected' => $result->corrected,
+			);
+			$this->cache->set( $key, $cached );
+		}
+		$ids = Cast::ints( $cached['ids'] ?? array() );
+		if ( '' !== $source ) {
+			$this->log->record( $query, $lang, count( $ids ), $source );
+		}
+		return array(
+			'ids'       => array_slice( $ids, 0, max( 1, min( self::MAX_IDS, $limit ) ) ),
+			'corrected' => isset( $cached['corrected'] ) && is_string( $cached['corrected'] ) ? $cached['corrected'] : null,
+			'query'     => $query,
+			'lang'      => $lang,
+		);
+	}
+
+	/**
 	 * Product id to document id, from a cached answer (an answer cached before 1.3 has none).
 	 *
 	 * @param mixed $docs The cached map.

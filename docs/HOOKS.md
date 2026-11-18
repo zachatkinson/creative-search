@@ -561,3 +561,21 @@ Or in wp-config.php: `define( 'CSEARCH_DISABLE_UPDATES', true );`
 
 `update_plugins_raw.githubusercontent.com` (the `Update URI` header's host), `plugins_api`, `upgrader_pre_download` and `load-update-core.php`. The update error code is `csearch_package_mismatch`.
 
+## 1.7: a search other plugins can ask from PHP (1.7.0)
+
+### `csearch_ranked_ids` (filter)
+
+- **Since:** 1.7.0
+- **Signature:** `apply_filters( 'csearch_ranked_ids', null, string $query, array $args ): ?array`
+- **What it does:** the product ids Creative Search ranks for a query, best first, for another plugin to use on the server without a REST round trip (D-161). It ranks as the results page does: the same parser, typo tolerance, synonyms, field weights, boosts and cache, and hidden products stay out as they do there. The owner's pinned products don't apply, since pins are for the shop's own results.
+  - `$args` takes `lang` (a locale or language code; the site's by default), `limit` (1 to 500, 500 by default) and `exact` (true keeps every word: no word is dropped when nothing matches them all). Unknown keys are ignored, and so is a value of the wrong type.
+  - The answer is an array: `ids` (product ids, best first), `corrected` (the corrected query, or `null`), `query` (the query as cleaned) and `lang` (the language searched).
+  - Creative Search answers at priority 10. When the first argument is not `null`, another plugin has answered and the answer is passed on untouched. With Creative Search inactive, or while its index holds no product in the language searched (before the first build), the filter returns `null`, and the caller does its own search.
+  - It needs no capability, since it reads only what the results page shows any visitor. Call it after `plugins_loaded`. Nothing about it is on the REST routes.
+- **Where it runs:** `Search\CallerSearch::answer()`, which calls `Search\SearchService::forCaller()`, on whatever request the calling plugin asks from.
+- **Example:**
+
+```php
+$answer = apply_filters( 'csearch_ranked_ids', null, $words, array( 'limit' => 50 ) );
+$ids    = is_array( $answer ) ? $answer['ids'] : my_plugin_own_search( $words );
+```
