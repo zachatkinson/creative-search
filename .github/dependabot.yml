@@ -1,7 +1,11 @@
-# Dependabot keeps the pinned actions current (D-160). Each action is pinned to a commit SHA; Dependabot updates the
-# SHA and the version comment beside it. Monthly, one pull request, and nothing younger than a week, as Creative
-# Skateboard Builder does (its D-040). Security updates are a repository setting of their own and arrive as soon as
-# an advisory does.
+# Dependabot keeps the lock files and the pinned actions current (D-160, D-165). Each action is pinned to a commit
+# SHA; Dependabot updates the SHA and the version comment beside it.
+#
+# Monthly, one grouped pull request per ecosystem and directory, and nothing younger than a week, as Creative
+# Skateboard Builder does (its D-040): each pull request is a full CI run, and a release a few days old is the one
+# most likely to be withdrawn. Security updates are a repository setting of their own and arrive as soon as an
+# advisory does, whatever this schedule says. Composer reads the platform PHP pinned in each composer.json, so no
+# update needs more than the floor.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -12,4 +16,36 @@ updates:
       default-days: 7
     groups:
       actions:
+        patterns: ['*']
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      composer:
+        patterns: ['*']
+  - package-ecosystem: composer
+    directory: /tools/integration
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      integration:
+        patterns: ['*']
+    ignore:
+      # The integration suite stays on PHPUnit 9.6 on purpose (D-021): the WordPress core test suite still calls
+      # PHPUnit\Util\Test::parseTestMethodAnnotations(), which PHPUnit 10 removed. It moves when core's ceiling does.
+      - dependency-name: phpunit/phpunit
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
         patterns: ['*']
