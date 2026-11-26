@@ -23,7 +23,7 @@
 		"phpstan/extension-installer": "^1.4",
 		"phpstan/phpstan": "^2.3",
 		"phpunit/phpunit": "^13.4",
-		"symfony/yaml": "^7.3",
+		"symfony/yaml": "^8.1",
 		"szepeviktor/phpstan-wordpress": "^2.0",
 		"wp-coding-standards/wpcs": "^3.4",
 		"wp-phpunit/wp-phpunit": "^7.1"
